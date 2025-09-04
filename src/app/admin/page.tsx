@@ -5,15 +5,13 @@ import { supabase } from '@/lib/supabaseClient';
 import { PlateTemplate, Country } from '@/types';
 import { Plus, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
 import { checkAdminStatus } from '@/lib/adminUtils';
+import ProtectedRoute from '@/components/Auth/ProtectedRoute';
 
 export default function AdminPage() {
   const [templates, setTemplates] = useState<PlateTemplate[]>([]);
   const [countries, setCountries] = useState<Country[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
-  // TODO: Implement add/edit forms
-  // const [showAddForm, setShowAddForm] = useState(false);
-  // const [editingTemplate, setEditingTemplate] = useState<PlateTemplate | null>(null);
+  // const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     checkAdminAccess();
@@ -22,7 +20,7 @@ export default function AdminPage() {
 
   async function checkAdminAccess() {
     const adminStatus = await checkAdminStatus();
-    setIsAdmin(adminStatus);
+    // setIsAdmin(adminStatus);
     
     if (!adminStatus) {
       // Redirect non-admin users
@@ -131,138 +129,129 @@ export default function AdminPage() {
     );
   }
 
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-red-600 text-lg mb-2">Access Denied</div>
-          <div className="text-gray-600">You don&apos;t have permission to access this page.</div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Admin Dashboard
-          </h1>
-          <p className="text-gray-600">
-            Manage license plate templates and system settings
-          </p>
-        </div>
-
-        {/* Templates Section */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-gray-900">
-              License Plate Templates
-            </h2>
-            <button
-              onClick={() => alert('Add template form coming soon!')}
-              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Add Template
-            </button>
+    <ProtectedRoute>
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Admin Dashboard
+            </h1>
+            <p className="text-gray-600">
+              Manage license plate templates and system settings
+            </p>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-medium text-gray-700">Name</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-700">Country</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-700">Dimensions</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-700">Status</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-700">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {templates.map((template) => (
-                  <tr key={template.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-3 px-4">
-                      <div className="font-medium text-gray-900">{template.name}</div>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <span className="text-2xl">{template.country?.flag_emoji}</span>
-                        <span>{template.country?.name}</span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-gray-600">
-                      {template.width_px} × {template.height_px} px
-                    </td>
-                    <td className="py-3 px-4">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          template.is_active
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}
-                      >
-                        {template.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => toggleTemplateStatus(template.id, template.is_active)}
-                          className="p-1 hover:bg-gray-200 rounded"
-                          title={template.is_active ? 'Deactivate' : 'Activate'}
-                        >
-                          {template.is_active ? (
-                            <EyeOff className="w-4 h-4 text-gray-600" />
-                          ) : (
-                            <Eye className="w-4 h-4 text-gray-600" />
-                          )}
-                        </button>
-                        <button
-                          onClick={() => alert('Edit template form coming soon!')}
-                          className="p-1 hover:bg-gray-200 rounded"
-                          title="Edit"
-                        >
-                          <Edit className="w-4 h-4 text-gray-600" />
-                        </button>
-                        <button
-                          onClick={() => deleteTemplate(template.id)}
-                          className="p-1 hover:bg-red-100 rounded"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4 text-red-600" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Countries Section */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">
-            Countries ({countries.length})
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {countries.map((country) => (
-              <div
-                key={country.id}
-                className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg"
+          {/* Templates Section */}
+          <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-gray-900">
+                License Plate Templates
+              </h2>
+              <button
+                onClick={() => alert('Add template form coming soon!')}
+                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
               >
-                <span className="text-2xl">{country.flag_emoji}</span>
-                <div>
-                  <div className="font-medium text-gray-900">{country.name}</div>
-                  <div className="text-sm text-gray-500">{country.code}</div>
+                <Plus className="w-4 h-4" />
+                Add Template
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-3 px-4 font-medium text-gray-700">Name</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-700">Country</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-700">Dimensions</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-700">Status</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-700">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {templates.map((template) => (
+                    <tr key={template.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-3 px-4">
+                        <div className="font-medium text-gray-900">{template.name}</div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-2xl">{template.country?.flag_emoji}</span>
+                          <span>{template.country?.name}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-gray-600">
+                        {template.width_px} × {template.height_px} px
+                      </td>
+                      <td className="py-3 px-4">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            template.is_active
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}
+                        >
+                          {template.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => toggleTemplateStatus(template.id, template.is_active)}
+                            className="p-1 hover:bg-gray-200 rounded"
+                            title={template.is_active ? 'Deactivate' : 'Activate'}
+                          >
+                            {template.is_active ? (
+                              <EyeOff className="w-4 h-4 text-gray-600" />
+                            ) : (
+                              <Eye className="w-4 h-4 text-gray-600" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => alert('Edit template form coming soon!')}
+                            className="p-1 hover:bg-gray-200 rounded"
+                            title="Edit"
+                          >
+                            <Edit className="w-4 h-4 text-gray-600" />
+                          </button>
+                          <button
+                            onClick={() => deleteTemplate(template.id)}
+                            className="p-1 hover:bg-red-100 rounded"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4 text-red-600" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Countries Section */}
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-6">
+              Countries ({countries.length})
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {countries.map((country) => (
+                <div
+                  key={country.id}
+                  className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg"
+                >
+                  <span className="text-2xl">{country.flag_emoji}</span>
+                  <div>
+                    <div className="font-medium text-gray-900">{country.name}</div>
+                    <div className="text-sm text-gray-500">{country.code}</div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </ProtectedRoute>
   );
 }
