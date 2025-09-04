@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { PlateTemplate } from '@/types';
-import Editor from '@/components/Editor/Editor';
+import ClientOnlyEditor from '@/components/Editor/ClientOnlyEditor';
 
 export default function EditorPage() {
   const params = useParams();
@@ -12,10 +12,6 @@ export default function EditorPage() {
   const [template, setTemplate] = useState<PlateTemplate | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetchTemplate();
-  }, [templateId]);
 
   const fetchTemplate = useCallback(async () => {
     try {
@@ -74,5 +70,5 @@ export default function EditorPage() {
     );
   }
 
-  return <Editor template={template} onSave={handleSave} />;
+  return <ClientOnlyEditor template={template} onSave={handleSave} />;
 }

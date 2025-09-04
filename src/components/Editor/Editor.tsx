@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Stage, Layer, Text, Image, Group } from 'react-konva';
 import type Konva from 'konva';
 import { EditorState, DesignElement, TextElement, ImageElement, PlateTemplate } from '@/types';
@@ -15,6 +15,12 @@ interface EditorProps {
 }
 
 export default function Editor({ template, initialDesign, onSave }: EditorProps) {
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   const [editorState, setEditorState] = useState<EditorState>({
     selectedElement: null,
     elements: initialDesign?.elements || [],
@@ -155,6 +161,14 @@ export default function Editor({ template, initialDesign, onSave }: EditorProps)
       onSave(editorState);
     }
   }, [editorState, onSave]);
+
+  if (!isClient) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-lg">Loading editor...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-gray-100">
