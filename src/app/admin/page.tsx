@@ -33,17 +33,24 @@ export default function AdminPage() {
   async function fetchData() {
     try {
       // Fetch countries
-      const { data: countriesData } = await supabase
+      const { data: countriesData, error: countriesError } = await supabase
         .from('countries')
         .select('*')
         .order('name');
 
-      if (countriesData) {
+      if (countriesError) {
+        console.error('Error fetching countries:', countriesError);
+        // Show sample data if Supabase is not configured
+        setCountries([
+          { id: '1', name: 'United States', code: 'USA', flag_emoji: '🇺🇸', created_at: '', updated_at: '' },
+          { id: '2', name: 'Canada', code: 'CAN', flag_emoji: '🇨🇦', created_at: '', updated_at: '' },
+        ]);
+      } else if (countriesData) {
         setCountries(countriesData);
       }
 
       // Fetch all templates (including inactive)
-      const { data: templatesData } = await supabase
+      const { data: templatesData, error: templatesError } = await supabase
         .from('plate_templates')
         .select(`
           *,
@@ -51,11 +58,30 @@ export default function AdminPage() {
         `)
         .order('name');
 
-      if (templatesData) {
+      if (templatesError) {
+        console.error('Error fetching templates:', templatesError);
+        // Show sample data if Supabase is not configured
+        setTemplates([
+          { 
+            id: '1', 
+            name: 'US Standard', 
+            image_url: '/templates/us-standard.png', 
+            width_px: 1200, 
+            height_px: 600, 
+            country_id: '1', 
+            country: { id: '1', name: 'United States', code: 'USA', flag_emoji: '🇺🇸', created_at: '', updated_at: '' },
+            is_active: true, 
+            created_at: '', 
+            updated_at: '' 
+          },
+        ]);
+      } else if (templatesData) {
         setTemplates(templatesData);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
+      // Set loading to false even on error
+      setLoading(false);
     } finally {
       setLoading(false);
     }

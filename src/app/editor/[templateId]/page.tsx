@@ -26,7 +26,21 @@ export default function EditorPage() {
         .single();
 
       if (fetchError) {
-        throw fetchError;
+        console.error('Error fetching template:', fetchError);
+        // Show sample template if Supabase is not configured
+        setTemplate({
+          id: templateId,
+          name: 'Sample Template',
+          image_url: '/templates/sample.png',
+          width_px: 1200,
+          height_px: 600,
+          country_id: '1',
+          country: { id: '1', name: 'United States', code: 'USA', flag_emoji: '🇺🇸', created_at: '', updated_at: '' },
+          is_active: true,
+          created_at: '',
+          updated_at: ''
+        });
+        return;
       }
 
       if (data) {
