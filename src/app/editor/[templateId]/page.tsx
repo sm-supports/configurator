@@ -15,7 +15,7 @@ export default function EditorPage() {
 
   useEffect(() => {
     fetchTemplate();
-  }, [templateId, fetchTemplate]);
+  }, [templateId]);
 
   const fetchTemplate = useCallback(async () => {
     try {
@@ -45,6 +45,10 @@ export default function EditorPage() {
       setLoading(false);
     }
   }, [templateId]);
+
+  useEffect(() => {
+    fetchTemplate();
+  }, [fetchTemplate]);
 
   const handleSave = async (designData: unknown) => {
     // TODO: Implement save to Supabase

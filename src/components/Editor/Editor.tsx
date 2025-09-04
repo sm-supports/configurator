@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react';
 import { Stage, Layer, Text, Image, Group } from 'react-konva';
+import type Konva from 'konva';
 import { EditorState, DesignElement, TextElement, ImageElement, PlateTemplate } from '@/types';
 import EditorToolbar from './EditorToolbar';
 import LayerPanel from './LayerPanel';
@@ -22,7 +23,7 @@ export default function Editor({ template, initialDesign, onSave }: EditorProps)
     pan: { x: 0, y: 0 }
   });
 
-  const stageRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<Konva.Stage>(null);
 
   const addTextElement = useCallback(() => {
     const newText: TextElement = {

@@ -4,18 +4,31 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { PlateTemplate, Country } from '@/types';
 import { Plus, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
+import { checkAdminStatus } from '@/lib/adminUtils';
 
 export default function AdminPage() {
   const [templates, setTemplates] = useState<PlateTemplate[]>([]);
   const [countries, setCountries] = useState<Country[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   // TODO: Implement add/edit forms
   // const [showAddForm, setShowAddForm] = useState(false);
   // const [editingTemplate, setEditingTemplate] = useState<PlateTemplate | null>(null);
 
   useEffect(() => {
+    checkAdminAccess();
     fetchData();
   }, []);
+
+  async function checkAdminAccess() {
+    const adminStatus = await checkAdminStatus();
+    setIsAdmin(adminStatus);
+    
+    if (!adminStatus) {
+      // Redirect non-admin users
+      window.location.href = '/';
+    }
+  }
 
   async function fetchData() {
     try {
@@ -88,6 +101,17 @@ export default function AdminPage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-lg">Loading admin dashboard...</div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-600 text-lg mb-2">Access Denied</div>
+          <div className="text-gray-600">You don&apos;t have permission to access this page.</div>
+        </div>
       </div>
     );
   }

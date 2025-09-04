@@ -32,11 +32,11 @@ export default function LayerPanel({
   // };
 
   const handleFontSizeChange = (id: string, fontSize: number) => {
-    onUpdateElement(id, { fontSize });
+    onUpdateElement(id, { fontSize } as Partial<TextElement>);
   };
 
   const handleColorChange = (id: string, color: string) => {
-    onUpdateElement(id, { color });
+    onUpdateElement(id, { color } as Partial<TextElement>);
   };
 
   const toggleVisibility = (id: string) => {
@@ -151,7 +151,7 @@ export default function LayerPanel({
                       <input
                         type="text"
                         value={(element as TextElement).text}
-                        onChange={(e) => onUpdateElement(element.id, { text: e.target.value })}
+                        onChange={(e) => onUpdateElement(element.id, { text: e.target.value } as Partial<TextElement>)}
                         onBlur={() => setEditingText(null)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
