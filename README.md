@@ -1,6 +1,12 @@
-# License Plate Designer
+# Configurator - License Plate Designer
 
-A web application that enables users to customize, save, and export high-resolution license plate designs. Built with Next.js, TypeScript, TailwindCSS, and Supabase.
+A modern web application for designing custom license plates with an intuitive drag-and-drop editor. Built with Next.js 15, TypeScript, Tailwind CSS, and Supabase.
+
+## 🚀 Deployment Ready
+
+This project is optimized for **Vercel deployment** with all production configurations in place. See [DEPLOYMENT.md](./DEPLOYMENT.md) for step-by-step deployment instructions.
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/sm-supports/configurator)
 
 ## Features
 
@@ -18,13 +24,15 @@ A web application that enables users to customize, save, and export high-resolut
 
 ### 👤 User Management
 - **Authentication** via Supabase Auth (email/password)
-- **User profiles** with saved design history
+- **User Dashboard** with saved design management
 - **Design persistence** with automatic saving
+- **Public/Private design sharing**
 
 ### 🔧 Admin Features
 - **Template CRUD operations** for administrators
 - **Country management** for expanding to new regions
 - **User design monitoring** and analytics
+- **Complete admin panel** with create/edit/delete functionality
 
 ## Tech Stack
 
@@ -95,14 +103,20 @@ The application uses the following main tables:
 src/
 ├── app/                    # Next.js App Router pages
 │   ├── (auth)/            # Authentication pages
-│   ├── admin/             # Admin dashboard
+│   ├── admin/             # Admin dashboard and CRUD operations
+│   │   ├── templates/     # Template management (new/edit)
+│   │   │   ├── new/       # Create new template
+│   │   │   └── [id]/      # Edit existing template
+│   ├── dashboard/         # User dashboard for saved designs
 │   ├── editor/            # Design editor
 │   ├── templates/         # Template browsing
-│   └── dashboard/         # User dashboard (TODO)
+│   └── page.tsx           # Home page
 ├── components/             # Reusable React components
-│   └── Editor/            # Editor-related components
-├── lib/                   # Utility libraries
-│   └── supabaseClient.ts  # Supabase client configuration
+│   ├── Auth/              # Authentication components
+│   ├── Editor/            # Editor-related components
+│   └── Navigation/        # Navigation components
+├── contexts/              # React contexts
+├── lib/                   # Utility functions and configurations
 ├── types/                 # TypeScript type definitions
 └── styles/                # Global styles
 ```
@@ -114,8 +128,10 @@ src/
 - `/register` - User registration
 - `/templates` - Browse license plate templates
 - `/editor/[templateId]` - Design editor for specific template
+- `/dashboard` - User dashboard with saved designs
 - `/admin` - Admin dashboard (admin access required)
-- `/dashboard` - User dashboard (TODO)
+- `/admin/templates/new` - Create new template (admin only)
+- `/admin/templates/[id]` - Edit existing template (admin only)
 
 ## Development
 
@@ -155,23 +171,26 @@ npm run lint         # Run ESLint
 
 ## Roadmap
 
-### Phase 1 (Current)
+### Phase 1 (Completed ✅)
 - ✅ Basic editor with text and images
 - ✅ Template management
 - ✅ User authentication
-- ✅ Admin dashboard
+- ✅ Admin dashboard with full CRUD
+- ✅ User dashboard with saved designs
+- ✅ Supabase storage integration
+- ✅ Responsive design improvements
 
-### Phase 2
-- [ ] User dashboard with saved designs
+### Phase 2 (In Progress)
 - [ ] Advanced text formatting options
 - [ ] Image filters and effects
 - [ ] Design templates and presets
+- [ ] Social sharing features
 
-### Phase 3
+### Phase 3 (Planned)
 - [ ] Payment integration
 - [ ] Order management
-- [ ] Social sharing
 - [ ] Mobile app
+- [ ] Template marketplace
 
 ## License
 

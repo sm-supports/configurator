@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { PlateTemplate, Country } from '@/types';
 import { Plus, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
@@ -8,6 +9,7 @@ import { checkAdminStatus } from '@/lib/adminUtils';
 import ProtectedRoute from '@/components/Auth/ProtectedRoute';
 
 export default function AdminPage() {
+  const router = useRouter();
   const [templates, setTemplates] = useState<PlateTemplate[]>([]);
   const [countries, setCountries] = useState<Country[]>([]);
   const [loading, setLoading] = useState(true);
@@ -149,7 +151,7 @@ export default function AdminPage() {
                 License Plate Templates
               </h2>
               <button
-                onClick={() => alert('Add template form coming soon!')}
+                onClick={() => router.push('/admin/templates/new')}
                 className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
               >
                 <Plus className="w-4 h-4" />
@@ -208,7 +210,7 @@ export default function AdminPage() {
                             )}
                           </button>
                           <button
-                            onClick={() => alert('Edit template form coming soon!')}
+                            onClick={() => router.push(`/admin/templates/${template.id}`)}
                             className="p-1 hover:bg-gray-200 rounded"
                             title="Edit"
                           >

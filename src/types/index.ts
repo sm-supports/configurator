@@ -26,6 +26,7 @@ export interface UserDesign {
   template_id: string;
   design_json: DesignData;
   name?: string;
+  is_public?: boolean;
   created_at: string;
   updated_at: string;
   template?: PlateTemplate;
@@ -49,6 +50,8 @@ export interface DesignElement {
   zIndex: number;
   locked?: boolean;
   visible?: boolean;
+  flippedH?: boolean;
+  flippedV?: boolean;
 }
 
 export interface TextElement extends DesignElement {
