@@ -7,6 +7,7 @@ import type Konva from 'konva';
 import { EditorState, DesignElement, TextElement, ImageElement, PlateTemplate } from '@/types';
 import EditorToolbar from './EditorToolbar';
 import LayerPanel from './LayerPanel';
+import { Undo, Redo } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
 interface EditorProps {
@@ -334,10 +335,10 @@ export default function Editor({ template, initialDesign, onSave }: EditorProps)
   }
 
   return (
-    <div className="h-screen flex bg-gray-50">
+    <div className="h-screen flex bg-gray-50 overflow-hidden">
       {/* Left Sidebar - Tools */}
-      <div className="w-80 bg-white border-r border-gray-200 flex-shrink-0">
-        <div className="p-6 h-full overflow-y-auto">
+      <div className="w-80 bg-white border-r border-gray-200 flex-shrink-0 overflow-y-auto hidden lg:block">
+        <div className="p-6">
           <EditorToolbar
             onAddText={addTextElement}
             onAddImage={addImageElement}
@@ -352,7 +353,7 @@ export default function Editor({ template, initialDesign, onSave }: EditorProps)
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden lg:ml-0">
         {/* Header */}
         <div className="bg-white border-b border-gray-200 px-6 py-4 flex-shrink-0">
           <div className="flex items-center justify-between">
@@ -360,20 +361,49 @@ export default function Editor({ template, initialDesign, onSave }: EditorProps)
               <h2 className="text-xl font-bold text-gray-900">{template.name}</h2>
               <p className="text-sm text-gray-600">License Plate Designer</p>
             </div>
-            <div className="text-right">
-              <div className="text-lg font-semibold text-gray-900">
-                {template.width_px} × {template.height_px} px
+            <div className="flex items-center gap-4">
+              {/* Mobile Toolbar */}
+              <div className="lg:hidden flex gap-2">
+                <button
+                  onClick={undo}
+                  disabled={!canUndo}
+                  className={`p-2 rounded-md ${canUndo ? 'text-gray-700 hover:bg-gray-100' : 'text-gray-400 cursor-not-allowed'}`}
+                  title="Undo"
+                >
+                  <Undo className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={redo}
+                  disabled={!canRedo}
+                  className={`p-2 rounded-md ${canRedo ? 'text-gray-700 hover:bg-gray-100' : 'text-gray-400 cursor-not-allowed'}`}
+                  title="Redo"
+                >
+                  <Redo className="w-5 h-5" />
+                </button>
               </div>
-              <p className="text-sm text-gray-600">Canvas Size (Zoom: {Math.round(editorState.zoom * 100)}%)</p>
+              <div className="text-right">
+                <div className="text-lg font-semibold text-gray-900">
+                  {template.width_px} × {template.height_px} px
+                </div>
+                <p className="text-sm text-gray-600">Canvas Size (Zoom: {Math.round(editorState.zoom * 100)}%)</p>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Canvas Area */}
-        <div className="flex-1 flex min-h-0">
+        <div className="flex-1 flex overflow-hidden">
           {/* Canvas Container */}
-          <div className="flex-1 flex items-center justify-center p-8 bg-gray-100 overflow-auto">
-            <div className="bg-white rounded-lg shadow-lg border border-gray-300">
+          <div className="flex-1 flex items-start justify-center p-8 bg-gray-100 overflow-auto min-h-0">
+            <div 
+              className="bg-white rounded-lg shadow-lg border border-gray-300 flex-shrink-0 relative"
+              style={{ 
+                minWidth: Math.max(template.width_px * editorState.zoom + 40, 400),
+                minHeight: Math.max(template.height_px * editorState.zoom + 40, 300),
+                maxWidth: '90vw',
+                maxHeight: '80vh'
+              }}
+            >
               <Stage
                 ref={stageRef}
                 width={template.width_px}
@@ -390,7 +420,10 @@ export default function Editor({ template, initialDesign, onSave }: EditorProps)
                   }
                 }}
                 onWheel={handleWheel}
-                style={{ display: 'block' }}
+                style={{ 
+                  display: 'block',
+                  cursor: 'default'
+                }}
               >
                 {/* Background Template */}
                 <Layer>
@@ -502,8 +535,8 @@ export default function Editor({ template, initialDesign, onSave }: EditorProps)
           </div>
 
           {/* Right Sidebar - Layers */}
-          <div className="w-80 bg-white border-l border-gray-200 flex-shrink-0">
-            <div className="p-6 h-full overflow-y-auto">
+          <div className="w-80 bg-white border-l border-gray-200 flex-shrink-0 overflow-y-auto hidden xl:block">
+            <div className="p-6">
               <LayerPanel
                 elements={editorState.elements}
                 selectedElement={editorState.selectedElement}
