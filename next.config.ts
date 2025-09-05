@@ -1,9 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Enable static exports for better Vercel deployment
-  output: 'standalone',
-  
   // Configure images for Vercel
   images: {
     remotePatterns: [
