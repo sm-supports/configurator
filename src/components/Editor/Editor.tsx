@@ -5,7 +5,7 @@ import { Stage, Layer, Text, Image as KonvaImage, Transformer, Rect } from 'reac
 import type Konva from 'konva';
 import { PlateTemplate, TextElement, ImageElement } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
-import { Undo2, Redo2, ZoomIn, ZoomOut, RotateCcw, Bold, Italic, Underline, Palette, Type, ImagePlus, Trash2 } from 'lucide-react';
+import { Undo2, Redo2, ZoomIn, ZoomOut, RotateCcw, Bold, Italic, Underline, Type, ImagePlus, Trash2 } from 'lucide-react';
 
 interface EditorProps {
   template: PlateTemplate;
@@ -20,7 +20,7 @@ interface EditorState {
   editingTextId: string | null;
 }
 
-export default function Editor({ template, onSave }: EditorProps) {
+export default function Editor({ template }: EditorProps) {
   // Canvas ref used to measure text dimensions for auto-fit sizing
   const measureCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const editorContainerRef = useRef<HTMLDivElement | null>(null);
@@ -61,8 +61,6 @@ export default function Editor({ template, onSave }: EditorProps) {
   const stageRef = useRef<Konva.Stage>(null);
   const transformerRef = useRef<Konva.Transformer>(null);
   const editInputRef = useRef<HTMLTextAreaElement>(null);
-  // Force rerender ticks for overlay updates during interactive transforms
-  const [overlayTick, setOverlayTick] = useState(0);
   // History stacks for undo/redo
   const undoStackRef = useRef<EditorState[]>([]);
   const redoStackRef = useRef<EditorState[]>([]);
@@ -406,24 +404,6 @@ export default function Editor({ template, onSave }: EditorProps) {
       transformer.getLayer()?.batchDraw();
     }
   }, [state.selectedId, state.editingTextId]);
-
-  // While dragging or transforming an image, force overlay to update live
-  useEffect(() => {
-    const stage = stageRef.current;
-    if (!stage || !state.selectedId) return;
-    const selected = state.elements.find((el) => el.id === state.selectedId);
-    if (!selected || selected.type !== 'image') return;
-    const node = stage.findOne(`#${state.selectedId}`) as Konva.Node | null;
-    if (!node) return;
-    const handler = () => setOverlayTick((v) => v + 1);
-    node.on('dragmove.overlay transform.overlay dragend.overlay transformend.overlay', handler);
-    return () => {
-      node.off('dragmove.overlay');
-      node.off('transform.overlay');
-      node.off('dragend.overlay');
-      node.off('transformend.overlay');
-    };
-  }, [state.selectedId, state.elements]);
 
   // Handle clicks on stage background
   const handleStageClick = useCallback((e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
@@ -1124,8 +1104,8 @@ export default function Editor({ template, onSave }: EditorProps) {
                   wCand = vx;
                   hCand = -vy;
                 }
-                let newW = Math.max(drag.minW, Math.abs(wCand));
-                let newH = Math.max(drag.minH, Math.abs(hCand));
+                const newW = Math.max(drag.minW, Math.abs(wCand));
+                const newH = Math.max(drag.minH, Math.abs(hCand));
                 // Compute new x,y to keep anchor fixed
                 let axp = 0, ayp = 0; // anchor local point after resize
                 if (drag.anchor === 'tl') {
