@@ -15,8 +15,8 @@ export async function checkAdminStatus(): Promise<boolean> {
       .single();
 
     return !!adminUser;
-  } catch (error) {
-    console.error('Error checking admin status:', error);
+  } catch {
+    // Error checking admin status
     return false;
   }
 }
@@ -28,8 +28,8 @@ export async function makeUserAdmin(userId: string): Promise<boolean> {
       .insert({ user_id: userId });
 
     return !error;
-  } catch (error) {
-    console.error('Error making user admin:', error);
+  } catch {
+    // Error making user admin
     return false;
   }
 }
@@ -42,8 +42,8 @@ export async function removeAdminStatus(userId: string): Promise<boolean> {
       .eq('user_id', userId);
 
     return !error;
-  } catch (error) {
-    console.error('Error removing admin status:', error);
+  } catch {
+    // Error removing admin status
     return false;
   }
 }

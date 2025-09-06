@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import { PlateTemplate, Country } from '@/types';
 import { Filter, Globe } from 'lucide-react';
@@ -24,7 +25,7 @@ export default function TemplatesPage() {
         .order('name');
 
       if (countriesError) {
-        console.error('Error fetching countries:', countriesError);
+        // Error fetching countries - show sample data if Supabase is not configured
         // Show sample data if Supabase is not configured
         setCountries([
           { id: '1', name: 'United States', code: 'USA', flag_emoji: '🇺🇸', created_at: '', updated_at: '' },
@@ -45,7 +46,7 @@ export default function TemplatesPage() {
         .order('name');
 
       if (templatesError) {
-        console.error('Error fetching templates:', templatesError);
+        // Error fetching templates - show sample data if Supabase is not configured
         // Show sample data if Supabase is not configured
         setTemplates([
           { 
@@ -88,6 +89,26 @@ export default function TemplatesPage() {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
+        {/* Quick Navigation */}
+        <div className="mb-6">
+          <div className="flex flex-wrap gap-4">
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <Filter className="w-4 h-4" />
+              <span>My Designs</span>
+            </Link>
+            <Link
+              href="/admin"
+              className="inline-flex items-center space-x-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+            >
+              <Globe className="w-4 h-4" />
+              <span>Admin Panel</span>
+            </Link>
+          </div>
+        </div>
+
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             License Plate Templates

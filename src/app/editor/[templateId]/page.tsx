@@ -1,15 +1,21 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
-import { PlateTemplate } from '@/types';
+import { PlateTemplate, UserDesign } from '@/types';
+import { getDesign } from '@/lib/designUtils';
 import ClientOnlyEditor from '@/components/Editor/ClientOnlyEditor';
+import EditorNavigation from '@/components/Navigation/EditorNavigation';
 
 export default function EditorPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const templateId = params.templateId as string;
+  const designId = searchParams.get('design');
+  
   const [template, setTemplate] = useState<PlateTemplate | null>(null);
+  const [existingDesign, setExistingDesign] = useState<UserDesign | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,7 +32,7 @@ export default function EditorPage() {
         .single();
 
       if (fetchError) {
-        console.error('Error fetching template:', fetchError);
+        // Error fetching template - show sample template if Supabase is not configured
         // Show sample template if Supabase is not configured
         setTemplate({
           id: templateId,
@@ -48,26 +54,65 @@ export default function EditorPage() {
       } else {
         setError('Template not found');
       }
-    } catch (err) {
-      console.error('Error fetching template:', err);
+    } catch {
+      // Error fetching template
       setError('Failed to load template');
-    } finally {
-      setLoading(false);
     }
   }, [templateId]);
 
-  useEffect(() => {
-    fetchTemplate();
-  }, [fetchTemplate]);
+  const fetchExistingDesign = useCallback(async () => {
+    if (!designId) return;
+    
+    try {
+      const result = await getDesign(designId);
+      if (result.error) {
+        setError(`Failed to load design: ${result.error}`);
+      } else if (result.design) {
+        setExistingDesign(result.design);
+        // Verify the design matches the template
+        if (result.design.template_id !== templateId) {
+          setError('Design does not match the selected template');
+        }
+      }
+    } catch {
+      setError('Failed to load existing design');
+    }
+  }, [designId, templateId]);
 
-  const handleSave = async (designData: unknown) => {
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    
+    await fetchTemplate();
+    if (designId) {
+      await fetchExistingDesign();
+    }
+    
+    setLoading(false);
+  }, [fetchTemplate, fetchExistingDesign, designId]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleSave = async () => {
     // TODO: Implement save to Supabase
-    console.log('Saving design:', designData);
+    // Design data would be saved here
+  };
+
+  const handleDownload = () => {
+    // TODO: Implement download functionality
+    console.log('Download triggered');
+  };
+
+  const handleShare = () => {
+    // TODO: Implement share functionality
+    console.log('Share triggered');
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="h-screen flex items-center justify-center">
         <div className="text-lg">Loading editor...</div>
       </div>
     );
@@ -75,7 +120,7 @@ export default function EditorPage() {
 
   if (error || !template) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="text-red-600 text-lg mb-2">Error</div>
           <div className="text-gray-600">{error || 'Template not found'}</div>
@@ -84,5 +129,17 @@ export default function EditorPage() {
     );
   }
 
-  return <ClientOnlyEditor template={template} onSave={handleSave} />;
+  return (
+    <div className="h-screen w-screen overflow-hidden bg-gray-50">
+      <EditorNavigation 
+        templateName={template.name}
+        onSave={handleSave}
+        onDownload={handleDownload}
+        onShare={handleShare}
+      />
+      <div className="h-[calc(100vh-64px)]">
+        <ClientOnlyEditor template={template} existingDesign={existingDesign} onSave={handleSave} />
+      </div>
+    </div>
+  );
 }

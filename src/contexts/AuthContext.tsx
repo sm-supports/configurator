@@ -26,8 +26,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { data: { session } } = await supabase.auth.getSession();
         setSession(session);
         setUser(session?.user ?? null);
-      } catch (error) {
-        console.error('Error getting initial session:', error);
+      } catch {
+        // Error getting initial session
       } finally {
         setLoading(false);
       }
@@ -52,8 +52,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await supabase.auth.signOut();
       setUser(null);
       setSession(null);
-    } catch (error) {
-      console.error('Error signing out:', error);
+    } catch {
+      // Error signing out
     }
   };
 
@@ -61,8 +61,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
-    } catch (error) {
-      console.error('Error refreshing user:', error);
+    } catch {
+      // Error refreshing user
     }
   };
 

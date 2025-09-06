@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
-import { Eye, EyeOff, Loader2, Mail, Lock, CheckCircle } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Mail, Lock, CheckCircle, ArrowLeft } from 'lucide-react';
+
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -67,6 +68,17 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-6">
       <div className="w-full max-w-md">
+        {/* Back to Home */}
+        <div className="mb-6">
+          <Link
+            href="/"
+            className="inline-flex items-center text-blue-600 hover:text-blue-800"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Home
+          </Link>
+        </div>
+
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
@@ -77,6 +89,7 @@ export default function RegisterPage() {
           </p>
         </div>
 
+        
         {/* Register Form */}
         <div className="bg-white rounded-lg shadow-lg p-8">
           <form onSubmit={onSubmit} className="space-y-6">

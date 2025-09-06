@@ -66,27 +66,67 @@ This project is optimized for **Vercel deployment** with all production configur
 
 3. **Set up environment variables**
    ```bash
-   cp env.example .env.local
+   cp .env.example .env.local
    ```
    
    Edit `.env.local` with your Supabase credentials:
    ```env
    NEXT_PUBLIC_SUPABASE_URL="https://your-project-id.supabase.co"
    NEXT_PUBLIC_SUPABASE_ANON_KEY="your-anon-key"
-   SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
    ```
 
-4. **Set up Supabase database**
-   - Run the SQL commands from `supabase-schema.sql` in your Supabase SQL editor
-   - This creates the necessary tables, policies, and sample data
+4. **Set up Supabase Authentication**
+   
+   **Step 1: Create a Supabase Project**
+   - Go to [https://supabase.com](https://supabase.com)
+   - Click "Start your project" and create a new project
+   - Wait for the project to be fully set up
+   
+   **Step 2: Get your credentials**
+   - Go to Project Settings → API
+   - Copy the "Project URL" (starts with `https://`)
+   - Copy the "anon public" key
+   - Add these to your `.env.local` file
+   
+   **Step 3: Configure Authentication**
+   - Go to Authentication → Settings in your Supabase dashboard
+   - Under "Site URL", add your local development URL: `http://localhost:3000`
+   - For production, add your deployed URL
+   - Enable email confirmation if desired (recommended for production)
 
-5. **Start the development server**
+5. **Set up Supabase database** (optional for basic auth)
+   - If you want to use the full template/design features, run the SQL commands from `supabase-schema.sql` in your Supabase SQL editor
+   - For basic authentication testing, this step can be skipped initially
+
+6. **Start the development server**
+6. **Start the development server**
    ```bash
    npm run dev
    ```
 
-6. **Open your browser**
+7. **Open your browser**
    Navigate to [http://localhost:3000](http://localhost:3000)
+
+## 🔐 Authentication Setup
+
+### Quick Start (Development)
+1. Create a free Supabase account at [supabase.com](https://supabase.com)
+2. Create a new project
+3. Get your Project URL and anon key from Settings → API
+4. Add them to `.env.local`
+5. That's it! Sign up/sign in will now work
+
+### Common Issues
+- **"Authentication is not configured"**: Make sure your `.env.local` file has the correct Supabase URL and anon key
+- **Login redirects fail**: Check that your Site URL in Supabase matches your development URL
+- **Email verification**: For production, configure email templates in Supabase Auth settings
+
+### Testing Authentication
+1. Start the dev server: `npm run dev`
+2. Click "Sign Up" on the homepage
+3. Create an account with any email/password
+4. You should be redirected to the templates page
+5. Access the dashboard and admin areas (protected routes)
 
 ## Database Schema
 

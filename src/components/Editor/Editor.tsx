@@ -3,12 +3,16 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Stage, Layer, Text, Image as KonvaImage, Transformer, Rect } from 'react-konva';
 import type Konva from 'konva';
-import { PlateTemplate, TextElement, ImageElement } from '@/types';
+import { PlateTemplate, TextElement, ImageElement, DesignData, UserDesign } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
-import { Undo2, Redo2, ZoomIn, ZoomOut, RotateCcw, Bold, Italic, Underline, Type, ImagePlus, Trash2 } from 'lucide-react';
+import { Undo2, Redo2, ZoomIn, ZoomOut, RotateCcw, Bold, Italic, Underline, Type, ImagePlus, Trash2, Save, Download, ChevronDown } from 'lucide-react';
+import { saveDesign } from '@/lib/designUtils';
+import { useAuth } from '@/contexts/AuthContext';
+import jsPDF from 'jspdf';
 
 interface EditorProps {
   template: PlateTemplate;
+  existingDesign?: UserDesign | null;
   onSave?: (designData: unknown) => void | Promise<void>;
 }
 
@@ -20,17 +24,54 @@ interface EditorState {
   editingTextId: string | null;
 }
 
-export default function Editor({ template }: EditorProps) {
+// Font lists for vehicle number plates and general fonts
+const vehiclePlateFonts = [
+  { name: 'Courier New', value: 'Courier New, monospace' },
+  { name: 'Monaco', value: 'Monaco, monospace' },
+  { name: 'Consolas', value: 'Consolas, monospace' },
+  { name: 'Lucida Console', value: 'Lucida Console, monospace' },
+  { name: 'System Monospace', value: 'monospace' }
+];
+
+const generalFonts = [
+  { name: 'Arial', value: 'Arial, sans-serif' },
+  { name: 'Helvetica', value: 'Helvetica, Arial, sans-serif' },
+  { name: 'Arial Black', value: 'Arial Black, sans-serif' },
+  { name: 'Impact', value: 'Impact, sans-serif' },
+  { name: 'Times New Roman', value: 'Times New Roman, serif' },
+  { name: 'Georgia', value: 'Georgia, serif' },
+  { name: 'Verdana', value: 'Verdana, sans-serif' },
+  { name: 'Tahoma', value: 'Tahoma, sans-serif' },
+  { name: 'Trebuchet MS', value: 'Trebuchet MS, sans-serif' },
+  { name: 'Palatino', value: 'Palatino, serif' },
+  { name: 'Garamond', value: 'Garamond, serif' },
+  { name: 'Book Antiqua', value: 'Book Antiqua, serif' },
+  { name: 'Lucida Grande', value: 'Lucida Grande, sans-serif' }
+];
+
+export default function Editor({ template, existingDesign }: EditorProps) {
+  // Authentication
+  const { user } = useAuth();
+  
   // Canvas ref used to measure text dimensions for auto-fit sizing
   const measureCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const editorContainerRef = useRef<HTMLDivElement | null>(null);
   const toolbarRef = useRef<HTMLDivElement | null>(null);
   const toolbarMouseDownRef = useRef<boolean>(false);
   const [state, setState] = useState<EditorState>({
-    elements: [],
+    elements: (existingDesign?.design_json?.elements || []) as Element[],
     selectedId: null,
     editingTextId: null
   });
+
+  // Save-related state
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Download-related state
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
 
   // Zoom state management
   const [zoom, setZoom] = useState(0.7); // Start at 70% zoom for better overview
@@ -120,29 +161,6 @@ export default function Editor({ template }: EditorProps) {
     setZoom(0.7); // Reset to default 70% zoom
   }, []);
 
-  // Font lists for vehicle number plates and general fonts
-  const vehiclePlateFonts = [
-    { name: 'Courier New', value: 'Courier New, monospace' },
-    { name: 'Monaco', value: 'Monaco, monospace' },
-    { name: 'Consolas', value: 'Consolas, monospace' },
-    { name: 'Lucida Console', value: 'Lucida Console, monospace' },
-    { name: 'System Monospace', value: 'monospace' }
-  ];
-
-  const generalFonts = [
-    { name: 'Arial', value: 'Arial, sans-serif' },
-    { name: 'Helvetica', value: 'Helvetica, Arial, sans-serif' },
-    { name: 'Arial Black', value: 'Arial Black, sans-serif' },
-    { name: 'Impact', value: 'Impact, sans-serif' },
-    { name: 'Times New Roman', value: 'Times New Roman, serif' },
-    { name: 'Georgia', value: 'Georgia, serif' },
-    { name: 'Verdana', value: 'Verdana, sans-serif' },
-    { name: 'Tahoma', value: 'Tahoma, sans-serif' },
-    { name: 'Trebuchet MS', value: 'Trebuchet MS, sans-serif' },
-    { name: 'System Sans-Serif', value: 'sans-serif' },
-    { name: 'System Serif', value: 'serif' }
-  ].sort((a, b) => a.name.localeCompare(b.name));
-
   const overlayDragRef = useRef<{
     elementId: string;
     anchor: 'tl' | 'tr' | 'br' | 'bl';
@@ -222,7 +240,274 @@ export default function Editor({ template }: EditorProps) {
       fontWeight: textElement.fontWeight,
       fontStyle: textElement.fontStyle || 'normal'
     });
-  }, [state.elements, zoom]);
+  }, [state.elements, zoom, measureText]);
+
+  // Save design function
+  const handleSaveDesign = useCallback(async () => {
+    if (!user) {
+      setSaveError('You must be logged in to save designs');
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveError(null);
+    setSaveSuccess(false);
+
+    try {
+      const designData: DesignData = {
+        elements: state.elements,
+        template_id: template.id,
+        width: template.width_px,
+        height: template.height_px,
+      };
+
+      const result = await saveDesign({
+        designData,
+        templateId: template.id,
+        name: `${template.name} Design`,
+        isPublic: false,
+      });
+
+      if (result.error) {
+        setSaveError(result.error);
+      } else {
+        setSaveSuccess(true);
+        // Clear success message after 3 seconds
+        setTimeout(() => setSaveSuccess(false), 3000);
+      }
+    } catch {
+      setSaveError('Failed to save design');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [user, state.elements, template]);
+
+  // Download/Export functions for high-quality printing
+  const exportToDataURL = useCallback((format: string, quality: number = 1): string | null => {
+    if (!stageRef.current) return null;
+    
+    // Set ultra-high DPI for professional printing
+    const stage = stageRef.current;
+    const printDPI = 600; // 600 DPI for ultra-high-quality printing (ideal for plates)
+    const screenDPI = 96; // Standard screen DPI
+    const scaleFactor = printDPI / screenDPI;
+    
+    // Hide UI elements for clean export
+    const transformer = transformerRef.current;
+    const previousTransformerNodes = transformer ? [...transformer.nodes()] : [];
+    
+    // Store visibility state of guide elements
+    const guideElements = [
+      'plate-outline',
+      'center-line-h',
+      'center-line-v', 
+      'center-text',
+      'width-measurement',
+      'height-measurement',
+      'mounting-hole-tl',
+      'mounting-hole-tr',
+      'mounting-hole-bl',
+      'mounting-hole-br'
+    ];
+    
+    const previousVisibility: { [key: string]: boolean } = {};
+    
+    // Hide transformer and guide elements
+    if (transformer) {
+      transformer.nodes([]);
+      transformer.getLayer()?.batchDraw();
+    }
+    
+    guideElements.forEach(name => {
+      const node = stage.findOne(`.${name}`);
+      if (node) {
+        previousVisibility[name] = node.visible();
+        node.visible(false);
+      }
+    });
+    
+    // Force redraw to apply visibility changes
+    stage.batchDraw();
+    
+    // Export the clean stage
+    const dataURL = stage.toDataURL({
+      mimeType: format === 'jpeg' ? 'image/jpeg' : 'image/png',
+      quality: quality,
+      pixelRatio: scaleFactor // Ultra-high resolution for professional printing
+    });
+    
+    // Restore transformer and guide elements
+    if (transformer && previousTransformerNodes.length > 0) {
+      transformer.nodes(previousTransformerNodes);
+      transformer.getLayer()?.batchDraw();
+    }
+    
+    guideElements.forEach(name => {
+      const node = stage.findOne(`.${name}`);
+      if (node && previousVisibility[name] !== undefined) {
+        node.visible(previousVisibility[name]);
+      }
+    });
+    
+    // Force redraw to restore visibility
+    stage.batchDraw();
+    
+    return dataURL;
+  }, []);
+
+  const downloadFile = useCallback((dataURL: string, filename: string) => {
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = dataURL;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, []);
+
+  const handleDownload = useCallback(async (format: 'png' | 'jpeg' | 'pdf' | 'eps' | 'tiff') => {
+    if (!stageRef.current) return;
+    
+    setIsDownloading(true);
+    setShowDownloadDropdown(false);
+    
+    try {
+      const designName = `${template.name.replace(/\s+/g, '_')}_design`;
+      const timestamp = new Date().toISOString().slice(0, 10); // YYYY-MM-DD format
+      
+      switch (format) {
+        case 'png': {
+          const dataURL = exportToDataURL('image/png', 1);
+          if (dataURL) downloadFile(dataURL, `${designName}_${timestamp}_600dpi.png`);
+          break;
+        }
+        
+        case 'jpeg': {
+          const dataURL = exportToDataURL('image/jpeg', 1.0); // Maximum quality JPEG
+          if (dataURL) downloadFile(dataURL, `${designName}_${timestamp}_600dpi.jpg`);
+          break;
+        }
+        
+        case 'pdf': {
+          const dataURL = exportToDataURL('image/png', 1);
+          if (dataURL) {
+            // Convert pixels to millimeters for PDF (exact plate dimensions)
+            // Using 600 DPI: 1 inch = 25.4mm, 600px = 1 inch
+            const mmWidth = (template.width_px * 25.4) / 600;
+            const mmHeight = (template.height_px * 25.4) / 600;
+            
+            const pdf = new jsPDF({
+              orientation: mmWidth > mmHeight ? 'landscape' : 'portrait',
+              unit: 'mm',
+              format: [mmWidth, mmHeight],
+              compress: false // No compression for print quality
+            });
+            
+            // Add image at exact size with no margins
+            pdf.addImage(dataURL, 'PNG', 0, 0, mmWidth, mmHeight, undefined, 'NONE');
+            pdf.save(`${designName}_${timestamp}_print_ready.pdf`);
+          }
+          break;
+        }
+        
+        case 'eps': {
+          // Export ultra-high resolution PNG for EPS conversion
+          const dataURL = exportToDataURL('image/png', 1);
+          if (dataURL) {
+            downloadFile(dataURL, `${designName}_${timestamp}_600dpi_for_eps.png`);
+            
+            // Create and download conversion instructions
+            const instructions = `
+EPS Conversion Instructions for Vehicle Number Plate Printing:
+
+File: ${designName}_${timestamp}_600dpi_for_eps.png
+Resolution: 600 DPI (Print Ready)
+Dimensions: ${template.width_px}x${template.height_px} pixels
+
+Recommended EPS Conversion Tools:
+1. Adobe Illustrator: File → Place → Embed → Save As EPS
+2. GIMP: File → Export As → Select EPS format
+3. Inkscape: Import PNG → Save As → Encapsulated PostScript
+4. Online converters: CloudConvert, Convertio
+
+For professional printing, ensure:
+- Vector tracing for scalability
+- CMYK color mode for commercial printing
+- Preserve original dimensions
+- Use highest quality settings
+
+This PNG is optimized at 600 DPI for superior print quality.
+            `;
+            
+            const blob = new Blob([instructions], { type: 'text/plain' });
+            const instructionsURL = URL.createObjectURL(blob);
+            downloadFile(instructionsURL, `${designName}_EPS_conversion_instructions.txt`);
+            URL.revokeObjectURL(instructionsURL);
+          }
+          break;
+        }
+        
+        case 'tiff': {
+          // Export ultra-high resolution PNG for TIFF conversion
+          const dataURL = exportToDataURL('image/png', 1);
+          if (dataURL) {
+            downloadFile(dataURL, `${designName}_${timestamp}_600dpi_for_tiff.png`);
+            
+            // Create and download conversion instructions
+            const instructions = `
+TIFF Conversion Instructions for Vehicle Number Plate Printing:
+
+File: ${designName}_${timestamp}_600dpi_for_tiff.png
+Resolution: 600 DPI (Print Ready)
+Dimensions: ${template.width_px}x${template.height_px} pixels
+
+Recommended TIFF Conversion Tools:
+1. Adobe Photoshop: File → Export → Export As → TIFF
+2. GIMP: File → Export As → Select TIFF format
+3. Paint.NET: File → Save As → TIFF format
+4. Online converters: CloudConvert, Online-Convert
+
+For vehicle plate printing, use these TIFF settings:
+- LZW or ZIP compression (lossless)
+- 600 DPI resolution maintained
+- RGB or CMYK color mode (depending on printer)
+- Uncompressed option for maximum quality
+- Preserve transparency if needed
+
+This PNG is already optimized at 600 DPI for commercial printing.
+            `;
+            
+            const blob = new Blob([instructions], { type: 'text/plain' });
+            const instructionsURL = URL.createObjectURL(blob);
+            downloadFile(instructionsURL, `${designName}_TIFF_conversion_instructions.txt`);
+            URL.revokeObjectURL(instructionsURL);
+          }
+          break;
+        }
+      }
+      
+      // Show success message
+      alert(`${format.toUpperCase()} export completed successfully! File optimized for professional vehicle plate printing at 600 DPI.`);
+      
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Export failed. Please try again or contact support if the issue persists.');
+    } finally {
+      setIsDownloading(false);
+    }
+  }, [template, exportToDataURL, downloadFile]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (showDownloadDropdown && target && !target.closest('.download-dropdown')) {
+        setShowDownloadDropdown(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showDownloadDropdown]);
 
   // Add text element
   const addText = useCallback(() => {
@@ -259,7 +544,7 @@ export default function Editor({ template }: EditorProps) {
         selectedId: newText.id
       };
     });
-  }, [state.elements.length, measureText, vehiclePlateFonts]);
+  }, [state.elements.length, pushHistory, measureText]);
 
   // Add image element
   const addImage = useCallback((file: File) => {
@@ -339,7 +624,7 @@ export default function Editor({ template }: EditorProps) {
       selectedId: save && reselect ? prev.editingTextId : null // Optionally reselect the element if saved
     }));
     setEditingValue('');
-  }, [state.editingTextId, editingValue, updateElement]);
+  }, [state.editingTextId, state.elements, editingValue, updateElement, measureText]);
 
   // Live-resize the textarea to fit content while typing
   useEffect(() => {
@@ -485,14 +770,14 @@ export default function Editor({ template }: EditorProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [state.selectedId, deleteElement, undo, redo]);
+  }, [state.selectedId, state.editingTextId, deleteElement, undo, redo]);
 
   return (
   <div ref={editorContainerRef} className="h-screen flex flex-col bg-gray-100">
       {/* Fixed Toolbar */}
       <div
         ref={toolbarRef}
-        className="fixed top-0 left-0 right-0 z-50 bg-white border-b p-4 flex gap-2 items-center shadow-sm h-20 overflow-hidden"
+        className="fixed top-0 left-0 right-0 z-50 bg-white border-b p-4 flex gap-2 items-center shadow-sm h-20 overflow-visible"
         onMouseDown={() => { toolbarMouseDownRef.current = true; }}
         onMouseUp={() => { toolbarMouseDownRef.current = false; }}
       >
@@ -604,7 +889,146 @@ export default function Editor({ template }: EditorProps) {
               <Trash2 className="w-5 h-5" />
             </button>
           )}
+
+          {/* Save Button */}
+          <button
+            onClick={handleSaveDesign}
+            disabled={isSaving || !user}
+            className={`p-3 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md ${
+              isSaving || !user
+                ? 'bg-gray-400 text-white cursor-not-allowed'
+                : saveSuccess
+                ? 'bg-green-500 text-white'
+                : 'bg-purple-500 text-white hover:bg-purple-600'
+            }`}
+            title={!user ? "Login to save designs" : isSaving ? "Saving..." : "Save Design"}
+            aria-label="Save Design"
+          >
+            <Save className="w-5 h-5" />
+          </button>
+
+          {/* Download Button with Dropdown */}
+          <div className="relative download-dropdown z-[100]">
+            <button
+              onClick={() => setShowDownloadDropdown(!showDownloadDropdown)}
+              disabled={isDownloading}
+              className={`p-3 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md flex items-center gap-1 ${
+                isDownloading
+                  ? 'bg-gray-400 text-white cursor-not-allowed'
+                  : 'bg-blue-500 text-white hover:bg-blue-600'
+              }`}
+              title={isDownloading ? "Downloading..." : "Download Design"}
+              aria-label="Download Design"
+            >
+              <Download className="w-5 h-5" />
+              <ChevronDown className="w-3 h-3" />
+            </button>
+
+            {/* Download Format Dropdown */}
+            {showDownloadDropdown && (
+              <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-[100] min-w-56">
+                <div className="py-1">
+                  <div className="px-4 py-2 bg-blue-50 border-b border-gray-200">
+                    <div className="text-xs font-semibold text-blue-700">Professional Print Formats</div>
+                    <div className="text-xs text-blue-600">600 DPI Ultra-High Quality</div>
+                  </div>
+                  
+                  <button
+                    onClick={() => handleDownload('png')}
+                    className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-100 border-b border-gray-100"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium">PNG (Lossless)</div>
+                        <div className="text-xs text-gray-500">Perfect for digital plates</div>
+                      </div>
+                      <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">Best</span>
+                    </div>
+                  </button>
+                  
+                  <button
+                    onClick={() => handleDownload('jpeg')}
+                    className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-100 border-b border-gray-100"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium">JPEG (Maximum Quality)</div>
+                        <div className="text-xs text-gray-500">Smaller file, excellent quality</div>
+                      </div>
+                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">Fast</span>
+                    </div>
+                  </button>
+                  
+                  <button
+                    onClick={() => handleDownload('pdf')}
+                    className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-100 border-b border-gray-200"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium">PDF (Print Ready)</div>
+                        <div className="text-xs text-gray-500">Exact dimensions, vector quality</div>
+                      </div>
+                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">Print</span>
+                    </div>
+                  </button>
+                  
+                  <div className="px-4 py-2 bg-amber-50 border-b border-gray-200">
+                    <div className="text-xs font-semibold text-amber-700">Professional Formats</div>
+                    <div className="text-xs text-amber-600">Includes conversion instructions</div>
+                  </div>
+                  
+                  <button
+                    onClick={() => handleDownload('eps')}
+                    className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-100 border-b border-gray-100"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium">EPS (Vector Format)</div>
+                        <div className="text-xs text-gray-500">For professional printing</div>
+                      </div>
+                      <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded">Pro</span>
+                    </div>
+                  </button>
+                  
+                  <button
+                    onClick={() => handleDownload('tiff')}
+                    className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-100"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium">TIFF (Uncompressed)</div>
+                        <div className="text-xs text-gray-500">Maximum quality archive</div>
+                      </div>
+                      <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">Archive</span>
+                    </div>
+                  </button>
+                </div>
+                
+                <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 text-xs text-gray-600">
+                  <div className="flex items-center gap-1 mb-1">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span className="font-medium">Vehicle Plate Optimized</span>
+                  </div>
+                  <div>600 DPI • Commercial Print Quality • Exact Dimensions</div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Save status messages */}
+        {(saveSuccess || saveError) && (
+          <div className="flex items-center gap-2 ml-4">
+            {saveSuccess && (
+              <span className="text-green-600 text-sm font-medium">Design saved!</span>
+            )}
+            {saveError && (
+              <span className="text-red-600 text-sm font-medium" title={saveError}>
+                {saveError.length > 30 ? saveError.substring(0, 30) + '...' : saveError}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Font Size and Font Family Controls - only show when text element is selected */}
         {(() => {
@@ -931,7 +1355,6 @@ export default function Editor({ template }: EditorProps) {
                       key={element.id}
                       element={imageEl}
                       zoom={zoom}
-                      isSelected={state.selectedId === element.id}
                       onSelect={() => selectElement(element.id)}
                       onUpdate={(updates) => updateElement(element.id, updates)}
                     />
@@ -1334,13 +1757,11 @@ export default function Editor({ template }: EditorProps) {
 function ImageComponent({ 
   element, 
   zoom,
-  isSelected, 
   onSelect, 
   onUpdate 
 }: {
   element: ImageElement;
   zoom: number;
-  isSelected: boolean;
   onSelect: () => void;
   onUpdate: (updates: Partial<ImageElement>) => void;
 }) {

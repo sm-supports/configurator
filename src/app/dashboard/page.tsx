@@ -144,6 +144,26 @@ export default function DashboardPage() {
     <ProtectedRoute>
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Quick Actions */}
+          <div className="mb-6">
+            <div className="flex flex-wrap gap-4">
+              <Link
+                href="/templates"
+                className="inline-flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Create New Design</span>
+              </Link>
+              <Link
+                href="/admin"
+                className="inline-flex items-center space-x-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+              >
+                <Edit className="w-4 h-4" />
+                <span>Admin Panel</span>
+              </Link>
+            </div>
+          </div>
+
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">My Designs</h1>

@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import { PlateTemplate, Country } from '@/types';
-import { Plus, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { checkAdminStatus } from '@/lib/adminUtils';
 import ProtectedRoute from '@/components/Auth/ProtectedRoute';
 
@@ -135,6 +136,17 @@ export default function AdminPage() {
     <ProtectedRoute>
       <div className="min-h-screen bg-gray-50 p-6">
         <div className="max-w-7xl mx-auto">
+          {/* Navigation Header */}
+          <div className="mb-6">
+            <Link
+              href="/"
+              className="inline-flex items-center text-blue-600 hover:text-blue-800 mb-4"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Home
+            </Link>
+          </div>
+
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
               Admin Dashboard
@@ -142,6 +154,48 @@ export default function AdminPage() {
             <p className="text-gray-600">
               Manage license plate templates and system settings
             </p>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            <Link
+              href="/admin/templates/new"
+              className="bg-blue-600 text-white p-6 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <div className="flex items-center space-x-3">
+                <Plus className="w-8 h-8" />
+                <div>
+                  <h3 className="text-lg font-semibold">Create Template</h3>
+                  <p className="text-blue-100">Add a new license plate template</p>
+                </div>
+              </div>
+            </Link>
+
+            <Link
+              href="/templates"
+              className="bg-green-600 text-white p-6 rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <div className="flex items-center space-x-3">
+                <Eye className="w-8 h-8" />
+                <div>
+                  <h3 className="text-lg font-semibold">View Templates</h3>
+                  <p className="text-green-100">Browse all available templates</p>
+                </div>
+              </div>
+            </Link>
+
+            <Link
+              href="/dashboard"
+              className="bg-purple-600 text-white p-6 rounded-lg hover:bg-purple-700 transition-colors"
+            >
+              <div className="flex items-center space-x-3">
+                <Edit className="w-8 h-8" />
+                <div>
+                  <h3 className="text-lg font-semibold">User Dashboard</h3>
+                  <p className="text-purple-100">View user designs and activity</p>
+                </div>
+              </div>
+            </Link>
           </div>
 
           {/* Templates Section */}

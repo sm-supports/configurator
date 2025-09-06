@@ -1,16 +1,21 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { PlateTemplate } from '@/types';
+import { PlateTemplate, UserDesign } from '@/types';
 
 interface ClientOnlyEditorProps {
   template: PlateTemplate;
+  existingDesign?: UserDesign | null;
   onSave?: (designData: unknown) => void | Promise<void>;
 }
 
-export default function ClientOnlyEditor({ template, onSave }: ClientOnlyEditorProps) {
+export default function ClientOnlyEditor({ template, existingDesign, onSave }: ClientOnlyEditorProps) {
   const [isClient, setIsClient] = useState(false);
-  const [EditorComponent, setEditorComponent] = useState<React.ComponentType<{ template: PlateTemplate; onSave?: (designData: unknown) => void | Promise<void>; }> | null>(null);
+  const [EditorComponent, setEditorComponent] = useState<React.ComponentType<{ 
+    template: PlateTemplate; 
+    existingDesign?: UserDesign | null;
+    onSave?: (designData: unknown) => void | Promise<void>; 
+  }> | null>(null);
 
   useEffect(() => {
     setIsClient(true);
@@ -19,8 +24,8 @@ export default function ClientOnlyEditor({ template, onSave }: ClientOnlyEditorP
       .then((module) => {
         setEditorComponent(() => module.default);
       })
-      .catch((error) => {
-        console.error('Failed to load Editor component:', error);
+      .catch(() => {
+        // Editor component failed to load
       });
   }, []);
 
@@ -32,5 +37,5 @@ export default function ClientOnlyEditor({ template, onSave }: ClientOnlyEditorP
     );
   }
 
-  return <EditorComponent template={template} onSave={onSave} />;
+  return <EditorComponent template={template} existingDesign={existingDesign} onSave={onSave} />;
 }

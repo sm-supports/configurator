@@ -4,10 +4,7 @@ import { useEffect } from 'react';
 
 export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
-    // Log the error to an error reporting service or console for now
-    if (typeof window !== 'undefined' && 'console' in window) {
-      console.error('Editor page error:', error);
-    }
+    // Error occurred in editor - could be logged to error reporting service here
   }, [error]);
 
   return (
