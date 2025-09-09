@@ -7,9 +7,10 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 // Protected routes that require authentication
+// NOTE: '/editor' intentionally omitted to allow anonymous visitors to try the editor.
+// Guests can design but cannot save or download (enforced in UI components).
 const PROTECTED_ROUTES = [
   '/dashboard',
-  '/editor',
   '/profile',
   '/admin',
   '/api/designs'

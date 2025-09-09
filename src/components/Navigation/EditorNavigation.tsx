@@ -83,7 +83,8 @@ export default function EditorNavigation({
             </button>
           )}
           
-          {onDownload && (
+          {/* Download only available when signed-in (further restricted to admins inside main Editor toolbar). */}
+          {user && onDownload && (
             <button
               onClick={onDownload}
               className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
