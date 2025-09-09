@@ -337,7 +337,7 @@ export default function Editor({ template, existingDesign }: EditorProps) {
         const rect = node.getClientRect({ relativeTo: stage });
         x = stageBox.left + rect.x;
         y = stageBox.top + rect.y;
-      } catch (err) {
+  } catch {
         // Fallback to absolute position if getClientRect fails for any reason
         const pos = node.getAbsolutePosition();
         x = stageBox.left + pos.x;
@@ -1650,7 +1650,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
                 const [firstCenter, secondCenter] = tabCenters;
                 const dipHalf = cutoutWidth / 2;
                 const left = safeX, right = safeX + safeW, top = safeY, bottom = safeY + safeH;
-                const clipBuilder = (ctx: any) => {
+                const clipBuilder = (ctx: Konva.Context) => {
                   ctx.beginPath();
                   ctx.moveTo(left + r, top);
                   ctx.lineTo(firstCenter - dipHalf, top);

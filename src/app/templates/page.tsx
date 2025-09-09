@@ -7,7 +7,6 @@ import { Filter, Globe } from 'lucide-react';
 // Server-rendered page: fetch data in parallel, minimal client JS
 export const revalidate = 60;
 
-type TemplatesSearchParams = { country?: string };
 
 // Allow explicit any here because Next's PageProps type is generated and a local
 // named type caused a mismatch with Next's expected PageProps.
