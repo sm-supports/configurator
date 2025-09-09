@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Stage, Layer, Text, Image as KonvaImage, Transformer, Rect } from 'react-konva';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { Stage, Layer, Text, Image as KonvaImage, Transformer, Rect, Circle, Path } from 'react-konva';
 import type Konva from 'konva';
 import { PlateTemplate, TextElement, ImageElement, DesignData, UserDesign } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
@@ -51,7 +51,7 @@ const generalFonts = [
 
 export default function Editor({ template, existingDesign }: EditorProps) {
   // Authentication
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   
   // Canvas ref used to measure text dimensions for auto-fit sizing
   const measureCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -72,6 +72,68 @@ export default function Editor({ template, existingDesign }: EditorProps) {
   // Download-related state
   const [isDownloading, setIsDownloading] = useState(false);
   const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
+  const [showLayersPanel, setShowLayersPanel] = useState(false);
+
+  // Placement configuration
+  const gridSize = 32; // px grid snapping for initial placement
+  const margin = 16; // margin from canvas edges
+
+  // Deterministic PRNG (mulberry32) seeded by template + user id for reproducible placements
+  const seed = useMemo(() => {
+    const base = `${template.id}|${user?.id || 'anon'}`;
+    let hash = 0;
+    for (let i = 0; i < base.length; i++) hash = (hash * 31 + base.charCodeAt(i)) | 0;
+    return hash >>> 0; // unsigned 32-bit
+  }, [template.id, user?.id]);
+
+  const mulberry32 = useCallback((a: number) => {
+    return function() {
+      a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }, []);
+
+  const prngRef = useRef<() => number>(mulberry32(seed));
+  useEffect(() => { prngRef.current = mulberry32(seed); }, [seed, mulberry32]);
+
+  const nextRand = () => prngRef.current();
+
+  interface SpawnOptions { width: number; height: number; }
+  const computeSpawnPosition = useCallback((opts: SpawnOptions) => {
+    const { width: elW, height: elH } = opts;
+    const maxW = template.width_px;
+    const maxH = template.height_px;
+    const usableW = Math.max(0, maxW - margin * 2 - elW);
+    const usableH = Math.max(0, maxH - margin * 2 - elH);
+
+    // Gather existing bounding boxes for overlap detection
+    const boxes = state.elements.map(el => ({
+      x: el.x,
+      y: el.y,
+      w: (el.width || 100),
+      h: (el.height || 50)
+    }));
+
+    const maxAttempts = 150;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      // Deterministic random candidate cell
+      const rx = usableW > 0 ? nextRand() * usableW : 0;
+      const ry = usableH > 0 ? nextRand() * usableH : 0;
+      // Snap to grid
+      const snappedX = margin + Math.round(rx / gridSize) * gridSize;
+      const snappedY = margin + Math.round(ry / gridSize) * gridSize;
+
+      const clampedX = Math.min(maxW - elW - margin, Math.max(margin, snappedX));
+      const clampedY = Math.min(maxH - elH - margin, Math.max(margin, snappedY));
+
+      const overlaps = boxes.some(b => !(clampedX + elW <= b.x || clampedY + elH <= b.y || clampedX >= b.x + b.w || clampedY >= b.y + b.h));
+      if (!overlaps) {
+        return { x: clampedX, y: clampedY };
+      }
+    }
+    // Fallback: place at margin, margin (snapped)
+    return { x: margin, y: margin };
+  }, [template.width_px, template.height_px, state.elements]);
 
   // Zoom state management
   const [zoom, setZoom] = useState(0.7); // Start at 70% zoom for better overview
@@ -500,14 +562,13 @@ This PNG is already optimized at 600 DPI for commercial printing.
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      if (showDownloadDropdown && target && !target.closest('.download-dropdown')) {
-        setShowDownloadDropdown(false);
-      }
+  if (showDownloadDropdown && target && !target.closest('.download-dropdown')) setShowDownloadDropdown(false);
+  if (showLayersPanel && target && !target.closest('.layers-panel') && !target.closest('[data-layers-button]')) setShowLayersPanel(false);
     };
     
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showDownloadDropdown]);
+  }, [showDownloadDropdown, showLayersPanel]);
 
   // Add text element
   const addText = useCallback(() => {
@@ -516,12 +577,13 @@ This PNG is already optimized at 600 DPI for commercial printing.
     const defaultFontFamily = vehiclePlateFonts[0].value; // Use first license plate font as default
     const defaultFontWeight = 'normal';
     const measured = measureText(defaultText, defaultFontSize, defaultFontFamily, defaultFontWeight, 'normal');
+  const { x: randX, y: randY } = computeSpawnPosition({ width: measured.width, height: measured.height });
     const newText: TextElement = {
       id: uuidv4(),
       type: 'text',
       text: defaultText,
-      x: 100,
-      y: 100,
+      x: randX,
+      y: randY,
       width: Math.max(50, measured.width),
       height: Math.max(24, measured.height),
       fontSize: defaultFontSize,
@@ -544,7 +606,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
         selectedId: newText.id
       };
     });
-  }, [state.elements.length, pushHistory, measureText]);
+  }, [state.elements.length, pushHistory, measureText, computeSpawnPosition]);
 
   // Add image element
   const addImage = useCallback((file: File) => {
@@ -552,14 +614,25 @@ This PNG is already optimized at 600 DPI for commercial printing.
     reader.onload = (e) => {
       const img = new window.Image();
       img.onload = () => {
+        // Scale down if image larger than canvas (respecting margins)
+        let targetW = img.width;
+        let targetH = img.height;
+        const maxAvailW = template.width_px - margin * 2;
+        const maxAvailH = template.height_px - margin * 2;
+        if (targetW > maxAvailW || targetH > maxAvailH) {
+          const scale = Math.min(maxAvailW / targetW, maxAvailH / targetH, 1);
+            targetW = Math.max(10, targetW * scale);
+            targetH = Math.max(10, targetH * scale);
+        }
+        const { x: randX, y: randY } = computeSpawnPosition({ width: targetW, height: targetH });
         const newImage: ImageElement = {
           id: uuidv4(),
           type: 'image',
           imageUrl: e.target?.result as string,
-          x: 150,
-          y: 150,
-          width: img.width,
-          height: img.height,
+          x: randX,
+          y: randY,
+          width: targetW,
+          height: targetH,
           originalWidth: img.width,
           originalHeight: img.height,
           zIndex: state.elements.length,
@@ -579,7 +652,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
       img.src = e.target?.result as string;
     };
     reader.readAsDataURL(file);
-  }, [state.elements.length, pushHistory]);
+  }, [state.elements.length, pushHistory, template.width_px, template.height_px, computeSpawnPosition]);
 
   // Handle element selection
   const selectElement = useCallback((id: string) => {
@@ -852,6 +925,132 @@ This PNG is already optimized at 600 DPI for commercial printing.
         <h1 className="text-lg font-bold flex-shrink-0">{template.name}</h1>
         
         <div className="flex gap-2 flex-1 justify-end">
+          {/* Layers Panel Toggle */}
+          <div className="relative">
+            <button
+              data-layers-button
+              onClick={() => setShowLayersPanel(p => !p)}
+              className={`p-3 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md flex items-center gap-1 ${showLayersPanel ? 'bg-indigo-600 text-white' : 'bg-indigo-500 text-white hover:bg-indigo-600'}`}
+              aria-label="Layers"
+              title="Show Layers Panel"
+            >
+              {/* Simple stacked icon */}
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                <path d="M12 3L3 9l9 6 9-6-9-6Z" />
+                <path d="M3 15l9 6 9-6" />
+              </svg>
+            </button>
+            {showLayersPanel && (
+              <div className="layers-panel absolute top-full right-0 mt-2 w-72 max-h-[60vh] overflow-auto bg-white border border-gray-200 rounded-lg shadow-xl z-[120] p-2 flex flex-col gap-2 text-sm">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-semibold text-gray-700">Layers</span>
+                  <button
+                    onClick={() => setShowLayersPanel(false)}
+                    className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-600"
+                  >Close</button>
+                </div>
+                <div className="text-[11px] text-gray-500 mb-1">Top is front-most. Reorder instantly.</div>
+                {state.elements.length === 0 && (
+                  <div className="text-xs text-gray-400 italic py-4 text-center">No elements yet</div>
+                )}
+                {[...state.elements].map((el, idx) => ({ el, idx }))
+                  .sort((a,b) => a.idx - b.idx)
+                  .reverse()
+                  .map(({ el }, visualIndex, arr) => {
+                    const isSelected = el.id === state.selectedId;
+                    const frontMost = visualIndex === 0; // already at front
+                    const backMost = visualIndex === arr.length - 1; // already at back
+                    const label = el.type === 'text'
+                      ? `Text: "${(el as TextElement).text.slice(0,20)}${(el as TextElement).text.length>20?'…':''}"`
+                      : 'Image';
+                    return (
+                      <div
+                        key={el.id}
+                        className={`group border rounded-md px-2 py-1 flex items-center gap-2 ${isSelected ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 bg-white hover:bg-gray-50'}`}
+                      >
+                        <button
+                          onClick={() => setState(p => ({ ...p, selectedId: el.id }))}
+                          className={`flex-1 text-left truncate text-xs ${isSelected ? 'text-indigo-700 font-medium' : 'text-gray-700'}`}
+                          title={label}
+                        >{label}</button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => {
+                              // Move up toward front (increase index)
+                              setState(prev => {
+                                const idx = prev.elements.findIndex(e => e.id === el.id);
+                                if (idx === -1 || idx === prev.elements.length - 1) return prev;
+                                pushHistory(prev);
+                                const elems = [...prev.elements];
+                                const tmp = elems[idx];
+                                elems[idx] = elems[idx + 1];
+                                elems[idx + 1] = tmp;
+                                return { ...prev, elements: elems };
+                              });
+                            }}
+                            disabled={frontMost}
+                            className="p-1 rounded border border-gray-300 text-[10px] leading-none disabled:opacity-40 hover:bg-gray-100"
+                            title="Bring Forward"
+                          >↑</button>
+                          <button
+                            onClick={() => {
+                              // Move down toward back (decrease index)
+                              setState(prev => {
+                                const idx = prev.elements.findIndex(e => e.id === el.id);
+                                if (idx <= 0) return prev;
+                                pushHistory(prev);
+                                const elems = [...prev.elements];
+                                const tmp = elems[idx];
+                                elems[idx] = elems[idx - 1];
+                                elems[idx - 1] = tmp;
+                                return { ...prev, elements: elems };
+                              });
+                            }}
+                            disabled={backMost}
+                            className="p-1 rounded border border-gray-300 text-[10px] leading-none disabled:opacity-40 hover:bg-gray-100"
+                            title="Send Backward"
+                          >↓</button>
+                          <button
+                            onClick={() => {
+                              // To top/front
+                              setState(prev => {
+                                const idx = prev.elements.findIndex(e => e.id === el.id);
+                                if (idx === -1 || idx === prev.elements.length - 1) return prev;
+                                pushHistory(prev);
+                                const elems = [...prev.elements];
+                                const [item] = elems.splice(idx,1);
+                                elems.push(item);
+                                return { ...prev, elements: elems };
+                              });
+                            }}
+                            disabled={frontMost}
+                            className="p-1 rounded border border-gray-300 text-[10px] leading-none disabled:opacity-40 hover:bg-gray-100"
+                            title="Bring to Front"
+                          >Top</button>
+                          <button
+                            onClick={() => {
+                              // To bottom/back
+                              setState(prev => {
+                                const idx = prev.elements.findIndex(e => e.id === el.id);
+                                if (idx <= 0) return prev;
+                                pushHistory(prev);
+                                const elems = [...prev.elements];
+                                const [item] = elems.splice(idx,1);
+                                elems.unshift(item);
+                                return { ...prev, elements: elems };
+                              });
+                            }}
+                            disabled={backMost}
+                            className="p-1 rounded border border-gray-300 text-[10px] leading-none disabled:opacity-40 hover:bg-gray-100"
+                            title="Send to Back"
+                          >Bottom</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
           {/* Add Text Button */}
           <button
             onClick={addText}
@@ -907,113 +1106,58 @@ This PNG is already optimized at 600 DPI for commercial printing.
             <Save className="w-5 h-5" />
           </button>
 
-          {/* Download Button with Dropdown */}
-          <div className="relative download-dropdown z-[100]">
-            <button
-              onClick={() => setShowDownloadDropdown(!showDownloadDropdown)}
-              disabled={isDownloading}
-              className={`p-3 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md flex items-center gap-1 ${
-                isDownloading
-                  ? 'bg-gray-400 text-white cursor-not-allowed'
-                  : 'bg-blue-500 text-white hover:bg-blue-600'
-              }`}
-              title={isDownloading ? "Downloading..." : "Download Design"}
-              aria-label="Download Design"
-            >
-              <Download className="w-5 h-5" />
-              <ChevronDown className="w-3 h-3" />
-            </button>
-
-            {/* Download Format Dropdown */}
-            {showDownloadDropdown && (
-              <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-[100] min-w-56">
-                <div className="py-1">
-                  <div className="px-4 py-2 bg-blue-50 border-b border-gray-200">
-                    <div className="text-xs font-semibold text-blue-700">Professional Print Formats</div>
-                    <div className="text-xs text-blue-600">600 DPI Ultra-High Quality</div>
+          {/* Download Button (Admins only) */}
+          {isAdmin && (
+            <div className="relative download-dropdown z-[100]">
+              <button
+                onClick={() => setShowDownloadDropdown(!showDownloadDropdown)}
+                disabled={isDownloading}
+                className={`p-3 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md flex items-center gap-1 ${
+                  isDownloading
+                    ? 'bg-gray-400 text-white cursor-not-allowed'
+                    : 'bg-blue-500 text-white hover:bg-blue-600'
+                }`}
+                title={isDownloading ? "Downloading..." : "Download (Admin Only)"}
+                aria-label="Download Design"
+              >
+                <Download className="w-5 h-5" />
+                <ChevronDown className="w-3 h-3" />
+              </button>
+              {showDownloadDropdown && (
+                <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-[100] min-w-56">
+                  <div className="py-1">
+                    <div className="px-4 py-2 bg-blue-50 border-b border-gray-200">
+                      <div className="text-xs font-semibold text-blue-700">Professional Print Formats</div>
+                      <div className="text-xs text-blue-600">600 DPI Ultra-High Quality</div>
+                    </div>
+                    <button onClick={() => handleDownload('png')} className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-100 border-b border-gray-100">
+                      <div className="flex items-center justify-between"><div><div className="font-medium">PNG (Lossless)</div><div className="text-xs text-gray-500">Perfect for digital plates</div></div><span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">Best</span></div>
+                    </button>
+                    <button onClick={() => handleDownload('jpeg')} className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-100 border-b border-gray-100">
+                      <div className="flex items-center justify-between"><div><div className="font-medium">JPEG (Maximum Quality)</div><div className="text-xs text-gray-500">Smaller file, excellent quality</div></div><span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">Fast</span></div>
+                    </button>
+                    <button onClick={() => handleDownload('pdf')} className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-100 border-b border-gray-200">
+                      <div className="flex items-center justify-between"><div><div className="font-medium">PDF (Print Ready)</div><div className="text-xs text-gray-500">Exact dimensions, vector quality</div></div><span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">Print</span></div>
+                    </button>
+                    <div className="px-4 py-2 bg-amber-50 border-b border-gray-200">
+                      <div className="text-xs font-semibold text-amber-700">Professional Formats</div>
+                      <div className="text-xs text-amber-600">Includes conversion instructions</div>
+                    </div>
+                    <button onClick={() => handleDownload('eps')} className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-100 border-b border-gray-100">
+                      <div className="flex items-center justify-between"><div><div className="font-medium">EPS (Vector Format)</div><div className="text-xs text-gray-500">For professional printing</div></div><span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded">Pro</span></div>
+                    </button>
+                    <button onClick={() => handleDownload('tiff')} className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-100">
+                      <div className="flex items-center justify-between"><div><div className="font-medium">TIFF (Uncompressed)</div><div className="text-xs text-gray-500">Maximum quality archive</div></div><span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">Archive</span></div>
+                    </button>
                   </div>
-                  
-                  <button
-                    onClick={() => handleDownload('png')}
-                    className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-100 border-b border-gray-100"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium">PNG (Lossless)</div>
-                        <div className="text-xs text-gray-500">Perfect for digital plates</div>
-                      </div>
-                      <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">Best</span>
-                    </div>
-                  </button>
-                  
-                  <button
-                    onClick={() => handleDownload('jpeg')}
-                    className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-100 border-b border-gray-100"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium">JPEG (Maximum Quality)</div>
-                        <div className="text-xs text-gray-500">Smaller file, excellent quality</div>
-                      </div>
-                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">Fast</span>
-                    </div>
-                  </button>
-                  
-                  <button
-                    onClick={() => handleDownload('pdf')}
-                    className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-100 border-b border-gray-200"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium">PDF (Print Ready)</div>
-                        <div className="text-xs text-gray-500">Exact dimensions, vector quality</div>
-                      </div>
-                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">Print</span>
-                    </div>
-                  </button>
-                  
-                  <div className="px-4 py-2 bg-amber-50 border-b border-gray-200">
-                    <div className="text-xs font-semibold text-amber-700">Professional Formats</div>
-                    <div className="text-xs text-amber-600">Includes conversion instructions</div>
+                  <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 text-xs text-gray-600">
+                    <div className="flex items-center gap-1 mb-1"><div className="w-2 h-2 bg-green-500 rounded-full"></div><span className="font-medium">Vehicle Plate Optimized</span></div>
+                    <div>600 DPI • Commercial Print Quality • Exact Dimensions</div>
                   </div>
-                  
-                  <button
-                    onClick={() => handleDownload('eps')}
-                    className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-100 border-b border-gray-100"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium">EPS (Vector Format)</div>
-                        <div className="text-xs text-gray-500">For professional printing</div>
-                      </div>
-                      <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded">Pro</span>
-                    </div>
-                  </button>
-                  
-                  <button
-                    onClick={() => handleDownload('tiff')}
-                    className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium">TIFF (Uncompressed)</div>
-                        <div className="text-xs text-gray-500">Maximum quality archive</div>
-                      </div>
-                      <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">Archive</span>
-                    </div>
-                  </button>
                 </div>
-                
-                <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 text-xs text-gray-600">
-                  <div className="flex items-center gap-1 mb-1">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="font-medium">Vehicle Plate Optimized</span>
-                  </div>
-                  <div>600 DPI • Commercial Print Quality • Exact Dimensions</div>
-                </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Save status messages */}
@@ -1209,87 +1353,110 @@ This PNG is already optimized at 600 DPI for commercial printing.
             onClick={handleStageClick}
             onTap={handleStageClick}
           >
-            {/* Background Layer */}
+            {/* Background Layer (Frame + inner white area + mounting tabs/holes) */}
             <Layer>
-              {/* Main plate background - light grey */}
-              <Rect
-                width={template.width_px * zoom}
-                height={template.height_px * zoom}
-                fill="#d3d3d3"
-                name="plate-background"
-              />
-              
-              {/* Bleed outline - thin blue line at canvas edge */}
-              <Rect
-                width={template.width_px * zoom}
-                height={template.height_px * zoom}
-                fill="transparent"
-                stroke="#4a90e2"
-                strokeWidth={2 * zoom}
-                name="bleed-outline"
-              />
-              
-              {/* Safety area - dashed green rectangle with margin */}
-              <Rect
-                x={template.width_px * 0.08 * zoom}
-                y={template.height_px * 0.12 * zoom}
-                width={template.width_px * 0.84 * zoom}
-                height={template.height_px * 0.76 * zoom}
-                fill="transparent"
-                stroke="#28a745"
-                strokeWidth={2 * zoom}
-                dash={[8 * zoom, 4 * zoom]}
-                name="safety-area"
-              />
-              
-              {/* Center text - "Upload Your Design" - only show when canvas is empty */}
-              {state.elements.length === 0 && (
-                <Text
-                  x={template.width_px * 0.5 * zoom}
-                  y={template.height_px * 0.45 * zoom}
-                  text="Upload Your Design"
-                  fontSize={template.height_px * 0.12 * zoom}
-                  fontFamily="Arial"
-                  fontWeight="normal"
-                  fill="#999999"
-                  opacity={0.7}
-                  align="center"
-                  offsetX={template.width_px * 0.25 * zoom}
-                  offsetY={template.height_px * 0.06 * zoom}
-                  name="center-text"
-                />
-              )}
-              
-              {/* Width measurement guide - bottom */}
-              <Text
-                x={template.width_px * 0.5 * zoom}
-                y={template.height_px * 0.95 * zoom}
-                text={`${(template.width_px / 37.8).toFixed(1)}in`}
-                fontSize={template.height_px * 0.03 * zoom}
-                fontFamily="Arial"
-                fontWeight="normal"
-                fill="#333333"
-                align="center"
-                offsetX={template.width_px * 0.05 * zoom}
-                offsetY={template.height_px * 0.015 * zoom}
-                name="width-measurement"
-              />
-              
-              {/* Height measurement guide - left */}
-              <Text
-                x={template.width_px * 0.02 * zoom}
-                y={template.height_px * 0.5 * zoom}
-                text={`${(template.height_px / 37.8).toFixed(1)}in`}
-                fontSize={template.height_px * 0.03 * zoom}
-                fontFamily="Arial"
-                fontWeight="normal"
-                fill="#333333"
-                align="center"
-                rotation={-90}
-                offsetX={template.width_px * 0.03 * zoom}
-                offsetY={template.height_px * 0.015 * zoom}
-                name="height-measurement"
-              />
+              {(() => {
+                const W = template.width_px * zoom;
+                const H = template.height_px * zoom;
+                const cornerR = 30 * zoom;
+                const border = Math.min(W, H) * 0.05; // ~5% thickness
+                const tabRadius = Math.min(W, H) * 0.085; // protrusion size
+                const holeRadius = tabRadius * 0.33;
+                // Horizontal positions for tabs (roughly 22% and 78%)
+                const tabXOffset = [0.22, 0.78];
+                const topY = border + tabRadius * 0.15; // slight inset from very top of white area
+                const bottomY = H - border - tabRadius * 0.15;
+                const innerX = border;
+                const innerY = border;
+                const innerW = W - border * 2;
+                const innerH = H - border * 2;
+                return (
+                  <>
+                    {/* Outer black frame */}
+                    <Rect
+                      width={W}
+                      height={H}
+                      fill="#000000"
+                      cornerRadius={cornerR}
+                      name="plate-frame"
+                    />
+                    {/* Inner white design area */}
+                    <Rect
+                      x={innerX}
+                      y={innerY}
+                      width={innerW}
+                      height={innerH}
+                      fill="#ffffff"
+                      cornerRadius={cornerR * 0.8}
+                      name="design-area"
+                    />
+                    {/* Mounting tab protrusions (black) with white hole centers and concave notches */}
+                    {/* Concave notches show where the plate would be indented around mounting tabs for proper installation */}
+                    {tabXOffset.flatMap((tx) => {
+                      const cx = W * tx;
+                      const notchWidth = tabRadius * 2.8; // Width of the concave notch 
+                      const notchDepth = tabRadius * 0.75; // Depth of the concave dip - deeper for better visibility
+                      
+                      // Calculate concave notch paths using quadratic curves
+                      const topNotchY = innerY; // Top edge of white area
+                      const bottomNotchY = innerY + innerH; // Bottom edge of white area
+                      
+                      // Top concave notch - creates a quadratic dip above the mounting tab
+                      // This shows where the plate curves inward around the mounting hardware
+                      const topNotchPath = `M ${cx - notchWidth/2} ${topNotchY} Q ${cx} ${topNotchY - notchDepth} ${cx + notchWidth/2} ${topNotchY}`;
+                      
+                      // Bottom concave notch - creates a quadratic dip below the mounting tab  
+                      const bottomNotchPath = `M ${cx - notchWidth/2} ${bottomNotchY} Q ${cx} ${bottomNotchY + notchDepth} ${cx + notchWidth/2} ${bottomNotchY}`;
+                      
+                      return [
+                        // Top concave notch (green line showing the indentation curve)
+                        <Path 
+                          key={`notch-top-${tx}`} 
+                          data={topNotchPath} 
+                          stroke="#00cc00" 
+                          strokeWidth={3} 
+                          fill="none"
+                          name="concave-notch"
+                          strokeDasharray="8 4" // Dashed line for better visual distinction
+                        />,
+                        // Bottom concave notch (green line showing the indentation curve)
+                        <Path 
+                          key={`notch-bottom-${tx}`} 
+                          data={bottomNotchPath} 
+                          stroke="#00cc00" 
+                          strokeWidth={3} 
+                          fill="none"
+                          name="concave-notch"
+                          strokeDasharray="8 4" // Dashed line for better visual distinction
+                        />,
+                        // Top mounting tab (circular protrusion)
+                        <Circle key={`tab-top-${tx}`} x={cx} y={topY} radius={tabRadius} fill="#000" name="mounting-tab" />, 
+                        <Circle key={`hole-top-${tx}`} x={cx} y={topY} radius={holeRadius} fill="#ffffff" name="mounting-hole" />, 
+                        // Bottom mounting tab (circular protrusion)
+                        <Circle key={`tab-bottom-${tx}`} x={cx} y={bottomY} radius={tabRadius} fill="#000" name="mounting-tab" />, 
+                        <Circle key={`hole-bottom-${tx}`} x={cx} y={bottomY} radius={holeRadius} fill="#ffffff" name="mounting-hole" />
+                      ];
+                    })}
+                    {/* Placeholder prompt (center) when empty */}
+                    {state.elements.length === 0 && (
+                      <Text
+                        x={W / 2}
+                        y={H / 2}
+                        text="Add Text or Image"
+                        fontSize={Math.max(18, template.height_px * 0.07 * zoom)}
+                        fontFamily="Arial"
+                        fontWeight="600"
+                        fill="#555555"
+                        opacity={0.4}
+                        align="center"
+                        offsetX={W / 4}
+                        offsetY={Math.max(18, template.height_px * 0.035 * zoom)}
+                        name="center-text"
+                      />
+                    )}
+                  </>
+                );
+              })()}
             </Layer>
 
             {/* Elements Layer */}
@@ -1364,60 +1531,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
               })}
             </Layer>
 
-            {/* Mounting Holes Layer - always on top of elements */}
-            <Layer>
-              {/* Mounting holes - top left */}
-              <Rect
-                x={template.width_px * 0.12 * zoom}
-                y={template.height_px * 0.18 * zoom}
-                width={template.width_px * 0.08 * zoom}
-                height={template.height_px * 0.04 * zoom}
-                fill="#ffffff"
-                stroke="#999999"
-                strokeWidth={1 * zoom}
-                cornerRadius={template.height_px * 0.02 * zoom}
-                name="mounting-hole-tl"
-              />
-              
-              {/* Mounting holes - top right */}
-              <Rect
-                x={template.width_px * 0.8 * zoom}
-                y={template.height_px * 0.18 * zoom}
-                width={template.width_px * 0.08 * zoom}
-                height={template.height_px * 0.04 * zoom}
-                fill="#ffffff"
-                stroke="#999999"
-                strokeWidth={1 * zoom}
-                cornerRadius={template.height_px * 0.02 * zoom}
-                name="mounting-hole-tr"
-              />
-              
-              {/* Mounting holes - bottom left */}
-              <Rect
-                x={template.width_px * 0.12 * zoom}
-                y={template.height_px * 0.78 * zoom}
-                width={template.width_px * 0.08 * zoom}
-                height={template.height_px * 0.04 * zoom}
-                fill="#ffffff"
-                stroke="#999999"
-                strokeWidth={1 * zoom}
-                cornerRadius={template.height_px * 0.02 * zoom}
-                name="mounting-hole-bl"
-              />
-              
-              {/* Mounting holes - bottom right */}
-              <Rect
-                x={template.width_px * 0.8 * zoom}
-                y={template.height_px * 0.78 * zoom}
-                width={template.width_px * 0.08 * zoom}
-                height={template.height_px * 0.04 * zoom}
-                fill="#ffffff"
-                stroke="#999999"
-                strokeWidth={1 * zoom}
-                cornerRadius={template.height_px * 0.02 * zoom}
-                name="mounting-hole-br"
-              />
-            </Layer>
+            {/* Removed separate mounting holes layer (integrated into background frame) */}
 
             {/* Transformer Layer */}
             <Layer>
