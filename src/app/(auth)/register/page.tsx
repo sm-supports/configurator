@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
-import { Eye, EyeOff, Loader2, Mail, Lock, CheckCircle, ArrowLeft } from 'lucide-react';
-
+import { Eye, EyeOff, Loader2, Mail, Lock, CheckCircle, ArrowLeft, Check, X } from 'lucide-react';
+import { isValidEmail, validatePassword } from '@/lib/authUtils';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -18,15 +18,31 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // Password validation states
+  const passwordValidation = validatePassword(password);
+  const passwordsMatch = password === confirmPassword && password.length > 0;
+
   const validateForm = () => {
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters long');
+    if (!email || !password || !confirmPassword) {
+      setError('Please fill in all fields');
       return false;
     }
+
+    if (!isValidEmail(email)) {
+      setError('Please enter a valid email address');
+      return false;
+    }
+
+    if (!passwordValidation.isValid) {
+      setError(passwordValidation.errors[0]);
+      return false;
+    }
+
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       return false;
     }
+
     return true;
   };
 
@@ -42,23 +58,46 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const { error: signUpError } = await supabase.auth.signUp({ 
-        email, 
-        password 
+      const { data, error: signUpError } = await supabase.auth.signUp({ 
+        email: email.toLowerCase().trim(), 
+        password,
+        options: {
+          data: {
+            email_confirm: true
+          }
+        }
       });
 
       if (signUpError) {
-        setError(signUpError.message);
+        console.error('Registration error:', signUpError);
+        
+        if (signUpError.message.includes('already_registered')) {
+          setError('An account with this email already exists. Please sign in instead.');
+        } else if (signUpError.message.includes('password')) {
+          setError('Password does not meet security requirements. Please try a stronger password.');
+        } else {
+          setError(signUpError.message);
+        }
         return;
       }
 
-      setSuccess('Account created successfully! Please check your email to verify your account.');
-      
-      // Redirect to login page after a short delay
-      setTimeout(() => {
-        router.push('/login');
-      }, 3000);
-    } catch {
+      if (data.user) {
+        setSuccess('Account created successfully! Please check your email to verify your account before signing in.');
+        
+        // Clear form
+        setEmail('');
+        setPassword('');
+        setConfirmPassword('');
+        
+        // Redirect to login page after a short delay
+        setTimeout(() => {
+          router.push('/login');
+        }, 5000);
+      } else {
+        setError('Account creation failed. Please try again.');
+      }
+    } catch (err) {
+      console.error('Unexpected registration error:', err);
       setError('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
@@ -130,6 +169,7 @@ export default function RegisterPage() {
                   placeholder="Enter your email"
                   required
                   disabled={loading}
+                  autoComplete="email"
                 />
               </div>
             </div>
@@ -149,9 +189,10 @@ export default function RegisterPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="block w-full pl-10 pr-12 py-3 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                  placeholder="Create a password (min. 6 characters)"
+                  placeholder="Create a strong password"
                   required
                   disabled={loading}
+                  autoComplete="new-password"
                 />
                 <button
                   type="button"
@@ -166,9 +207,55 @@ export default function RegisterPage() {
                   )}
                 </button>
               </div>
-              <p className="mt-1 text-xs text-gray-500">
-                Password must be at least 6 characters long
-              </p>
+              
+              {/* Password Requirements */}
+              {password.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  <p className="text-sm font-medium text-gray-700">Password requirements:</p>
+                  <div className="space-y-1">
+                    <div className={`flex items-center text-xs ${password.length >= 8 ? 'text-green-600' : 'text-gray-500'}`}>
+                      {password.length >= 8 ? (
+                        <Check className="w-3 h-3 mr-2" />
+                      ) : (
+                        <X className="w-3 h-3 mr-2" />
+                      )}
+                      At least 8 characters
+                    </div>
+                    <div className={`flex items-center text-xs ${/[A-Z]/.test(password) ? 'text-green-600' : 'text-gray-500'}`}>
+                      {/[A-Z]/.test(password) ? (
+                        <Check className="w-3 h-3 mr-2" />
+                      ) : (
+                        <X className="w-3 h-3 mr-2" />
+                      )}
+                      One uppercase letter
+                    </div>
+                    <div className={`flex items-center text-xs ${/[a-z]/.test(password) ? 'text-green-600' : 'text-gray-500'}`}>
+                      {/[a-z]/.test(password) ? (
+                        <Check className="w-3 h-3 mr-2" />
+                      ) : (
+                        <X className="w-3 h-3 mr-2" />
+                      )}
+                      One lowercase letter
+                    </div>
+                    <div className={`flex items-center text-xs ${/[0-9]/.test(password) ? 'text-green-600' : 'text-gray-500'}`}>
+                      {/[0-9]/.test(password) ? (
+                        <Check className="w-3 h-3 mr-2" />
+                      ) : (
+                        <X className="w-3 h-3 mr-2" />
+                      )}
+                      One number
+                    </div>
+                    <div className={`flex items-center text-xs ${/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password) ? 'text-green-600' : 'text-gray-500'}`}>
+                      {/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password) ? (
+                        <Check className="w-3 h-3 mr-2" />
+                      ) : (
+                        <X className="w-3 h-3 mr-2" />
+                      )}
+                      One special character
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Confirm Password Field */}
@@ -185,10 +272,17 @@ export default function RegisterPage() {
                   type={showConfirmPassword ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="block w-full pl-10 pr-12 py-3 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  className={`block w-full pl-10 pr-12 py-3 border rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 transition-colors ${
+                    confirmPassword.length > 0
+                      ? passwordsMatch
+                        ? 'border-green-300 focus:ring-green-500 focus:border-green-500'
+                        : 'border-red-300 focus:ring-red-500 focus:border-red-500'
+                      : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                  }`}
                   placeholder="Confirm your password"
                   required
                   disabled={loading}
+                  autoComplete="new-password"
                 />
                 <button
                   type="button"
@@ -202,7 +296,20 @@ export default function RegisterPage() {
                     <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />
                   )}
                 </button>
+                {/* Password match indicator */}
+                {confirmPassword.length > 0 && (
+                  <div className="absolute inset-y-0 right-10 flex items-center">
+                    {passwordsMatch ? (
+                      <Check className="w-4 h-4 text-green-500" />
+                    ) : (
+                      <X className="w-4 h-4 text-red-500" />
+                    )}
+                  </div>
+                )}
               </div>
+              {confirmPassword.length > 0 && !passwordsMatch && (
+                <p className="mt-1 text-xs text-red-600">Passwords do not match</p>
+              )}
             </div>
 
             {/* Submit Button */}

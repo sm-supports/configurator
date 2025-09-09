@@ -66,7 +66,7 @@ export default function AdminPage() {
           { 
             id: '1', 
             name: 'US Standard', 
-            image_url: '/templates/us-standard.png', 
+            image_url: 'https://via.placeholder.com/1200x600/2563eb/ffffff?text=US+Standard', 
             width_px: 1200, 
             height_px: 600, 
             country_id: '1', 

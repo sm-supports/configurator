@@ -37,7 +37,7 @@ export default function EditorPage() {
         setTemplate({
           id: templateId,
           name: 'Sample Template',
-          image_url: '/templates/sample.png',
+          image_url: 'https://via.placeholder.com/1200x600/2563eb/ffffff?text=Sample+Template',
           width_px: 1200,
           height_px: 600,
           country_id: '1',

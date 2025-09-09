@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { Stage, Layer, Text, Image as KonvaImage, Transformer, Rect, Circle, Path } from 'react-konva';
+import { Stage, Layer, Text, Image as KonvaImage, Transformer, Rect, Circle, Path, Group } from 'react-konva';
 import type Konva from 'konva';
 import { PlateTemplate, TextElement, ImageElement, DesignData, UserDesign } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
-import { Undo2, Redo2, ZoomIn, ZoomOut, RotateCcw, Bold, Italic, Underline, Type, ImagePlus, Trash2, Save, Download, ChevronDown } from 'lucide-react';
+import EditorHistory from '@/lib/editorHistory';
+import { Undo2, Redo2, ZoomIn, ZoomOut, RotateCcw, Bold, Italic, Underline, Type, ImagePlus, Trash2, Save, Download, ChevronDown, FlipHorizontal, FlipVertical } from 'lucide-react';
 import { saveDesign } from '@/lib/designUtils';
 import { useAuth } from '@/contexts/AuthContext';
 import jsPDF from 'jspdf';
@@ -58,8 +59,88 @@ export default function Editor({ template, existingDesign }: EditorProps) {
   const editorContainerRef = useRef<HTMLDivElement | null>(null);
   const toolbarRef = useRef<HTMLDivElement | null>(null);
   const toolbarMouseDownRef = useRef<boolean>(false);
+  
+  // Create default license plate elements
+  const createDefaultElements = useCallback((): Element[] => {
+    if (existingDesign?.design_json?.elements) {
+      return existingDesign.design_json.elements as Element[];
+    }
+    
+    // Default license plate template with sample text
+    const defaultElements: Element[] = [
+      // Main license plate text - centered and prominent
+      {
+        id: uuidv4(),
+        type: 'text',
+        text: 'ABC-123',
+        x: template.width_px * 0.15, // 15% from left
+        y: template.height_px * 0.35, // 35% from top
+        width: template.width_px * 0.7, // 70% width
+        height: template.height_px * 0.3, // 30% height
+        fontSize: Math.min(template.width_px * 0.14, template.height_px * 0.28), // Responsive font size
+        fontFamily: vehiclePlateFonts[0].value, // Courier New monospace
+        fontWeight: 'bold',
+        fontStyle: 'normal',
+        textDecoration: 'none',
+        color: '#000000',
+        textAlign: 'center',
+        zIndex: 1,
+        visible: true,
+        locked: false,
+        flippedH: false,
+        flippedV: false
+      },
+      // State/Region text (smaller, above main text)
+      {
+        id: uuidv4(),
+        type: 'text',
+        text: 'CALIFORNIA',
+        x: template.width_px * 0.2, // 20% from left
+        y: template.height_px * 0.15, // 15% from top
+        width: template.width_px * 0.6, // 60% width
+        height: template.height_px * 0.15, // 15% height
+        fontSize: Math.min(template.width_px * 0.04, template.height_px * 0.1), // Smaller font
+        fontFamily: vehiclePlateFonts[0].value,
+        fontWeight: 'normal',
+        fontStyle: 'normal',
+        textDecoration: 'none',
+        color: '#000000',
+        textAlign: 'center',
+        zIndex: 1,
+        visible: true,
+        locked: false,
+        flippedH: false,
+        flippedV: false
+      },
+      // Bottom tagline/slogan
+      {
+        id: uuidv4(),
+        type: 'text',
+        text: 'Golden State',
+        x: template.width_px * 0.2, // 20% from left
+        y: template.height_px * 0.75, // 75% from top
+        width: template.width_px * 0.6, // 60% width
+        height: template.height_px * 0.12, // 12% height
+        fontSize: Math.min(template.width_px * 0.03, template.height_px * 0.08), // Smaller font
+        fontFamily: vehiclePlateFonts[0].value,
+        fontWeight: 'normal',
+        fontStyle: 'italic',
+        textDecoration: 'none',
+        color: '#000000',
+        textAlign: 'center',
+        zIndex: 1,
+        visible: true,
+        locked: false,
+        flippedH: false,
+        flippedV: false
+      }
+    ];
+    
+    return defaultElements;
+  }, [existingDesign, template.width_px, template.height_px]);
+  
   const [state, setState] = useState<EditorState>({
-    elements: (existingDesign?.design_json?.elements || []) as Element[],
+    elements: createDefaultElements(),
     selectedId: null,
     editingTextId: null
   });
@@ -150,6 +231,7 @@ export default function Editor({ template, existingDesign }: EditorProps) {
     fontFamily: string;
     fontWeight: React.CSSProperties['fontWeight'];
     fontStyle: string;
+  color: string;
   }>({ 
     x: 0, 
     y: 0, 
@@ -159,56 +241,30 @@ export default function Editor({ template, existingDesign }: EditorProps) {
     fontFamily: 'Courier New, monospace',
     fontWeight: 'normal',
     fontStyle: 'normal'
+  , color: '#000000'
   });
 
   const stageRef = useRef<Konva.Stage>(null);
   const transformerRef = useRef<Konva.Transformer>(null);
   const editInputRef = useRef<HTMLTextAreaElement>(null);
-  // History stacks for undo/redo
-  const undoStackRef = useRef<EditorState[]>([]);
-  const redoStackRef = useRef<EditorState[]>([]);
-  const stateRef = useRef<EditorState>(state);
-  useEffect(() => { stateRef.current = state; }, [state]);
+  // History manager for undo/redo
+  const historyRef = useRef<EditorHistory<EditorState>>(new EditorHistory<EditorState>());
 
-  const cloneElements = useCallback((els: Element[]) => els.map((el) => ({ ...el })), []);
+  // Helper to push a snapshot of previous state into history
   const pushHistory = useCallback((prev: EditorState) => {
-    // Snapshot without active text editing session
-    const snapshot: EditorState = {
-      elements: cloneElements(prev.elements),
-      selectedId: prev.selectedId,
-      editingTextId: null,
-    };
-    undoStackRef.current.push(snapshot);
-    // Clear redo on new branch
-    redoStackRef.current = [];
-  }, [cloneElements]);
+    historyRef.current.push(prev);
+  }, []);
 
-  const canUndo = () => undoStackRef.current.length > 0;
-  const canRedo = () => redoStackRef.current.length > 0;
+  const canUndo = useCallback(() => historyRef.current.canUndo(), []);
+  const canRedo = useCallback(() => historyRef.current.canRedo(), []);
 
   const undo = useCallback(() => {
-    if (!canUndo()) return;
-    const current: EditorState = {
-      elements: cloneElements(stateRef.current.elements),
-      selectedId: stateRef.current.selectedId,
-      editingTextId: null,
-    };
-    const prev = undoStackRef.current.pop()!;
-    redoStackRef.current.push(current);
-    setState({ ...prev });
-  }, [cloneElements]);
+    historyRef.current.undo(state, (s) => setState(s));
+  }, [state]);
 
   const redo = useCallback(() => {
-    if (!canRedo()) return;
-    const current: EditorState = {
-      elements: cloneElements(stateRef.current.elements),
-      selectedId: stateRef.current.selectedId,
-      editingTextId: null,
-    };
-    const next = redoStackRef.current.pop()!;
-    undoStackRef.current.push(current);
-    setState({ ...next });
-  }, [cloneElements]);
+    historyRef.current.redo(state, (s) => setState(s));
+  }, [state]);
 
   // Zoom functions
   const zoomIn = useCallback(() => {
@@ -268,18 +324,30 @@ export default function Editor({ template, existingDesign }: EditorProps) {
     const stageBox = stage?.container().getBoundingClientRect();
     if (!stage || !stageBox) return;
 
-    // Prefer using the Konva node's absolute position for precise placement
+    // Prefer using the Konva node's absolute position for precise placement.
+    // Note: node.getAbsolutePosition() already reflects the rendered pixel coordinates
+    // because we render using scaled coordinates (x = element.x * zoom). Do NOT
+    // multiply that value by zoom again — that caused the textarea to jump.
     const node = stage.findOne(`#${elementId}`) as Konva.Text | null;
-    let absX = element.x;
-    let absY = element.y;
+    let x: number;
+    let y: number;
     if (node) {
-      const pos = node.getAbsolutePosition();
-      absX = pos.x;
-      absY = pos.y;
+      try {
+        // getClientRect with relativeTo stage returns the node bounding box in stage coordinates
+        const rect = node.getClientRect({ relativeTo: stage });
+        x = stageBox.left + rect.x;
+        y = stageBox.top + rect.y;
+      } catch (err) {
+        // Fallback to absolute position if getClientRect fails for any reason
+        const pos = node.getAbsolutePosition();
+        x = stageBox.left + pos.x;
+        y = stageBox.top + pos.y;
+      }
+    } else {
+      // Fallback: compute using element coords multiplied by the current zoom once
+      x = stageBox.left + element.x * zoom;
+      y = stageBox.top + element.y * zoom;
     }
-    const stageScale = zoom; // Use zoom instead of stage.scaleX()
-    const x = stageBox.left + (absX * stageScale);
-    const y = stageBox.top + (absY * stageScale);
 
     // Measure current text to set initial edit box size to content
     const measured = measureText(textElement.text, textElement.fontSize, textElement.fontFamily, textElement.fontWeight, textElement.fontStyle);
@@ -295,12 +363,13 @@ export default function Editor({ template, existingDesign }: EditorProps) {
     setEditingPos({ 
       x, 
       y, 
-  width: Math.max(measured.width + padX, element.width || 200) * stageScale,
-  height: Math.max(measured.height + padY, element.height || 50) * stageScale,
-      fontSize: textElement.fontSize * stageScale,
+  width: Math.max(measured.width + padX, element.width || 200) * zoom,
+  height: Math.max(measured.height + padY, element.height || 50) * zoom,
+      fontSize: textElement.fontSize * zoom,
       fontFamily: textElement.fontFamily,
       fontWeight: textElement.fontWeight,
-      fontStyle: textElement.fontStyle || 'normal'
+      fontStyle: textElement.fontStyle || 'normal',
+      color: textElement.color || '#000000'
     });
   }, [state.elements, zoom, measureText]);
 
@@ -595,7 +664,9 @@ This PNG is already optimized at 600 DPI for commercial printing.
       textAlign: 'left',
       zIndex: state.elements.length,
       visible: true,
-      locked: false
+      locked: false,
+      flippedH: false,
+      flippedV: false
     };
 
     setState(prev => {
@@ -637,7 +708,9 @@ This PNG is already optimized at 600 DPI for commercial printing.
           originalHeight: img.height,
           zIndex: state.elements.length,
           visible: true,
-          locked: false
+          locked: false,
+          flippedH: false,
+          flippedV: false
         };
 
         setState(prev => {
@@ -671,6 +744,38 @@ This PNG is already optimized at 600 DPI for commercial printing.
       };
     });
   }, [pushHistory]);
+
+  // Handle horizontal flip
+  const flipHorizontal = useCallback((id: string) => {
+    const element = state.elements.find(el => el.id === id);
+    if (!element) return;
+    
+    setState(prev => {
+      pushHistory(prev);
+      return {
+        ...prev,
+        elements: prev.elements.map(el => 
+          el.id === id ? { ...el, flippedH: !el.flippedH } as Element : el
+        )
+      };
+    });
+  }, [state.elements, pushHistory]);
+
+  // Handle vertical flip
+  const flipVertical = useCallback((id: string) => {
+    const element = state.elements.find(el => el.id === id);
+    if (!element) return;
+    
+    setState(prev => {
+      pushHistory(prev);
+      return {
+        ...prev,
+        elements: prev.elements.map(el => 
+          el.id === id ? { ...el, flippedV: !el.flippedV } as Element : el
+        )
+      };
+    });
+  }, [state.elements, pushHistory]);
 
   // Finish text editing
   const finishTextEdit = useCallback((save: boolean = true, reselect: boolean = true) => {
@@ -717,10 +822,10 @@ This PNG is already optimized at 600 DPI for commercial printing.
   // Focus textarea when starting to edit
   useEffect(() => {
     if (state.editingTextId && editInputRef.current) {
-      editInputRef.current.focus();
-      // Move caret to end
-      const len = editInputRef.current.value.length;
-      editInputRef.current.setSelectionRange(len, len);
+  const el = editInputRef.current;
+  el.focus();
+  // Select all text so double-click / edit starts with full selection
+  el.select();
     }
   }, [state.editingTextId]);
 
@@ -856,21 +961,20 @@ This PNG is already optimized at 600 DPI for commercial printing.
       >
         <button
           onClick={() => window.location.href = '/'}
-          className="p-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors duration-200 shadow-sm hover:shadow-md flex items-center gap-2"
+          className="p-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors duration-200 shadow-sm hover:shadow-md"
           title="Go to Home"
           aria-label="Home"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
           </svg>
-          <span className="hidden sm:inline">Home</span>
         </button>
         
         <div className="h-6 w-px bg-gray-200 mx-2" />
 
         <button
           onClick={undo}
-          disabled={!undoStackRef.current.length}
+          disabled={!canUndo()}
           className="p-3 rounded-lg hover:bg-gray-100 text-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm hover:shadow-md disabled:hover:shadow-sm"
           title="Undo (Cmd/Ctrl+Z)"
           aria-label="Undo"
@@ -879,7 +983,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
         </button>
         <button
           onClick={redo}
-          disabled={!redoStackRef.current.length}
+          disabled={!canRedo()}
           className="p-3 rounded-lg hover:bg-gray-100 text-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm hover:shadow-md disabled:hover:shadow-sm"
           title="Redo (Cmd/Ctrl+Shift+Z or Cmd/Ctrl+Y)"
           aria-label="Redo"
@@ -889,36 +993,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
 
         <div className="h-6 w-px bg-gray-200 mx-2" />
 
-        {/* Zoom Controls */}
-        <button
-          onClick={zoomOut}
-          disabled={zoom <= minZoom}
-          className="p-3 rounded-lg hover:bg-gray-100 text-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm hover:shadow-md disabled:hover:shadow-sm"
-          title="Zoom Out"
-          aria-label="Zoom Out"
-        >
-          <ZoomOut className="w-5 h-5" />
-        </button>
-        <span className="text-sm text-gray-600 min-w-[4rem] text-center font-medium">
-          {Math.round(zoom * 100)}%
-        </span>
-        <button
-          onClick={zoomIn}
-          disabled={zoom >= maxZoom}
-          className="p-3 rounded-lg hover:bg-gray-100 text-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm hover:shadow-md disabled:hover:shadow-sm"
-          title="Zoom In"
-          aria-label="Zoom In"
-        >
-          <ZoomIn className="w-5 h-5" />
-        </button>
-        <button
-          onClick={resetZoom}
-          className="p-3 rounded-lg hover:bg-gray-100 text-gray-800 transition-colors duration-200 shadow-sm hover:shadow-md"
-          title="Reset Zoom (70%)"
-          aria-label="Reset Zoom"
-        >
-          <RotateCcw className="w-5 h-5" />
-        </button>
+  {/* Zoom controls moved to a fixed bottom-right overlay (see below) */}
 
         <div className="h-6 w-px bg-gray-200 mx-1" />
 
@@ -943,15 +1018,15 @@ This PNG is already optimized at 600 DPI for commercial printing.
             {showLayersPanel && (
               <div className="layers-panel absolute top-full right-0 mt-2 w-72 max-h-[60vh] overflow-auto bg-white border border-gray-200 rounded-lg shadow-xl z-[120] p-2 flex flex-col gap-2 text-sm">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="font-semibold text-gray-700">Layers</span>
+                  <span className="font-semibold text-black">Layers</span>
                   <button
                     onClick={() => setShowLayersPanel(false)}
-                    className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-600"
+                    className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-black"
                   >Close</button>
                 </div>
-                <div className="text-[11px] text-gray-500 mb-1">Top is front-most. Reorder instantly.</div>
+                <div className="text-[11px] text-black mb-1">Top is front-most. Reorder instantly.</div>
                 {state.elements.length === 0 && (
-                  <div className="text-xs text-gray-400 italic py-4 text-center">No elements yet</div>
+                  <div className="text-xs text-black italic py-4 text-center">No elements yet</div>
                 )}
                 {[...state.elements].map((el, idx) => ({ el, idx }))
                   .sort((a,b) => a.idx - b.idx)
@@ -970,7 +1045,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
                       >
                         <button
                           onClick={() => setState(p => ({ ...p, selectedId: el.id }))}
-                          className={`flex-1 text-left truncate text-xs ${isSelected ? 'text-indigo-700 font-medium' : 'text-gray-700'}`}
+                          className={`flex-1 text-left truncate text-xs ${isSelected ? 'text-indigo-700 font-medium' : 'text-black'}`}
                           title={label}
                         >{label}</button>
                         <div className="flex items-center gap-1">
@@ -989,7 +1064,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
                               });
                             }}
                             disabled={frontMost}
-                            className="p-1 rounded border border-gray-300 text-[10px] leading-none disabled:opacity-40 hover:bg-gray-100"
+                            className="p-1 rounded border border-gray-300 text-[10px] text-black leading-none disabled:opacity-40 hover:bg-gray-100"
                             title="Bring Forward"
                           >↑</button>
                           <button
@@ -1007,7 +1082,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
                               });
                             }}
                             disabled={backMost}
-                            className="p-1 rounded border border-gray-300 text-[10px] leading-none disabled:opacity-40 hover:bg-gray-100"
+                            className="p-1 rounded border border-gray-300 text-[10px] text-black leading-none disabled:opacity-40 hover:bg-gray-100"
                             title="Send Backward"
                           >↓</button>
                           <button
@@ -1024,7 +1099,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
                               });
                             }}
                             disabled={frontMost}
-                            className="p-1 rounded border border-gray-300 text-[10px] leading-none disabled:opacity-40 hover:bg-gray-100"
+                            className="p-1 rounded border border-gray-300 text-[10px] text-black leading-none disabled:opacity-40 hover:bg-gray-100"
                             title="Bring to Front"
                           >Top</button>
                           <button
@@ -1041,7 +1116,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
                               });
                             }}
                             disabled={backMost}
-                            className="p-1 rounded border border-gray-300 text-[10px] leading-none disabled:opacity-40 hover:bg-gray-100"
+                            className="p-1 rounded border border-gray-300 text-[10px] text-black leading-none disabled:opacity-40 hover:bg-gray-100"
                             title="Send to Back"
                           >Bottom</button>
                         </div>
@@ -1185,7 +1260,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
               <div className="flex items-center gap-3 ml-4">
                 {/* Font Size Input */}
                 <div className="flex items-center gap-1">
-                  <label className="text-xs font-medium text-gray-700 flex-shrink-0">Size:</label>
+                  <label className="text-xs font-medium text-black flex-shrink-0">Size:</label>
                   <input
                     type="number"
                     min="8"
@@ -1208,14 +1283,14 @@ This PNG is already optimized at 600 DPI for commercial printing.
                         }
                       }
                     }}
-                    className="w-14 px-1 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-14 px-1 py-1 border border-gray-300 rounded text-xs text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
-                  <span className="text-sm text-gray-500">px</span>
+                  <span className="text-sm text-black">px</span>
                 </div>
 
                 {/* Font Family Selector */}
                 <div className="flex items-center gap-1">
-                  <label className="text-xs font-medium text-gray-700 flex-shrink-0">Font:</label>
+                  <label className="text-xs font-medium text-black flex-shrink-0">Font:</label>
                   <select
                     value={textElement.fontFamily}
                     onChange={(e) => {
@@ -1233,18 +1308,18 @@ This PNG is already optimized at 600 DPI for commercial printing.
                         }));
                       }
                     }}
-                    className="px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white min-w-[120px]"
+                    className="px-2 py-1 border border-gray-300 rounded text-xs text-black focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white min-w-[120px]"
                   >
                     <optgroup label="License Plate Fonts (Recommended)">
                       {vehiclePlateFonts.map(font => (
-                        <option key={font.value} value={font.value} style={{ fontFamily: font.value }}>
+                        <option key={font.value} value={font.value} style={{ fontFamily: font.value, color: 'black' }}>
                           {font.name}
                         </option>
                       ))}
                     </optgroup>
                     <optgroup label="Other Fonts">
                       {generalFonts.map(font => (
-                        <option key={font.value} value={font.value} style={{ fontFamily: font.value }}>
+                        <option key={font.value} value={font.value} style={{ fontFamily: font.value, color: 'black' }}>
                           {font.name}
                         </option>
                       ))}
@@ -1254,7 +1329,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
 
                 {/* Text Color Control */}
                 <div className="flex items-center gap-1">
-                  <label className="text-xs font-medium text-gray-700 flex-shrink-0">Color:</label>
+                  <label className="text-xs font-medium text-black flex-shrink-0">Color:</label>
                   <div className="relative">
                     <input
                       type="color"
@@ -1271,7 +1346,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
 
                 {/* Text Style Controls */}
                 <div className="flex items-center gap-1">
-                  <label className="text-xs font-medium text-gray-700 flex-shrink-0 mr-1">Style:</label>
+                  <label className="text-xs font-medium text-black flex-shrink-0 mr-1">Style:</label>
                   
                   {/* Bold Button */}
                   <button
@@ -1322,6 +1397,77 @@ This PNG is already optimized at 600 DPI for commercial printing.
                   >
                     <Underline className="w-3 h-3" />
                   </button>
+
+                  {/* Horizontal Flip Button */}
+                  <button
+                    onClick={() => flipHorizontal(state.selectedId!)}
+                    className={`p-1 rounded text-xs border ${
+                      textElement.flippedH 
+                        ? 'bg-blue-500 text-white border-blue-500' 
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }`}
+                    title="Flip Horizontal"
+                  >
+                    <FlipHorizontal className="w-3 h-3" />
+                  </button>
+
+                  {/* Vertical Flip Button */}
+                  <button
+                    onClick={() => flipVertical(state.selectedId!)}
+                    className={`p-1 rounded text-xs border ${
+                      textElement.flippedV 
+                        ? 'bg-blue-500 text-white border-blue-500' 
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }`}
+                    title="Flip Vertical"
+                  >
+                    <FlipVertical className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
+          return null;
+        })()}
+
+        {/* Image-specific controls */}
+        {(() => {
+          const selectedElement = state.elements.find(el => el.id === state.selectedId);
+          const isImageElement = selectedElement?.type === 'image';
+          if (state.selectedId && isImageElement) {
+            const imageElement = selectedElement as ImageElement;
+            return (
+              <div className="flex items-center gap-4 py-2 px-4 bg-gray-100 border-b border-gray-200 text-sm">
+                {/* Transform Controls for Images */}
+                <div className="flex items-center gap-1">
+                  <label className="text-xs font-medium text-black flex-shrink-0 mr-1">Transform:</label>
+                  
+                  {/* Horizontal Flip Button */}
+                  <button
+                    onClick={() => flipHorizontal(state.selectedId!)}
+                    className={`p-1 rounded text-xs border ${
+                      imageElement.flippedH 
+                        ? 'bg-blue-500 text-white border-blue-500' 
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }`}
+                    title="Flip Horizontal"
+                  >
+                    <FlipHorizontal className="w-3 h-3" />
+                  </button>
+
+                  {/* Vertical Flip Button */}
+                  <button
+                    onClick={() => flipVertical(state.selectedId!)}
+                    className={`p-1 rounded text-xs border ${
+                      imageElement.flippedV 
+                        ? 'bg-blue-500 text-white border-blue-500' 
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }`}
+                    title="Flip Vertical"
+                  >
+                    <FlipVertical className="w-3 h-3" />
+                  </button>
                 </div>
               </div>
             );
@@ -1329,7 +1475,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
           return null;
         })()}
 
-        <div className="text-xs text-gray-600 flex-shrink-0">
+        <div className="text-xs text-black flex-shrink-0">
           Elements: {state.elements.length} | Selected: {state.selectedId ? 'Yes' : 'None'}
         </div>
       </div>
@@ -1390,49 +1536,72 @@ This PNG is already optimized at 600 DPI for commercial printing.
                       cornerRadius={cornerR * 0.8}
                       name="design-area"
                     />
-                    {/* Mounting tab protrusions (black) with white hole centers and concave notches */}
-                    {/* Concave notches show where the plate would be indented around mounting tabs for proper installation */}
+                    {/* Safe design area path (green dashed) shaped around mounting cutouts */}
+                    {(() => {
+                      // Tuned geometry for clearer visibility
+                      const inset = border * 2; // increased padding inward
+                      const safeX = innerX + inset;
+                      const safeY = innerY + inset;
+                      const safeW = innerW - inset * 2;
+                      const safeH = innerH - inset * 2;
+                      const r = cornerR * 0.5;
+                      const tabCenters = tabXOffset.map(tx => W * tx);
+                      const cutoutWidth = tabRadius * 2.8; // wider curve span
+                      const cutoutDepth = tabRadius * 0.85; // deeper dip
+                      const left = safeX;
+                      const right = safeX + safeW;
+                      const top = safeY;
+                      const bottom = safeY + safeH;
+                      const [firstCenter, secondCenter] = tabCenters;
+                      const dipHalf = cutoutWidth / 2;
+                      const path: string[] = [];
+                      path.push(`M ${left + r} ${top}`);
+                      // top edge to first dip
+                      path.push(`L ${firstCenter - dipHalf} ${top}`);
+                      // smoother dip using two quadratics
+                      path.push(`Q ${firstCenter - dipHalf * 0.55} ${top + cutoutDepth} ${firstCenter} ${top + cutoutDepth}`);
+                      path.push(`Q ${firstCenter + dipHalf * 0.55} ${top + cutoutDepth} ${firstCenter + dipHalf} ${top}`);
+                      // to second dip
+                      path.push(`L ${secondCenter - dipHalf} ${top}`);
+                      path.push(`Q ${secondCenter - dipHalf * 0.55} ${top + cutoutDepth} ${secondCenter} ${top + cutoutDepth}`);
+                      path.push(`Q ${secondCenter + dipHalf * 0.55} ${top + cutoutDepth} ${secondCenter + dipHalf} ${top}`);
+                      // to top-right corner
+                      path.push(`L ${right - r} ${top}`);
+                      path.push(`Q ${right} ${top} ${right} ${top + r}`);
+                      // right side
+                      path.push(`L ${right} ${bottom - r}`);
+                      path.push(`Q ${right} ${bottom} ${right - r} ${bottom}`);
+                      // bottom edge (reverse dips)
+                      path.push(`L ${secondCenter + dipHalf} ${bottom}`);
+                      path.push(`Q ${secondCenter + dipHalf * 0.55} ${bottom - cutoutDepth} ${secondCenter} ${bottom - cutoutDepth}`);
+                      path.push(`Q ${secondCenter - dipHalf * 0.55} ${bottom - cutoutDepth} ${secondCenter - dipHalf} ${bottom}`);
+                      path.push(`L ${firstCenter + dipHalf} ${bottom}`);
+                      path.push(`Q ${firstCenter + dipHalf * 0.55} ${bottom - cutoutDepth} ${firstCenter} ${bottom - cutoutDepth}`);
+                      path.push(`Q ${firstCenter - dipHalf * 0.55} ${bottom - cutoutDepth} ${firstCenter - dipHalf} ${bottom}`);
+                      path.push(`L ${left + r} ${bottom}`);
+                      path.push(`Q ${left} ${bottom} ${left} ${bottom - r}`);
+                      path.push(`L ${left} ${top + r}`);
+                      path.push(`Q ${left} ${top} ${left + r} ${top}`);
+                      path.push('Z');
+                      return (
+                        <Path
+                          data={path.join(' ')}
+                          stroke="#16a34a" // slightly darker green for contrast
+                          strokeWidth={3}
+                          dash={[12,6]}
+                          listening={false}
+                          name="safe-area-guide"
+                        />
+                      );
+                    })()}
+                    {/* Mounting tab protrusions (black) with white hole centers */}
                     {tabXOffset.flatMap((tx) => {
                       const cx = W * tx;
-                      const notchWidth = tabRadius * 2.8; // Width of the concave notch 
-                      const notchDepth = tabRadius * 0.75; // Depth of the concave dip - deeper for better visibility
-                      
-                      // Calculate concave notch paths using quadratic curves
-                      const topNotchY = innerY; // Top edge of white area
-                      const bottomNotchY = innerY + innerH; // Bottom edge of white area
-                      
-                      // Top concave notch - creates a quadratic dip above the mounting tab
-                      // This shows where the plate curves inward around the mounting hardware
-                      const topNotchPath = `M ${cx - notchWidth/2} ${topNotchY} Q ${cx} ${topNotchY - notchDepth} ${cx + notchWidth/2} ${topNotchY}`;
-                      
-                      // Bottom concave notch - creates a quadratic dip below the mounting tab  
-                      const bottomNotchPath = `M ${cx - notchWidth/2} ${bottomNotchY} Q ${cx} ${bottomNotchY + notchDepth} ${cx + notchWidth/2} ${bottomNotchY}`;
-                      
                       return [
-                        // Top concave notch (green line showing the indentation curve)
-                        <Path 
-                          key={`notch-top-${tx}`} 
-                          data={topNotchPath} 
-                          stroke="#00cc00" 
-                          strokeWidth={3} 
-                          fill="none"
-                          name="concave-notch"
-                          strokeDasharray="8 4" // Dashed line for better visual distinction
-                        />,
-                        // Bottom concave notch (green line showing the indentation curve)
-                        <Path 
-                          key={`notch-bottom-${tx}`} 
-                          data={bottomNotchPath} 
-                          stroke="#00cc00" 
-                          strokeWidth={3} 
-                          fill="none"
-                          name="concave-notch"
-                          strokeDasharray="8 4" // Dashed line for better visual distinction
-                        />,
-                        // Top mounting tab (circular protrusion)
+                        // Top tab
                         <Circle key={`tab-top-${tx}`} x={cx} y={topY} radius={tabRadius} fill="#000" name="mounting-tab" />, 
                         <Circle key={`hole-top-${tx}`} x={cx} y={topY} radius={holeRadius} fill="#ffffff" name="mounting-hole" />, 
-                        // Bottom mounting tab (circular protrusion)
+                        // Bottom tab
                         <Circle key={`tab-bottom-${tx}`} x={cx} y={bottomY} radius={tabRadius} fill="#000" name="mounting-tab" />, 
                         <Circle key={`hole-bottom-${tx}`} x={cx} y={bottomY} radius={holeRadius} fill="#ffffff" name="mounting-hole" />
                       ];
@@ -1442,7 +1611,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
                       <Text
                         x={W / 2}
                         y={H / 2}
-                        text="Add Text or Image"
+                        text="Create Your Design"
                         fontSize={Math.max(18, template.height_px * 0.07 * zoom)}
                         fontFamily="Arial"
                         fontWeight="600"
@@ -1459,76 +1628,113 @@ This PNG is already optimized at 600 DPI for commercial printing.
               })()}
             </Layer>
 
-            {/* Elements Layer */}
+            {/* Elements Layer (preserve order; per-text clipping) */}
             <Layer>
-              {state.elements.map((element) => {
-                if (element.type === 'text') {
-                  const textEl = element as TextElement;
-                  return (
-                    <Text
-                      key={element.id}
-                      id={element.id}
-                      text={textEl.text}
-                      x={element.x * zoom}
-                      y={element.y * zoom}
-                      width={(element.width || 100) * zoom}
-                      height={(element.height || 50) * zoom}
-                      fontSize={textEl.fontSize * zoom}
-                      fontFamily={textEl.fontFamily}
-                      fontWeight={textEl.fontWeight}
-                      fontStyle={textEl.fontStyle || 'normal'}
-                      textDecoration={textEl.textDecoration || 'none'}
-                      fill={textEl.color}
-                      align={textEl.textAlign}
-                      visible={state.editingTextId !== element.id}
-                      draggable
-                      onClick={() => selectElement(element.id)}
-                      onTap={() => selectElement(element.id)}
-                      onDblClick={() => startTextEdit(element.id)}
-                      onDblTap={() => startTextEdit(element.id)}
-                      onDragEnd={(e) => {
-                        updateElement(element.id, {
-                          x: e.target.x() / zoom,
-                          y: e.target.y() / zoom
-                        });
-                      }}
-                      onTransformEnd={(e) => {
-                        const node = e.target;
-                        const scaleX = node.scaleX();
-                        const scaleY = node.scaleY();
-                        
-                        node.scaleX(1);
-                        node.scaleY(1);
-                        
-                        // Calculate new font size based on the average scale, then auto-fit width/height
-                        const avgScale = (scaleX + scaleY) / 2;
-                        const newFontSize = Math.max(8, Math.round(textEl.fontSize * avgScale));
-                        const measured = measureText(textEl.text, newFontSize, textEl.fontFamily, textEl.fontWeight, textEl.fontStyle);
-                        updateElement(element.id, {
-                          x: node.x() / zoom,
-                          y: node.y() / zoom,
-                          width: measured.width,
-                          height: measured.height,
-                          rotation: node.rotation(),
-                          fontSize: newFontSize
-                        });
-                      }}
-                    />
-                  );
-                } else if (element.type === 'image') {
-                  const imageEl = element as ImageElement;
-                  return (
-                    <ImageComponent
-                      key={element.id}
-                      element={imageEl}
-                      zoom={zoom}
-                      onSelect={() => selectElement(element.id)}
-                      onUpdate={(updates) => updateElement(element.id, updates)}
-                    />
-                  );
-                }
-                return null;
-              })}
+              {(() => {
+                // Geometry for safe clipping path reused per text
+                const W = template.width_px * zoom;
+                const H = template.height_px * zoom;
+                const cornerR = 30 * zoom;
+                const border = Math.min(W, H) * 0.05;
+                const tabRadius = Math.min(W, H) * 0.085;
+                const tabXOffset = [0.22, 0.78];
+                const inset = border * 0.4;
+                const innerX = border, innerY = border;
+                const innerW = W - border * 2, innerH = H - border * 2;
+                const safeX = innerX + inset, safeY = innerY + inset;
+                const safeW = innerW - inset * 2, safeH = innerH - inset * 2;
+                const r = cornerR * 0.5;
+                const tabCenters = tabXOffset.map(tx => W * tx);
+                const cutoutWidth = tabRadius * 2.8;
+                const cutoutDepth = tabRadius * 0.85;
+                const [firstCenter, secondCenter] = tabCenters;
+                const dipHalf = cutoutWidth / 2;
+                const left = safeX, right = safeX + safeW, top = safeY, bottom = safeY + safeH;
+                const clipBuilder = (ctx: any) => {
+                  ctx.beginPath();
+                  ctx.moveTo(left + r, top);
+                  ctx.lineTo(firstCenter - dipHalf, top);
+                  ctx.quadraticCurveTo(firstCenter - dipHalf * 0.55, top + cutoutDepth, firstCenter, top + cutoutDepth);
+                  ctx.quadraticCurveTo(firstCenter + dipHalf * 0.55, top + cutoutDepth, firstCenter + dipHalf, top);
+                  ctx.lineTo(secondCenter - dipHalf, top);
+                  ctx.quadraticCurveTo(secondCenter - dipHalf * 0.55, top + cutoutDepth, secondCenter, top + cutoutDepth);
+                  ctx.quadraticCurveTo(secondCenter + dipHalf * 0.55, top + cutoutDepth, secondCenter + dipHalf, top);
+                  ctx.lineTo(right - r, top);
+                  ctx.quadraticCurveTo(right, top, right, top + r);
+                  ctx.lineTo(right, bottom - r);
+                  ctx.quadraticCurveTo(right, bottom, right - r, bottom);
+                  ctx.lineTo(secondCenter + dipHalf, bottom);
+                  ctx.quadraticCurveTo(secondCenter + dipHalf * 0.55, bottom - cutoutDepth, secondCenter, bottom - cutoutDepth);
+                  ctx.quadraticCurveTo(secondCenter - dipHalf * 0.55, bottom - cutoutDepth, secondCenter - dipHalf, bottom);
+                  ctx.lineTo(firstCenter + dipHalf, bottom);
+                  ctx.quadraticCurveTo(firstCenter + dipHalf * 0.55, bottom - cutoutDepth, firstCenter, bottom - cutoutDepth);
+                  ctx.quadraticCurveTo(firstCenter - dipHalf * 0.55, bottom - cutoutDepth, firstCenter - dipHalf, bottom);
+                  ctx.lineTo(left + r, bottom);
+                  ctx.quadraticCurveTo(left, bottom, left, bottom - r);
+                  ctx.lineTo(left, top + r);
+                  ctx.quadraticCurveTo(left, top, left + r, top);
+                  ctx.closePath();
+                };
+                return state.elements.map(element => {
+                  if (element.type === 'text') {
+                    const textEl = element as TextElement;
+                    return (
+                      <Group key={element.id} clipFunc={clipBuilder}>
+                        <Text
+                          id={element.id}
+                          text={textEl.text}
+                          x={element.x * zoom}
+                          y={element.y * zoom}
+                          width={(element.width || 100) * zoom}
+                          height={(element.height || 50) * zoom}
+                          fontSize={textEl.fontSize * zoom}
+                          fontFamily={textEl.fontFamily}
+                          fontWeight={textEl.fontWeight}
+                          fontStyle={textEl.fontStyle || 'normal'}
+                          textDecoration={textEl.textDecoration || 'none'}
+                          fill={textEl.color}
+                          align={textEl.textAlign}
+                          scaleX={element.flippedH ? -1 : 1}
+                          scaleY={element.flippedV ? -1 : 1}
+                          offsetX={element.flippedH ? (element.width || 100) * zoom : 0}
+                          offsetY={element.flippedV ? (element.height || 50) * zoom : 0}
+                          visible={state.editingTextId !== element.id}
+                          draggable
+                          onClick={() => selectElement(element.id)}
+                          onTap={() => selectElement(element.id)}
+                          onDblClick={() => startTextEdit(element.id)}
+                          onDblTap={() => startTextEdit(element.id)}
+                          onDragEnd={(e) => {
+                            updateElement(element.id, { x: e.target.x() / zoom, y: e.target.y() / zoom });
+                          }}
+                          onTransformEnd={(e) => {
+                            const node = e.target;
+                            const scaleX = node.scaleX();
+                            const scaleY = node.scaleY();
+                            node.scaleX(1); node.scaleY(1);
+                            const avgScale = (Math.abs(scaleX) + Math.abs(scaleY)) / 2;
+                            const newFontSize = Math.max(8, Math.round(textEl.fontSize * avgScale));
+                            const measured = measureText(textEl.text, newFontSize, textEl.fontFamily, textEl.fontWeight, textEl.fontStyle);
+                            updateElement(element.id, { x: node.x() / zoom, y: node.y() / zoom, width: measured.width, height: measured.height, rotation: node.rotation(), fontSize: newFontSize });
+                          }}
+                        />
+                      </Group>
+                    );
+                  } else if (element.type === 'image') {
+                    const imageEl = element as ImageElement;
+                    return (
+                      <ImageComponent
+                        key={element.id}
+                        element={imageEl}
+                        zoom={zoom}
+                        onSelect={() => selectElement(element.id)}
+                        onUpdate={(updates) => updateElement(element.id, updates)}
+                      />
+                    );
+                  }
+                  return null;
+                });
+              })()}
             </Layer>
 
             {/* Removed separate mounting holes layer (integrated into background frame) */}
@@ -1585,8 +1791,12 @@ This PNG is already optimized at 600 DPI for commercial printing.
               const node = stage.findOne(`#${selected.id}`) as Konva.Image | null;
               const parent = node?.getParent();
               if (!node || !parent) return;
-              // Push history once at the start of overlay drag
-              pushHistory(stateRef.current);
+              // Push history once at the start of overlay drag (capture current state)
+              pushHistory({
+                elements: state.elements.map(el => ({ ...el })),
+                selectedId: state.selectedId,
+                editingTextId: null,
+              });
               const parentInv = parent.getAbsoluteTransform().copy().invert();
               // Anchor is opposite corner
               const sw = typeof selected.width === 'number' ? selected.width : node.width();
@@ -1807,6 +2017,39 @@ This PNG is already optimized at 600 DPI for commercial printing.
         </div>
       </div>
 
+      {/* Bottom-right Zoom Controls (fixed) */}
+      <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-white border border-gray-200 rounded-lg p-2 shadow-lg">
+        <button
+          onClick={zoomOut}
+          disabled={zoom <= minZoom}
+          className="p-2 rounded hover:bg-gray-100 text-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-200"
+          title="Zoom Out"
+          aria-label="Zoom Out"
+        >
+          <ZoomOut className="w-4 h-4" />
+        </button>
+        <span className="text-sm text-black min-w-[3rem] text-center font-medium">
+          {Math.round(zoom * 100)}%
+        </span>
+        <button
+          onClick={zoomIn}
+          disabled={zoom >= maxZoom}
+          className="p-2 rounded hover:bg-gray-100 text-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-200"
+          title="Zoom In"
+          aria-label="Zoom In"
+        >
+          <ZoomIn className="w-4 h-4" />
+        </button>
+        <button
+          onClick={resetZoom}
+          className="p-2 rounded hover:bg-gray-100 text-gray-800 transition-colors duration-200"
+          title="Reset Zoom (70%)"
+          aria-label="Reset Zoom"
+        >
+          <RotateCcw className="w-4 h-4" />
+        </button>
+      </div>
+
       {/* Status Bar */}
       <div className="bg-white border-t p-2 text-sm text-gray-600">
         Canvas: {template.width_px} × {template.height_px}px
@@ -1852,6 +2095,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
             border: 'none',
             outline: '2px solid #007ACC',
             background: 'white',
+            color: editingPos.color || 'black',
             zIndex: 1000,
             resize: 'none',
             lineHeight: 1,
@@ -1899,6 +2143,10 @@ function ImageComponent({
       width={(element.width || 100) * zoom}
       height={(element.height || 100) * zoom}
       rotation={element.rotation || 0}
+      scaleX={element.flippedH ? -1 : 1}
+      scaleY={element.flippedV ? -1 : 1}
+      offsetX={element.flippedH ? (element.width || 100) * zoom : 0}
+      offsetY={element.flippedV ? (element.height || 100) * zoom : 0}
       draggable
       onClick={onSelect}
       onTap={onSelect}
@@ -1919,8 +2167,8 @@ function ImageComponent({
         onUpdate({
           x: node.x() / zoom,
           y: node.y() / zoom,
-          width: Math.max(10, node.width() * scaleX / zoom),
-          height: Math.max(10, node.height() * scaleY / zoom),
+          width: Math.max(10, node.width() * Math.abs(scaleX) / zoom),
+          height: Math.max(10, node.height() * Math.abs(scaleY) / zoom),
           rotation: node.rotation()
         });
       }}
