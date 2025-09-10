@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { Stage, Layer, Text, Image as KonvaImage, Transformer, Rect, Circle, Path, Group } from 'react-konva';
+import { Stage, Layer, Text, Image as KonvaImage, Transformer, Rect, Circle, Group } from 'react-konva';
 import type Konva from 'konva';
 import { PlateTemplate, TextElement, ImageElement, DesignData, UserDesign } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
@@ -60,84 +60,14 @@ export default function Editor({ template, existingDesign }: EditorProps) {
   const toolbarRef = useRef<HTMLDivElement | null>(null);
   const toolbarMouseDownRef = useRef<boolean>(false);
   
-  // Create default license plate elements
+  // Create default elements (empty canvas)
   const createDefaultElements = useCallback((): Element[] => {
     if (existingDesign?.design_json?.elements) {
       return existingDesign.design_json.elements as Element[];
     }
-    
-    // Default license plate template with sample text
-    const defaultElements: Element[] = [
-      // Main license plate text - centered and prominent
-      {
-        id: uuidv4(),
-        type: 'text',
-        text: 'ABC-123',
-        x: template.width_px * 0.15, // 15% from left
-        y: template.height_px * 0.35, // 35% from top
-        width: template.width_px * 0.7, // 70% width
-        height: template.height_px * 0.3, // 30% height
-        fontSize: Math.min(template.width_px * 0.14, template.height_px * 0.28), // Responsive font size
-        fontFamily: vehiclePlateFonts[0].value, // Courier New monospace
-        fontWeight: 'bold',
-        fontStyle: 'normal',
-        textDecoration: 'none',
-        color: '#000000',
-        textAlign: 'center',
-        zIndex: 1,
-        visible: true,
-        locked: false,
-        flippedH: false,
-        flippedV: false
-      },
-      // State/Region text (smaller, above main text)
-      {
-        id: uuidv4(),
-        type: 'text',
-        text: 'CALIFORNIA',
-        x: template.width_px * 0.2, // 20% from left
-        y: template.height_px * 0.15, // 15% from top
-        width: template.width_px * 0.6, // 60% width
-        height: template.height_px * 0.15, // 15% height
-        fontSize: Math.min(template.width_px * 0.04, template.height_px * 0.1), // Smaller font
-        fontFamily: vehiclePlateFonts[0].value,
-        fontWeight: 'normal',
-        fontStyle: 'normal',
-        textDecoration: 'none',
-        color: '#000000',
-        textAlign: 'center',
-        zIndex: 1,
-        visible: true,
-        locked: false,
-        flippedH: false,
-        flippedV: false
-      },
-      // Bottom tagline/slogan
-      {
-        id: uuidv4(),
-        type: 'text',
-        text: 'Golden State',
-        x: template.width_px * 0.2, // 20% from left
-        y: template.height_px * 0.75, // 75% from top
-        width: template.width_px * 0.6, // 60% width
-        height: template.height_px * 0.12, // 12% height
-        fontSize: Math.min(template.width_px * 0.03, template.height_px * 0.08), // Smaller font
-        fontFamily: vehiclePlateFonts[0].value,
-        fontWeight: 'normal',
-        fontStyle: 'italic',
-        textDecoration: 'none',
-        color: '#000000',
-        textAlign: 'center',
-        zIndex: 1,
-        visible: true,
-        locked: false,
-        flippedH: false,
-        flippedV: false
-      }
-    ];
-    
-    return defaultElements;
-  }, [existingDesign, template.width_px, template.height_px]);
+    // Start with no default text or elements
+    return [];
+  }, [existingDesign]);
   
   const [state, setState] = useState<EditorState>({
     elements: createDefaultElements(),
@@ -858,6 +788,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
       if (stage) {
         const selectedNode = stage.findOne(`#${state.selectedId}`);
         if (selectedNode) {
+          // Always attach transformer but use overlay for rotation
           transformer.nodes([selectedNode]);
           transformer.getLayer()?.batchDraw();
         }
@@ -1510,8 +1441,8 @@ This PNG is already optimized at 600 DPI for commercial printing.
                 const holeRadius = tabRadius * 0.33;
                 // Horizontal positions for tabs (roughly 22% and 78%)
                 const tabXOffset = [0.22, 0.78];
-                const topY = border + tabRadius * 0.15; // slight inset from very top of white area
-                const bottomY = H - border - tabRadius * 0.15;
+                const topY = border + tabRadius * 0.5; // moved down more from top of white area
+                const bottomY = H - border - tabRadius * 0.5;
                 const innerX = border;
                 const innerY = border;
                 const innerW = W - border * 2;
@@ -1536,64 +1467,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
                       cornerRadius={cornerR * 0.8}
                       name="design-area"
                     />
-                    {/* Safe design area path (green dashed) shaped around mounting cutouts */}
-                    {(() => {
-                      // Tuned geometry for clearer visibility
-                      const inset = border * 2; // increased padding inward
-                      const safeX = innerX + inset;
-                      const safeY = innerY + inset;
-                      const safeW = innerW - inset * 2;
-                      const safeH = innerH - inset * 2;
-                      const r = cornerR * 0.5;
-                      const tabCenters = tabXOffset.map(tx => W * tx);
-                      const cutoutWidth = tabRadius * 2.8; // wider curve span
-                      const cutoutDepth = tabRadius * 0.85; // deeper dip
-                      const left = safeX;
-                      const right = safeX + safeW;
-                      const top = safeY;
-                      const bottom = safeY + safeH;
-                      const [firstCenter, secondCenter] = tabCenters;
-                      const dipHalf = cutoutWidth / 2;
-                      const path: string[] = [];
-                      path.push(`M ${left + r} ${top}`);
-                      // top edge to first dip
-                      path.push(`L ${firstCenter - dipHalf} ${top}`);
-                      // smoother dip using two quadratics
-                      path.push(`Q ${firstCenter - dipHalf * 0.55} ${top + cutoutDepth} ${firstCenter} ${top + cutoutDepth}`);
-                      path.push(`Q ${firstCenter + dipHalf * 0.55} ${top + cutoutDepth} ${firstCenter + dipHalf} ${top}`);
-                      // to second dip
-                      path.push(`L ${secondCenter - dipHalf} ${top}`);
-                      path.push(`Q ${secondCenter - dipHalf * 0.55} ${top + cutoutDepth} ${secondCenter} ${top + cutoutDepth}`);
-                      path.push(`Q ${secondCenter + dipHalf * 0.55} ${top + cutoutDepth} ${secondCenter + dipHalf} ${top}`);
-                      // to top-right corner
-                      path.push(`L ${right - r} ${top}`);
-                      path.push(`Q ${right} ${top} ${right} ${top + r}`);
-                      // right side
-                      path.push(`L ${right} ${bottom - r}`);
-                      path.push(`Q ${right} ${bottom} ${right - r} ${bottom}`);
-                      // bottom edge (reverse dips)
-                      path.push(`L ${secondCenter + dipHalf} ${bottom}`);
-                      path.push(`Q ${secondCenter + dipHalf * 0.55} ${bottom - cutoutDepth} ${secondCenter} ${bottom - cutoutDepth}`);
-                      path.push(`Q ${secondCenter - dipHalf * 0.55} ${bottom - cutoutDepth} ${secondCenter - dipHalf} ${bottom}`);
-                      path.push(`L ${firstCenter + dipHalf} ${bottom}`);
-                      path.push(`Q ${firstCenter + dipHalf * 0.55} ${bottom - cutoutDepth} ${firstCenter} ${bottom - cutoutDepth}`);
-                      path.push(`Q ${firstCenter - dipHalf * 0.55} ${bottom - cutoutDepth} ${firstCenter - dipHalf} ${bottom}`);
-                      path.push(`L ${left + r} ${bottom}`);
-                      path.push(`Q ${left} ${bottom} ${left} ${bottom - r}`);
-                      path.push(`L ${left} ${top + r}`);
-                      path.push(`Q ${left} ${top} ${left + r} ${top}`);
-                      path.push('Z');
-                      return (
-                        <Path
-                          data={path.join(' ')}
-                          stroke="#16a34a" // slightly darker green for contrast
-                          strokeWidth={3}
-                          dash={[12,6]}
-                          listening={false}
-                          name="safe-area-guide"
-                        />
-                      );
-                    })()}
+                    {/* Safe design area guide removed */}
                     {/* Mounting tab protrusions (black) with white hole centers */}
                     {tabXOffset.flatMap((tx) => {
                       const cx = W * tx;
@@ -1606,21 +1480,20 @@ This PNG is already optimized at 600 DPI for commercial printing.
                         <Circle key={`hole-bottom-${tx}`} x={cx} y={bottomY} radius={holeRadius} fill="#ffffff" name="mounting-hole" />
                       ];
                     })}
-                    {/* Placeholder prompt (center) when empty */}
+                    {/* Default placeholder text when no elements exist */}
                     {state.elements.length === 0 && (
                       <Text
                         x={W / 2}
                         y={H / 2}
                         text="Create Your Design"
-                        fontSize={Math.max(18, template.height_px * 0.07 * zoom)}
-                        fontFamily="Arial"
-                        fontWeight="600"
-                        fill="#555555"
-                        opacity={0.4}
+                        fontSize={Math.min(W, H) * 0.08}
+                        fontFamily="Arial, sans-serif"
+                        fill="#999999"
                         align="center"
-                        offsetX={W / 4}
-                        offsetY={Math.max(18, template.height_px * 0.035 * zoom)}
-                        name="center-text"
+                        verticalAlign="middle"
+                        offsetX={(Math.min(W, H) * 0.08 * 8) / 2} // approximate text width offset for centering
+                        offsetY={(Math.min(W, H) * 0.08) / 2} // font size offset for vertical centering
+                        name="placeholder-text"
                       />
                     )}
                   </>
@@ -1694,6 +1567,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
                           textDecoration={textEl.textDecoration || 'none'}
                           fill={textEl.color}
                           align={textEl.textAlign}
+                          rotation={element.rotation || 0}
                           scaleX={element.flippedH ? -1 : 1}
                           scaleY={element.flippedV ? -1 : 1}
                           offsetX={element.flippedH ? (element.width || 100) * zoom : 0}
@@ -1743,6 +1617,8 @@ This PNG is already optimized at 600 DPI for commercial printing.
             <Layer>
               <Transformer
                 ref={transformerRef}
+                enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right']} // Disable rotation anchor
+                rotateEnabled={false} // Disable built-in rotation handle
                 boundBoxFunc={(oldBox, newBox) => {
                   // Prevent elements from being too small
                   if (newBox.width < 20 || newBox.height < 10) {
@@ -1753,38 +1629,44 @@ This PNG is already optimized at 600 DPI for commercial printing.
               />
             </Layer>
           </Stage>
-          {/* Selection overlay: draw transformer-like outline for selected image beyond canvas */}
+          {/* Selection overlay: always show rotation handle for selected elements */}
           {(() => {
             if (!state.selectedId || state.editingTextId) return null;
             const selected = state.elements.find((el) => el.id === state.selectedId);
-            if (!selected || selected.type !== 'image') return null;
+            if (!selected) return null;
 
             // Compute polygon points of the selected node in viewport coordinates
             const stage = stageRef.current;
             if (!stage) return null;
             const containerRect = stage.container().getBoundingClientRect();
-            const node = stage.findOne(`#${selected.id}`) as Konva.Image | null;
+            const node = stage.findOne(`#${selected.id}`) as Konva.Text | Konva.Image | null;
             if (!node) return null;
 
             const t = node.getAbsoluteTransform();
-            // Ensure numeric width/height
-            const sw = typeof selected.width === 'number' ? selected.width : node.width();
-            const sh = typeof selected.height === 'number' ? selected.height : node.height();
+            // Get width/height based on element type
+            let sw: number, sh: number;
+            if (selected.type === 'text') {
+              sw = typeof selected.width === 'number' ? selected.width : node.width();
+              sh = typeof selected.height === 'number' ? selected.height : node.height();
+            } else {
+              sw = typeof selected.width === 'number' ? selected.width : node.width();
+              sh = typeof selected.height === 'number' ? selected.height : node.height();
+            }
             const local = [
               { x: 0, y: 0 },
               { x: sw, y: 0 },
               { x: sw, y: sh },
               { x: 0, y: sh }
             ];
-            const stageScale = zoom;
             const pts = local
               .map((p) => t.point(p))
-              .map((p) => ({ x: containerRect.left + p.x * stageScale, y: containerRect.top + p.y * stageScale }));
+              .map((p) => ({ x: containerRect.left + p.x, y: containerRect.top + p.y }));
 
             const pointsStr = pts.map((p) => `${p.x},${p.y}`).join(' ');
 
-            // Helpers to start interactive resize from overlay
+            // Helper to start interactive resize from overlay (for images only)
             const startOverlayResize = (cornerIndex: 0 | 1 | 2 | 3) => (e: React.PointerEvent) => {
+              if (selected.type !== 'image') return; // Only allow resize for images
               e.preventDefault();
               e.stopPropagation();
               const stageScale = zoom;
@@ -1887,7 +1769,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
               window.addEventListener('pointerup', onUp, true);
             };
 
-            // Decide handle visibility: clickable only when center is outside canvas
+            // Decide handle visibility: show for all elements, but different styles
             const isOutside = (p: { x: number; y: number }) => {
               return (
                 p.x < containerRect.left ||
@@ -1895,6 +1777,69 @@ This PNG is already optimized at 600 DPI for commercial printing.
                 p.y < containerRect.top ||
                 p.y > containerRect.bottom
               );
+            };
+
+            // Calculate rotation handle position (above the top-center of the element)
+            const centerTop = {
+              x: (pts[0].x + pts[1].x) / 2,
+              y: (pts[0].y + pts[1].y) / 2
+            };
+            const handleDistance = 30; // Distance from the element
+            const rotateHandle = {
+              x: centerTop.x,
+              y: centerTop.y - handleDistance
+            };
+
+            const startRotation = (e: React.PointerEvent) => {
+              e.preventDefault();
+              e.stopPropagation();
+              
+              const node = stage.findOne(`#${selected.id}`) as Konva.Text | Konva.Image | null;
+              if (!node) return;
+              
+              // Push history once at the start of rotation
+              pushHistory({
+                elements: state.elements.map(el => ({ ...el })),
+                selectedId: state.selectedId,
+                editingTextId: null,
+              });
+              
+              const initialRotation = node.rotation() || 0;
+              const center = {
+                x: (pts[0].x + pts[2].x) / 2,
+                y: (pts[0].y + pts[2].y) / 2
+              };
+              
+              const getAngle = (clientX: number, clientY: number) => {
+                const dx = clientX - center.x;
+                const dy = clientY - center.y;
+                return Math.atan2(dy, dx) * 180 / Math.PI;
+              };
+              
+              const startAngle = getAngle(e.clientX, e.clientY);
+              
+              const onMove = (ev: PointerEvent) => {
+                const currentAngle = getAngle(ev.clientX, ev.clientY);
+                const deltaAngle = currentAngle - startAngle;
+                const newRotation = initialRotation + deltaAngle;
+                
+                setState((prev) => ({
+                  ...prev,
+                  elements: prev.elements.map((el) =>
+                    el.id === selected.id
+                      ? { ...el, rotation: newRotation }
+                      : el
+                  ),
+                }));
+              };
+              
+              const onUp = () => {
+                window.removeEventListener('pointermove', onMove);
+                window.removeEventListener('pointerup', onUp, true);
+              };
+              
+              window.addEventListener('pointermove', onMove);
+              window.addEventListener('pointerup', onUp, true);
             };
 
             return (
@@ -1916,13 +1861,40 @@ This PNG is already optimized at 600 DPI for commercial printing.
                       />
                     </mask>
                   </defs>
-                  {/* Outer polygon outline (dashed) */}
+                  {/* Selection outline - always visible */}
                   <polygon
                     points={pointsStr}
                     fill="none"
                     stroke="#1d4ed8"
                     strokeWidth={1.5}
                     strokeDasharray="6 4"
+                  />
+                  {/* Rotation handle connector line - always visible */}
+                  <line
+                    x1={centerTop.x}
+                    y1={centerTop.y}
+                    x2={rotateHandle.x}
+                    y2={rotateHandle.y}
+                    stroke="#1d4ed8"
+                    strokeWidth={1}
+                  />
+                  {/* Additional outline for parts outside canvas */}
+                  <polygon
+                    points={pointsStr}
+                    fill="none"
+                    stroke="#1d4ed8"
+                    strokeWidth={2}
+                    strokeDasharray="6 4"
+                    mask="url(#mask-outside-canvas)"
+                  />
+                  {/* Additional connector line for parts outside canvas */}
+                  <line
+                    x1={centerTop.x}
+                    y1={centerTop.y}
+                    x2={rotateHandle.x}
+                    y2={rotateHandle.y}
+                    stroke="#1d4ed8"
+                    strokeWidth={2}
                     mask="url(#mask-outside-canvas)"
                   />
                 </svg>
@@ -1987,7 +1959,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
                   }}
                 />
                 {/* Corner handles (interactive outside the canvas) */}
-                {pts.map((p, i) => {
+                {selected.type === 'image' && pts.map((p, i) => {
                   const outside = isOutside(p);
                   const size = 12;
                   const half = size / 2;
@@ -2011,6 +1983,36 @@ This PNG is already optimized at 600 DPI for commercial printing.
                     />
                   );
                 })}
+                {/* Rotation handle - always visible and interactive */}
+                <div
+                  onPointerDown={startRotation}
+                  style={{
+                    position: 'fixed',
+                    left: rotateHandle.x - 10,
+                    top: rotateHandle.y - 10,
+                    width: 20,
+                    height: 20,
+                    border: '2px solid #1d4ed8',
+                    background: '#ffffff',
+                    borderRadius: '50%',
+                    zIndex: 1000,
+                    pointerEvents: 'auto', // Always interactive for rotation
+                    cursor: 'crosshair',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 8,
+                      height: 8,
+                      background: '#1d4ed8',
+                      borderRadius: '50%',
+                    }}
+                  />
+                </div>
               </>
             );
           })()}
