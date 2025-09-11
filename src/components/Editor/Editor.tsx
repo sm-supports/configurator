@@ -78,6 +78,15 @@ export default function Editor({ template, existingDesign }: EditorProps) {
   // Save-related state
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Background image state
+  const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    const img = new window.Image();
+    img.src = '/img2.png'; // Make sure this path is correct (public/img2.png)
+    img.onload = () => setBgImage(img);
+  }, []);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   // Download-related state
@@ -1068,7 +1077,11 @@ This PNG is already optimized at 600 DPI for commercial printing.
           </button>
           
           {/* Add Image Button */}
-          <label className="p-3 bg-green-500 text-white rounded-lg hover:bg-green-600 cursor-pointer transition-colors duration-200 shadow-sm hover:shadow-md">
+          <label 
+            className="p-3 bg-green-500 text-white rounded-lg hover:bg-green-600 cursor-pointer transition-colors duration-200 shadow-sm hover:shadow-md"
+            title="Add Image"
+            aria-label="Add Image"
+          >
             <ImagePlus className="w-5 h-5" />
             <input
               type="file"
@@ -1078,8 +1091,6 @@ This PNG is already optimized at 600 DPI for commercial printing.
                 if (file) addImage(file);
               }}
               className="hidden"
-              title="Add Image Element"
-              aria-label="Add Image"
             />
           </label>
 
@@ -1414,50 +1425,69 @@ This PNG is already optimized at 600 DPI for commercial printing.
       {/* Canvas Area - add top padding for fixed toolbar */}
       <div className="flex-1 flex items-center justify-center p-8 pt-24 overflow-auto"
            style={{ paddingTop: '5rem' }}>
-        <div 
-          className="bg-white rounded-lg shadow-lg p-4 relative"
-          style={{
-            width: template.width_px * zoom + 32, // 32px for padding (16px each side)
-            height: template.height_px * zoom + 32,
-            minWidth: template.width_px * zoom + 32,
-            minHeight: template.height_px * zoom + 32,
-          }}
-        >
+        <div className="relative">
+          {/* Placeholder text outside canvas when no elements exist */}
+          {state.elements.length === 0 && (
+            <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 text-center">
+              <p className="text-2xl text-gray-500 font-medium">Create Your Design</p>
+            </div>
+          )}
+          
           <Stage
             ref={stageRef}
             width={template.width_px * zoom}
-            height={template.height_px * zoom}
+            height={template.height_px * zoom + (Math.min(template.width_px, template.height_px) * zoom * 0.2)} // Add space for text above
             onClick={handleStageClick}
             onTap={handleStageClick}
           >
+            {/* Background Image Layer */}
+            <Layer>
+              {bgImage && (
+                <KonvaImage
+                  image={bgImage}
+                  x={0}
+                  y={0}
+                  width={template.width_px * zoom}
+                  height={template.height_px * zoom + (Math.min(template.width_px, template.height_px) * zoom * 0.2)}
+                  listening={false} // Does not block pointer events
+                />
+              )}
+            </Layer>
+
             {/* Background Layer (Frame + inner white area + mounting tabs/holes) */}
             <Layer>
               {(() => {
                 const W = template.width_px * zoom;
                 const H = template.height_px * zoom;
+                const textSpace = Math.min(W, H) * 0.15; // Space reserved for text above plate
+                const plateOffsetY = textSpace; // Move entire plate down by this amount
+                
                 const cornerR = 30 * zoom;
                 const border = Math.min(W, H) * 0.05; // ~5% thickness
                 const tabRadius = Math.min(W, H) * 0.085; // protrusion size
                 const holeRadius = tabRadius * 0.33;
                 // Horizontal positions for tabs (roughly 22% and 78%)
                 const tabXOffset = [0.22, 0.78];
-                const topY = border + tabRadius * 0.5; // moved down more from top of white area
-                const bottomY = H - border - tabRadius * 0.5;
+                const topY = border + tabRadius * 0.5 + plateOffsetY; // moved down more from top of white area
+                const bottomY = H - border - tabRadius * 0.5 + plateOffsetY;
                 const innerX = border;
-                const innerY = border;
+                const innerY = border + plateOffsetY;
                 const innerW = W - border * 2;
                 const innerH = H - border * 2;
+                
                 return (
                   <>
-                    {/* Outer black frame */}
+                    {/* Background shapes commented out - using image background instead */}
+                    {/*
                     <Rect
+                      x={0}
+                      y={plateOffsetY}
                       width={W}
                       height={H}
                       fill="#000000"
                       cornerRadius={cornerR}
                       name="plate-frame"
                     />
-                    {/* Inner white design area */}
                     <Rect
                       x={innerX}
                       y={innerY}
@@ -1467,35 +1497,16 @@ This PNG is already optimized at 600 DPI for commercial printing.
                       cornerRadius={cornerR * 0.8}
                       name="design-area"
                     />
-                    {/* Safe design area guide removed */}
-                    {/* Mounting tab protrusions (black) with white hole centers */}
                     {tabXOffset.flatMap((tx) => {
                       const cx = W * tx;
                       return [
-                        // Top tab
                         <Circle key={`tab-top-${tx}`} x={cx} y={topY} radius={tabRadius} fill="#000" name="mounting-tab" />, 
                         <Circle key={`hole-top-${tx}`} x={cx} y={topY} radius={holeRadius} fill="#ffffff" name="mounting-hole" />, 
-                        // Bottom tab
                         <Circle key={`tab-bottom-${tx}`} x={cx} y={bottomY} radius={tabRadius} fill="#000" name="mounting-tab" />, 
                         <Circle key={`hole-bottom-${tx}`} x={cx} y={bottomY} radius={holeRadius} fill="#ffffff" name="mounting-hole" />
                       ];
                     })}
-                    {/* Default placeholder text when no elements exist */}
-                    {state.elements.length === 0 && (
-                      <Text
-                        x={W / 2}
-                        y={H / 2}
-                        text="Create Your Design"
-                        fontSize={Math.min(W, H) * 0.08}
-                        fontFamily="Arial, sans-serif"
-                        fill="#999999"
-                        align="center"
-                        verticalAlign="middle"
-                        offsetX={(Math.min(W, H) * 0.08 * 8) / 2} // approximate text width offset for centering
-                        offsetY={(Math.min(W, H) * 0.08) / 2} // font size offset for vertical centering
-                        name="placeholder-text"
-                      />
-                    )}
+                    */}
                   </>
                 );
               })()}
@@ -1507,12 +1518,15 @@ This PNG is already optimized at 600 DPI for commercial printing.
                 // Geometry for safe clipping path reused per text
                 const W = template.width_px * zoom;
                 const H = template.height_px * zoom;
+                const textSpace = Math.min(W, H) * 0.15; // Same space as in background layer
+                const plateOffsetY = textSpace; // Same offset as background layer
+                
                 const cornerR = 30 * zoom;
                 const border = Math.min(W, H) * 0.05;
                 const tabRadius = Math.min(W, H) * 0.085;
                 const tabXOffset = [0.22, 0.78];
                 const inset = border * 0.4;
-                const innerX = border, innerY = border;
+                const innerX = border, innerY = border + plateOffsetY; // Add offset here
                 const innerW = W - border * 2, innerH = H - border * 2;
                 const safeX = innerX + inset, safeY = innerY + inset;
                 const safeW = innerW - inset * 2, safeH = innerH - inset * 2;
@@ -1523,6 +1537,20 @@ This PNG is already optimized at 600 DPI for commercial printing.
                 const [firstCenter, secondCenter] = tabCenters;
                 const dipHalf = cutoutWidth / 2;
                 const left = safeX, right = safeX + safeW, top = safeY, bottom = safeY + safeH;
+                
+                // Bounds constraint function - keeps elements within the black frame
+                const constrainToBounds = (x: number, y: number, width: number, height: number) => {
+                  const minX = innerX / zoom;
+                  const minY = (innerY - plateOffsetY) / zoom;
+                  const maxX = (innerX + innerW - width * zoom) / zoom;
+                  const maxY = (innerY + innerH - height * zoom - plateOffsetY) / zoom;
+                  
+                  return {
+                    x: Math.max(minX, Math.min(maxX, x)),
+                    y: Math.max(minY, Math.min(maxY, y))
+                  };
+                };
+                
                 const clipBuilder = (ctx: Konva.Context) => {
                   ctx.beginPath();
                   ctx.moveTo(left + r, top);
@@ -1557,7 +1585,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
                           id={element.id}
                           text={textEl.text}
                           x={element.x * zoom}
-                          y={element.y * zoom}
+                          y={element.y * zoom + plateOffsetY}
                           width={(element.width || 100) * zoom}
                           height={(element.height || 50) * zoom}
                           fontSize={textEl.fontSize * zoom}
@@ -1574,12 +1602,26 @@ This PNG is already optimized at 600 DPI for commercial printing.
                           offsetY={element.flippedV ? (element.height || 50) * zoom : 0}
                           visible={state.editingTextId !== element.id}
                           draggable
+                          dragBoundFunc={(pos) => {
+                            const elementWidth = element.width || 100;
+                            const elementHeight = element.height || 50;
+                            const constrainedPos = constrainToBounds(pos.x / zoom, (pos.y - plateOffsetY) / zoom, elementWidth, elementHeight);
+                            return {
+                              x: constrainedPos.x * zoom,
+                              y: constrainedPos.y * zoom + plateOffsetY
+                            };
+                          }}
                           onClick={() => selectElement(element.id)}
                           onTap={() => selectElement(element.id)}
                           onDblClick={() => startTextEdit(element.id)}
                           onDblTap={() => startTextEdit(element.id)}
                           onDragEnd={(e) => {
-                            updateElement(element.id, { x: e.target.x() / zoom, y: e.target.y() / zoom });
+                            const newX = e.target.x() / zoom;
+                            const newY = (e.target.y() - plateOffsetY) / zoom;
+                            const elementWidth = element.width || 100;
+                            const elementHeight = element.height || 50;
+                            const constrained = constrainToBounds(newX, newY, elementWidth, elementHeight);
+                            updateElement(element.id, { x: constrained.x, y: constrained.y });
                           }}
                           onTransformEnd={(e) => {
                             const node = e.target;
@@ -1589,7 +1631,10 @@ This PNG is already optimized at 600 DPI for commercial printing.
                             const avgScale = (Math.abs(scaleX) + Math.abs(scaleY)) / 2;
                             const newFontSize = Math.max(8, Math.round(textEl.fontSize * avgScale));
                             const measured = measureText(textEl.text, newFontSize, textEl.fontFamily, textEl.fontWeight, textEl.fontStyle);
-                            updateElement(element.id, { x: node.x() / zoom, y: node.y() / zoom, width: measured.width, height: measured.height, rotation: node.rotation(), fontSize: newFontSize });
+                            const newX = node.x() / zoom;
+                            const newY = (node.y() - plateOffsetY) / zoom;
+                            const constrained = constrainToBounds(newX, newY, measured.width, measured.height);
+                            updateElement(element.id, { x: constrained.x, y: constrained.y, width: measured.width, height: measured.height, rotation: node.rotation(), fontSize: newFontSize });
                           }}
                         />
                       </Group>
@@ -1601,8 +1646,21 @@ This PNG is already optimized at 600 DPI for commercial printing.
                         key={element.id}
                         element={imageEl}
                         zoom={zoom}
+                        plateOffsetY={plateOffsetY}
+                        constrainToBounds={constrainToBounds}
                         onSelect={() => selectElement(element.id)}
-                        onUpdate={(updates) => updateElement(element.id, updates)}
+                        onUpdate={(updates) => {
+                          // Apply bounds constraints to image updates
+                          if (updates.x !== undefined || updates.y !== undefined) {
+                            const newX = updates.x !== undefined ? updates.x : element.x;
+                            const newY = updates.y !== undefined ? updates.y : element.y;
+                            const width = updates.width !== undefined ? updates.width : element.width || 100;
+                            const height = updates.height !== undefined ? updates.height : element.height || 100;
+                            const constrained = constrainToBounds(newX, newY, width, height);
+                            updates = { ...updates, x: constrained.x, y: constrained.y };
+                          }
+                          updateElement(element.id, updates);
+                        }}
                       />
                     );
                   }
@@ -2117,11 +2175,15 @@ This PNG is already optimized at 600 DPI for commercial printing.
 function ImageComponent({ 
   element, 
   zoom,
+  plateOffsetY,
+  constrainToBounds,
   onSelect, 
   onUpdate 
 }: {
   element: ImageElement;
   zoom: number;
+  plateOffsetY?: number;
+  constrainToBounds?: (x: number, y: number, width: number, height: number) => { x: number; y: number };
   onSelect: () => void;
   onUpdate: (updates: Partial<ImageElement>) => void;
 }) {
@@ -2141,7 +2203,7 @@ function ImageComponent({
       id={element.id}
       image={image}
       x={element.x * zoom}
-      y={element.y * zoom}
+      y={element.y * zoom + (plateOffsetY || 0)}
       width={(element.width || 100) * zoom}
       height={(element.height || 100) * zoom}
       rotation={element.rotation || 0}
@@ -2150,12 +2212,21 @@ function ImageComponent({
       offsetX={element.flippedH ? (element.width || 100) * zoom : 0}
       offsetY={element.flippedV ? (element.height || 100) * zoom : 0}
       draggable
+      dragBoundFunc={constrainToBounds && plateOffsetY !== undefined ? (pos) => {
+        const elementWidth = element.width || 100;
+        const elementHeight = element.height || 100;
+        const constrainedPos = constrainToBounds(pos.x / zoom, (pos.y - plateOffsetY) / zoom, elementWidth, elementHeight);
+        return {
+          x: constrainedPos.x * zoom,
+          y: constrainedPos.y * zoom + plateOffsetY
+        };
+      } : undefined}
       onClick={onSelect}
       onTap={onSelect}
       onDragEnd={(e) => {
         onUpdate({
           x: e.target.x() / zoom,
-          y: e.target.y() / zoom
+          y: plateOffsetY !== undefined ? (e.target.y() - plateOffsetY) / zoom : e.target.y() / zoom
         });
       }}
       onTransformEnd={(e) => {
@@ -2168,7 +2239,7 @@ function ImageComponent({
         
         onUpdate({
           x: node.x() / zoom,
-          y: node.y() / zoom,
+          y: plateOffsetY !== undefined ? (node.y() - plateOffsetY) / zoom : node.y() / zoom,
           width: Math.max(10, node.width() * Math.abs(scaleX) / zoom),
           height: Math.max(10, node.height() * Math.abs(scaleY) / zoom),
           rotation: node.rotation()
