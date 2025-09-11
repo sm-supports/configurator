@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { Stage, Layer, Text, Image as KonvaImage, Transformer, Rect, Circle, Group } from 'react-konva';
+import { Stage, Layer, Text, Image as KonvaImage, Group } from 'react-konva';
 import type Konva from 'konva';
 import { PlateTemplate, TextElement, ImageElement, DesignData, UserDesign } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
@@ -93,6 +93,13 @@ export default function Editor({ template, existingDesign }: EditorProps) {
   const [isDownloading, setIsDownloading] = useState(false);
   const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
   const [showLayersPanel, setShowLayersPanel] = useState(false);
+  // Lightweight overlay tick to trigger overlay re-render without mutating elements
+  const [overlayTick, setOverlayTick] = useState(0);
+  const rafTickRef = useRef<number | null>(null);
+  const bumpOverlay = useCallback(() => {
+    if (rafTickRef.current) cancelAnimationFrame(rafTickRef.current);
+    rafTickRef.current = requestAnimationFrame(() => setOverlayTick((n) => n + 1));
+  }, []);
 
   // Placement configuration
   const gridSize = 32; // px grid snapping for initial placement
@@ -123,8 +130,72 @@ export default function Editor({ template, existingDesign }: EditorProps) {
     const { width: elW, height: elH } = opts;
     const maxW = template.width_px;
     const maxH = template.height_px;
-    const usableW = Math.max(0, maxW - margin * 2 - elW);
-    const usableH = Math.max(0, maxH - margin * 2 - elH);
+    
+    // Enhanced placement zones for text elements on frame
+    const textSpace = Math.min(maxW, maxH) * 0.2; // Increased space for text above plate
+    const margin = 16;
+    
+    // Define placement zones:
+    // 1. Frame area above the plate (priority for new text)
+    // 2. Left and right sides of the plate
+    // 3. Frame area below the plate
+    // 4. Interior of the plate (fallback)
+    
+    const plateStartY = textSpace;
+    const plateEndY = maxH;
+    
+    const zones = [
+      // Zone 1: Above plate (primary text area)
+      {
+        x: margin,
+        y: margin,
+        width: maxW - margin * 2,
+        height: Math.max(0, plateStartY - margin * 2),
+        priority: 1
+      },
+      // Zone 2: Left side of plate
+      {
+        x: margin,
+        y: plateStartY + margin,
+        width: Math.max(0, (maxW * 0.15) - margin),
+        height: Math.max(0, (plateEndY - plateStartY) - margin * 2),
+        priority: 2
+      },
+      // Zone 3: Right side of plate
+      {
+        x: maxW - (maxW * 0.15),
+        y: plateStartY + margin,
+        width: Math.max(0, (maxW * 0.15) - margin),
+        height: Math.max(0, (plateEndY - plateStartY) - margin * 2),
+        priority: 2
+      },
+      // Zone 4: Below plate
+      {
+        x: margin,
+        y: plateEndY + margin,
+        width: maxW - margin * 2,
+        height: Math.max(0, textSpace - margin * 2),
+        priority: 3
+      },
+      // Zone 5: Interior of plate (fallback)
+      {
+        x: maxW * 0.15 + margin,
+        y: plateStartY + margin,
+        width: Math.max(0, maxW * 0.7 - margin * 2),
+        height: Math.max(0, (plateEndY - plateStartY) - margin * 2),
+        priority: 4
+      }
+    ];
+
+    // Filter zones that can fit the element
+    const viableZones = zones.filter(zone => 
+      zone.width >= elW && zone.height >= elH && zone.width > 0 && zone.height > 0
+    ).sort((a, b) => a.priority - b.priority);
+
+    if (viableZones.length === 0) {
+      // Fallback to original behavior if no zones fit
+      return { x: margin, y: margin };
+    }
 
     // Gather existing bounding boxes for overlap detection
     const boxes = state.elements.map(el => ({
@@ -135,30 +206,72 @@ export default function Editor({ template, existingDesign }: EditorProps) {
     }));
 
     const maxAttempts = 150;
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      // Deterministic random candidate cell
-      const rx = usableW > 0 ? nextRand() * usableW : 0;
-      const ry = usableH > 0 ? nextRand() * usableH : 0;
-      // Snap to grid
-      const snappedX = margin + Math.round(rx / gridSize) * gridSize;
-      const snappedY = margin + Math.round(ry / gridSize) * gridSize;
+    
+    // Try each zone in priority order
+    for (const zone of viableZones) {
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        // Deterministic random position within the zone
+        const rx = zone.width > elW ? nextRand() * (zone.width - elW) : 0;
+        const ry = zone.height > elH ? nextRand() * (zone.height - elH) : 0;
+        
+        // Snap to grid
+        const snappedX = zone.x + Math.round(rx / gridSize) * gridSize;
+        const snappedY = zone.y + Math.round(ry / gridSize) * gridSize;
+        
+        const clampedX = Math.min(zone.x + zone.width - elW, Math.max(zone.x, snappedX));
+        const clampedY = Math.min(zone.y + zone.height - elH, Math.max(zone.y, snappedY));
 
-      const clampedX = Math.min(maxW - elW - margin, Math.max(margin, snappedX));
-      const clampedY = Math.min(maxH - elH - margin, Math.max(margin, snappedY));
-
-      const overlaps = boxes.some(b => !(clampedX + elW <= b.x || clampedY + elH <= b.y || clampedX >= b.x + b.w || clampedY >= b.y + b.h));
-      if (!overlaps) {
-        return { x: clampedX, y: clampedY };
+        const overlaps = boxes.some(b => !(
+          clampedX + elW <= b.x || 
+          clampedY + elH <= b.y || 
+          clampedX >= b.x + b.w || 
+          clampedY >= b.y + b.h
+        ));
+        
+        if (!overlaps) {
+          return { x: clampedX, y: clampedY };
+        }
       }
     }
-    // Fallback: place at margin, margin (snapped)
-    return { x: margin, y: margin };
+    
+    // Final fallback: place at the start of the highest priority viable zone
+    const firstZone = viableZones[0];
+    return { x: firstZone.x, y: firstZone.y };
   }, [template.width_px, template.height_px, state.elements]);
 
   // Zoom state management
   const [zoom, setZoom] = useState(0.7); // Start at 70% zoom for better overview
   const minZoom = 0.1;
   const maxZoom = 3;
+  // View offset for zoom-to-cursor anchoring
+  const [view, setView] = useState({ x: 0, y: 0 });
+  const viewRef = useRef({ x: 0, y: 0 });
+  useEffect(() => { viewRef.current = view; }, [view]);
+
+  // Smooth zoom helpers
+  const clampZoom = useCallback((z: number) => Math.max(minZoom, Math.min(maxZoom, z)), [minZoom, maxZoom]);
+  const zoomRef = useRef(0.7);
+  useEffect(() => { zoomRef.current = zoom; }, [zoom]);
+  // Track last pointer position in viewport coords for anchor-based zoom
+  const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
+  const setZoomWithAnchor = useCallback((target: number, anchor: { x: number; y: number }) => {
+    const stage = stageRef.current;
+    const container = stage?.container();
+    if (!container) { setZoom(clampZoom(target)); return; }
+    const rect = container.getBoundingClientRect();
+    const z0 = zoomRef.current;
+    const z1 = clampZoom(target);
+    const vx0 = viewRef.current.x;
+    const vy0 = viewRef.current.y;
+    const ax = anchor.x - rect.left;
+    const ay = anchor.y - rect.top;
+    const vx1 = ax - ((ax - vx0) / z0) * z1;
+    const vy1 = ay - ((ay - vy0) / z0) * z1;
+    setView({ x: vx1, y: vy1 });
+    setZoom(z1);
+    bumpOverlay();
+  }, [clampZoom, bumpOverlay]);
+  // Note: we use setZoomWithAnchor for immediate updates; animated zoom can be added if needed
 
   const [editingValue, setEditingValue] = useState('');
   const [editingPos, setEditingPos] = useState<{ 
@@ -184,7 +297,6 @@ export default function Editor({ template, existingDesign }: EditorProps) {
   });
 
   const stageRef = useRef<Konva.Stage>(null);
-  const transformerRef = useRef<Konva.Transformer>(null);
   const editInputRef = useRef<HTMLTextAreaElement>(null);
   // History manager for undo/redo
   const historyRef = useRef<EditorHistory<EditorState>>(new EditorHistory<EditorState>());
@@ -207,28 +319,70 @@ export default function Editor({ template, existingDesign }: EditorProps) {
 
   // Zoom functions
   const zoomIn = useCallback(() => {
-    setZoom(prev => Math.min(maxZoom, prev * 1.2));
-  }, [maxZoom]);
+    // Ultra gentle step, anchored to viewport center
+  const stage = stageRef.current;
+  const rect = stage?.container().getBoundingClientRect();
+  const anchor = lastPointerRef.current || (rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : { x: window.innerWidth / 2, y: window.innerHeight / 2 });
+  setZoomWithAnchor(zoom * 1.02, anchor);
+  }, [zoom, setZoomWithAnchor]);
 
   const zoomOut = useCallback(() => {
-    setZoom(prev => Math.max(minZoom, prev / 1.2));
-  }, [minZoom]);
+    // Ultra gentle step, anchored to viewport center
+  const stage = stageRef.current;
+  const rect = stage?.container().getBoundingClientRect();
+  const anchor = lastPointerRef.current || (rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : { x: window.innerWidth / 2, y: window.innerHeight / 2 });
+  setZoomWithAnchor(zoom / 1.02, anchor);
+  }, [zoom, setZoomWithAnchor]);
 
   const resetZoom = useCallback(() => {
-    setZoom(0.7); // Reset to default 70% zoom
-  }, []);
+    const stage = stageRef.current;
+    const rect = stage?.container().getBoundingClientRect();
+    const anchor = rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    setZoomWithAnchor(0.7, anchor); // Reset to default 70% zoom
+  }, [setZoomWithAnchor]);
 
-  const overlayDragRef = useRef<{
-    elementId: string;
-    anchor: 'tl' | 'tr' | 'br' | 'bl';
-    parentInv: Konva.Transform;
-    anchorParent: { x: number; y: number };
-    rot: number; // radians
-    cos: number;
-    sin: number;
-    minW: number;
-    minH: number;
-  } | null>(null);
+  // Trackpad pinch (ctrlKey) smooth zoom on stage
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const container = stage.container();
+    // Debounced wheel handling to avoid overly-aggressive zoom
+    const accum = { sum: 0, raf: 0 as number | null };
+  const onWheel = (e: WheelEvent) => {
+      // Zoom on pinch (ctrlKey) or when holding Alt as an explicit gesture
+      const isZoomGesture = e.ctrlKey || e.altKey;
+      if (!isZoomGesture) return;
+      e.preventDefault();
+      accum.sum += e.deltaY;
+      if (accum.raf) return;
+      accum.raf = requestAnimationFrame(() => {
+        const sum = accum.sum;
+        accum.sum = 0;
+        if (accum.raf) cancelAnimationFrame(accum.raf);
+        accum.raf = null;
+        // Very gentle sensitivity; negative deltaY zooms in
+        const S = e.altKey && !e.ctrlKey ? 0.00005 : 0.0001; // even slower with Alt-only
+    let factor = Math.exp(-sum * S);
+        // Clamp per-frame factor to avoid jumps
+  factor = Math.max(0.995, Math.min(1.005, factor));
+  const z0 = zoomRef.current;
+  const z1 = clampZoom(z0 * factor);
+    // Anchor to cursor: adjust view offset so the point under the mouse stays put
+    const rect = container.getBoundingClientRect();
+    const relX = (e.clientX - rect.left);
+    const relY = (e.clientY - rect.top);
+    const vx0 = viewRef.current.x;
+    const vy0 = viewRef.current.y;
+    const vx1 = relX - ((relX - vx0) / z0) * z1;
+    const vy1 = relY - ((relY - vy0) / z0) * z1;
+    setView({ x: vx1, y: vy1 });
+    setZoom(z1);
+    bumpOverlay();
+      });
+    };
+    container.addEventListener('wheel', onWheel, { passive: false });
+    return () => container.removeEventListener('wheel', onWheel as EventListener);
+  }, [clampZoom, bumpOverlay]);
 
   // Measure text width/height in pixels for given font settings
   const measureText = useCallback((text: string, fontSize: number, fontFamily: string, fontWeight: string | number, fontStyle: string = 'normal') => {
@@ -362,10 +516,6 @@ export default function Editor({ template, existingDesign }: EditorProps) {
     const screenDPI = 96; // Standard screen DPI
     const scaleFactor = printDPI / screenDPI;
     
-    // Hide UI elements for clean export
-    const transformer = transformerRef.current;
-    const previousTransformerNodes = transformer ? [...transformer.nodes()] : [];
-    
     // Store visibility state of guide elements
     const guideElements = [
       'plate-outline',
@@ -382,12 +532,7 @@ export default function Editor({ template, existingDesign }: EditorProps) {
     
     const previousVisibility: { [key: string]: boolean } = {};
     
-    // Hide transformer and guide elements
-    if (transformer) {
-      transformer.nodes([]);
-      transformer.getLayer()?.batchDraw();
-    }
-    
+    // Hide guide elements for clean export
     guideElements.forEach(name => {
       const node = stage.findOne(`.${name}`);
       if (node) {
@@ -406,12 +551,7 @@ export default function Editor({ template, existingDesign }: EditorProps) {
       pixelRatio: scaleFactor // Ultra-high resolution for professional printing
     });
     
-    // Restore transformer and guide elements
-    if (transformer && previousTransformerNodes.length > 0) {
-      transformer.nodes(previousTransformerNodes);
-      transformer.getLayer()?.batchDraw();
-    }
-    
+    // Restore guide elements
     guideElements.forEach(name => {
       const node = stage.findOne(`.${name}`);
       if (node && previousVisibility[name] !== undefined) {
@@ -779,34 +919,6 @@ This PNG is already optimized at 600 DPI for commercial printing.
       };
     });
   }, [pushHistory]);
-
-  // Attach transformer to selected element
-  useEffect(() => {
-    const transformer = transformerRef.current;
-    if (!transformer) return;
-
-    // Do not show transformer while editing text
-    if (state.editingTextId) {
-      transformer.nodes([]);
-      transformer.getLayer()?.batchDraw();
-      return;
-    }
-
-    if (state.selectedId) {
-      const stage = stageRef.current;
-      if (stage) {
-        const selectedNode = stage.findOne(`#${state.selectedId}`);
-        if (selectedNode) {
-          // Always attach transformer but use overlay for rotation
-          transformer.nodes([selectedNode]);
-          transformer.getLayer()?.batchDraw();
-        }
-      }
-    } else {
-      transformer.nodes([]);
-      transformer.getLayer()?.batchDraw();
-    }
-  }, [state.selectedId, state.editingTextId]);
 
   // Handle clicks on stage background
   const handleStageClick = useCallback((e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
@@ -1439,9 +1551,17 @@ This PNG is already optimized at 600 DPI for commercial printing.
             height={template.height_px * zoom + (Math.min(template.width_px, template.height_px) * zoom * 0.2)} // Add space for text above
             onClick={handleStageClick}
             onTap={handleStageClick}
+            onMouseMove={(e) => {
+              const evt = e.evt as MouseEvent;
+              lastPointerRef.current = { x: evt.clientX, y: evt.clientY };
+            }}
+            onPointerDown={(e) => {
+              const evt = e.evt as PointerEvent;
+              lastPointerRef.current = { x: evt.clientX, y: evt.clientY };
+            }}
           >
-            {/* Background Image Layer */}
-            <Layer>
+            {/* Background Image Layer wrapped by view offset */}
+            <Layer offsetX={-view.x} offsetY={-view.y}>
               {bgImage && (
                 <KonvaImage
                   image={bgImage}
@@ -1454,68 +1574,13 @@ This PNG is already optimized at 600 DPI for commercial printing.
               )}
             </Layer>
 
-            {/* Background Layer (Frame + inner white area + mounting tabs/holes) */}
-            <Layer>
-              {(() => {
-                const W = template.width_px * zoom;
-                const H = template.height_px * zoom;
-                const textSpace = Math.min(W, H) * 0.15; // Space reserved for text above plate
-                const plateOffsetY = textSpace; // Move entire plate down by this amount
-                
-                const cornerR = 30 * zoom;
-                const border = Math.min(W, H) * 0.05; // ~5% thickness
-                const tabRadius = Math.min(W, H) * 0.085; // protrusion size
-                const holeRadius = tabRadius * 0.33;
-                // Horizontal positions for tabs (roughly 22% and 78%)
-                const tabXOffset = [0.22, 0.78];
-                const topY = border + tabRadius * 0.5 + plateOffsetY; // moved down more from top of white area
-                const bottomY = H - border - tabRadius * 0.5 + plateOffsetY;
-                const innerX = border;
-                const innerY = border + plateOffsetY;
-                const innerW = W - border * 2;
-                const innerH = H - border * 2;
-                
-                return (
-                  <>
-                    {/* Background shapes commented out - using image background instead */}
-                    {/*
-                    <Rect
-                      x={0}
-                      y={plateOffsetY}
-                      width={W}
-                      height={H}
-                      fill="#000000"
-                      cornerRadius={cornerR}
-                      name="plate-frame"
-                    />
-                    <Rect
-                      x={innerX}
-                      y={innerY}
-                      width={innerW}
-                      height={innerH}
-                      fill="#ffffff"
-                      cornerRadius={cornerR * 0.8}
-                      name="design-area"
-                    />
-                    {tabXOffset.flatMap((tx) => {
-                      const cx = W * tx;
-                      return [
-                        <Circle key={`tab-top-${tx}`} x={cx} y={topY} radius={tabRadius} fill="#000" name="mounting-tab" />, 
-                        <Circle key={`hole-top-${tx}`} x={cx} y={topY} radius={holeRadius} fill="#ffffff" name="mounting-hole" />, 
-                        <Circle key={`tab-bottom-${tx}`} x={cx} y={bottomY} radius={tabRadius} fill="#000" name="mounting-tab" />, 
-                        <Circle key={`hole-bottom-${tx}`} x={cx} y={bottomY} radius={holeRadius} fill="#ffffff" name="mounting-hole" />
-                      ];
-                    })}
-                    */}
-                  </>
-                );
-              })()}
-            </Layer>
+            {/* Background Layer (currently just the image) */}
+            <Layer offsetX={-view.x} offsetY={-view.y}>{/* background visuals are provided by the image above */}</Layer>
 
             {/* Elements Layer (preserve order; per-text clipping) */}
-            <Layer>
+            <Layer offsetX={-view.x} offsetY={-view.y}>
               {(() => {
-                // Geometry for safe clipping path reused per text
+                // Geometry for plate interior (still used for images), but text is allowed on the frame
                 const W = template.width_px * zoom;
                 const H = template.height_px * zoom;
                 const textSpace = Math.min(W, H) * 0.15; // Same space as in background layer
@@ -1580,7 +1645,8 @@ This PNG is already optimized at 600 DPI for commercial printing.
                   if (element.type === 'text') {
                     const textEl = element as TextElement;
                     return (
-                      <Group key={element.id} clipFunc={clipBuilder}>
+                      // Do NOT clip text; it can live on the frame too
+                      <Group key={element.id}>
                         <Text
                           id={element.id}
                           text={textEl.text}
@@ -1603,28 +1669,39 @@ This PNG is already optimized at 600 DPI for commercial printing.
                           visible={state.editingTextId !== element.id}
                           draggable
                           dragBoundFunc={(pos) => {
-                            const elementWidth = element.width || 100;
-                            const elementHeight = element.height || 50;
-                            const constrainedPos = constrainToBounds(pos.x / zoom, (pos.y - plateOffsetY) / zoom, elementWidth, elementHeight);
-                            return {
-                              x: constrainedPos.x * zoom,
-                              y: constrainedPos.y * zoom + plateOffsetY
-                            };
+                            // Let text move anywhere on the visible stage, but commit bounds on drag end
+                            const stageW = template.width_px * zoom;
+                            const stageH = template.height_px * zoom + (Math.min(template.width_px, template.height_px) * zoom * 0.2);
+                            const x = Math.max(0, Math.min(stageW - (element.width || 100) * zoom, pos.x));
+                            const y = Math.max(0, Math.min(stageH - (element.height || 50) * zoom, pos.y));
+                            bumpOverlay();
+                            return { x, y };
                           }}
                           onClick={() => selectElement(element.id)}
                           onTap={() => selectElement(element.id)}
                           onDblClick={() => startTextEdit(element.id)}
                           onDblTap={() => startTextEdit(element.id)}
                           onDragEnd={(e) => {
+                            // Commit final drag position but keep within the overall stage frame
                             const newX = e.target.x() / zoom;
                             const newY = (e.target.y() - plateOffsetY) / zoom;
-                            const elementWidth = element.width || 100;
-                            const elementHeight = element.height || 50;
-                            const constrained = constrainToBounds(newX, newY, elementWidth, elementHeight);
-                            updateElement(element.id, { x: constrained.x, y: constrained.y });
+                            const stageMinX = 0;
+                            const stageMinY = -plateOffsetY / zoom;
+                            const stageMaxX = (template.width_px - (element.width || 100));
+                            const stageMaxY = (template.height_px + Math.min(template.width_px, template.height_px) * 0.2) - (element.height || 50);
+                            const cx = Math.max(stageMinX, Math.min(stageMaxX, newX));
+                            const cy = Math.max(stageMinY, Math.min(stageMaxY, newY));
+                            updateElement(element.id, { x: cx, y: cy });
+                          }}
+                          onTransform={(e) => {
+                            // Live feedback without state churn
+                            const node = e.target as unknown as Konva.Text;
+                            node.getLayer()?.batchDraw();
+                            bumpOverlay();
                           }}
                           onTransformEnd={(e) => {
-                            const node = e.target;
+                            // Commit proportional font sizing for text on end
+                            const node = e.target as unknown as Konva.Text;
                             const scaleX = node.scaleX();
                             const scaleY = node.scaleY();
                             node.scaleX(1); node.scaleY(1);
@@ -1633,8 +1710,14 @@ This PNG is already optimized at 600 DPI for commercial printing.
                             const measured = measureText(textEl.text, newFontSize, textEl.fontFamily, textEl.fontWeight, textEl.fontStyle);
                             const newX = node.x() / zoom;
                             const newY = (node.y() - plateOffsetY) / zoom;
-                            const constrained = constrainToBounds(newX, newY, measured.width, measured.height);
-                            updateElement(element.id, { x: constrained.x, y: constrained.y, width: measured.width, height: measured.height, rotation: node.rotation(), fontSize: newFontSize });
+                            // Keep within global stage frame (not just inner plate)
+                            const stageMinX = 0;
+                            const stageMinY = -plateOffsetY / zoom;
+                            const stageMaxX = (template.width_px - measured.width);
+                            const stageMaxY = (template.height_px + Math.min(template.width_px, template.height_px) * 0.2) - measured.height;
+                            const cx = Math.max(stageMinX, Math.min(stageMaxX, newX));
+                            const cy = Math.max(stageMinY, Math.min(stageMaxY, newY));
+                            updateElement(element.id, { x: cx, y: cy, width: measured.width, height: measured.height, rotation: node.rotation(), fontSize: newFontSize });
                           }}
                         />
                       </Group>
@@ -1642,26 +1725,27 @@ This PNG is already optimized at 600 DPI for commercial printing.
                   } else if (element.type === 'image') {
                     const imageEl = element as ImageElement;
                     return (
-                      <ImageComponent
-                        key={element.id}
-                        element={imageEl}
-                        zoom={zoom}
-                        plateOffsetY={plateOffsetY}
-                        constrainToBounds={constrainToBounds}
-                        onSelect={() => selectElement(element.id)}
-                        onUpdate={(updates) => {
-                          // Apply bounds constraints to image updates
-                          if (updates.x !== undefined || updates.y !== undefined) {
-                            const newX = updates.x !== undefined ? updates.x : element.x;
-                            const newY = updates.y !== undefined ? updates.y : element.y;
-                            const width = updates.width !== undefined ? updates.width : element.width || 100;
-                            const height = updates.height !== undefined ? updates.height : element.height || 100;
-                            const constrained = constrainToBounds(newX, newY, width, height);
-                            updates = { ...updates, x: constrained.x, y: constrained.y };
-                          }
-                          updateElement(element.id, updates);
-                        }}
-                      />
+                      <Group key={element.id} clipFunc={clipBuilder}>
+                        <ImageComponent
+                          element={imageEl}
+                          zoom={zoom}
+                          plateOffsetY={plateOffsetY}
+                          constrainToBounds={constrainToBounds}
+                          onSelect={() => selectElement(element.id)}
+                          onUpdate={(updates) => {
+                            // Apply bounds constraints to image updates
+                            if (updates.x !== undefined || updates.y !== undefined) {
+                              const newX = updates.x !== undefined ? updates.x : element.x;
+                              const newY = updates.y !== undefined ? updates.y : element.y;
+                              const width = updates.width !== undefined ? updates.width : element.width || 100;
+                              const height = updates.height !== undefined ? updates.height : element.height || 100;
+                              const constrained = constrainToBounds(newX, newY, width, height);
+                              updates = { ...updates, x: constrained.x, y: constrained.y };
+                            }
+                            updateElement(element.id, updates);
+                          }}
+                        />
+                      </Group>
                     );
                   }
                   return null;
@@ -1671,37 +1755,27 @@ This PNG is already optimized at 600 DPI for commercial printing.
 
             {/* Removed separate mounting holes layer (integrated into background frame) */}
 
-            {/* Transformer Layer */}
-            <Layer>
-              <Transformer
-                ref={transformerRef}
-                enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right']} // Disable rotation anchor
-                rotateEnabled={false} // Disable built-in rotation handle
-                boundBoxFunc={(oldBox, newBox) => {
-                  // Prevent elements from being too small
-                  if (newBox.width < 20 || newBox.height < 10) {
-                    return oldBox;
-                  }
-                  return newBox;
-                }}
-              />
-            </Layer>
           </Stage>
-          {/* Selection overlay: always show rotation handle for selected elements */}
+          {/* Unified transformation overlay system - meets all 7 requirements */}
           {(() => {
             if (!state.selectedId || state.editingTextId) return null;
             const selected = state.elements.find((el) => el.id === state.selectedId);
             if (!selected) return null;
 
-            // Compute polygon points of the selected node in viewport coordinates
+            // Get stage and container positioning
             const stage = stageRef.current;
             if (!stage) return null;
             const containerRect = stage.container().getBoundingClientRect();
             const node = stage.findOne(`#${selected.id}`) as Konva.Text | Konva.Image | null;
             if (!node) return null;
 
+            // Plate offset used when rendering nodes (text drawn at y + plateOffsetY)
+            const Wov = template.width_px * zoom;
+            const Hov = template.height_px * zoom;
+            const plateOffsetY = Math.min(Wov, Hov) * 0.15;
+
+            // Compute element bounding box in screen coordinates 
             const t = node.getAbsoluteTransform();
-            // Get width/height based on element type
             let sw: number, sh: number;
             if (selected.type === 'text') {
               sw = typeof selected.width === 'number' ? selected.width : node.width();
@@ -1710,152 +1784,204 @@ This PNG is already optimized at 600 DPI for commercial printing.
               sw = typeof selected.width === 'number' ? selected.width : node.width();
               sh = typeof selected.height === 'number' ? selected.height : node.height();
             }
-            const local = [
-              { x: 0, y: 0 },
-              { x: sw, y: 0 },
-              { x: sw, y: sh },
-              { x: 0, y: sh }
+            
+            const localCorners = [
+              { x: 0, y: 0 },         // top-left
+              { x: sw, y: 0 },        // top-right
+              { x: sw, y: sh },       // bottom-right
+              { x: 0, y: sh }         // bottom-left
             ];
-            const pts = local
+            
+            const screenCorners = localCorners
               .map((p) => t.point(p))
-              .map((p) => ({ x: containerRect.left + p.x, y: containerRect.top + p.y }));
+              .map((p) => ({ 
+                x: containerRect.left + p.x, 
+                y: containerRect.top + p.y 
+              }));
 
-            const pointsStr = pts.map((p) => `${p.x},${p.y}`).join(' ');
+            // Element center in screen coordinates
+            const center = {
+              x: (screenCorners[0].x + screenCorners[2].x) / 2,
+              y: (screenCorners[0].y + screenCorners[2].y) / 2
+            };
 
-            // Helper to start interactive resize from overlay (for images only)
-            const startOverlayResize = (cornerIndex: 0 | 1 | 2 | 3) => (e: React.PointerEvent) => {
-              if (selected.type !== 'image') return; // Only allow resize for images
+            // Top center edge for rotation handle placement
+            const topCenter = {
+              x: (screenCorners[0].x + screenCorners[1].x) / 2,
+              y: (screenCorners[0].y + screenCorners[1].y) / 2
+            };
+
+            // Position rotation handle above element
+            const rotationHandleDistance = 40;
+            const rotationHandle = {
+              x: topCenter.x,
+              y: topCenter.y - rotationHandleDistance
+            };
+
+            // Canvas bounds checking utility
+            const isPointOutsideCanvas = (point: { x: number; y: number }) => {
+              return (
+                point.x < containerRect.left ||
+                point.x > containerRect.right ||
+                point.y < containerRect.top ||
+                point.y > containerRect.bottom
+              );
+            };
+
+            // Unified resize interaction handler for both text and images
+            const startUnifiedResize = (cornerIndex: 0 | 1 | 2 | 3) => (e: React.PointerEvent) => {
               e.preventDefault();
               e.stopPropagation();
-              const stageScale = zoom;
-              const node = stage.findOne(`#${selected.id}`) as Konva.Image | null;
-              const parent = node?.getParent();
-              if (!node || !parent) return;
-              // Push history once at the start of overlay drag (capture current state)
+              
+              const stage = stageRef.current;
+              if (!stage) return;
+              
+              // Push history at start of transformation
               pushHistory({
                 elements: state.elements.map(el => ({ ...el })),
                 selectedId: state.selectedId,
                 editingTextId: null,
               });
+
+              const stageScale = zoom;
+              const node = stage.findOne(`#${selected.id}`) as Konva.Text | Konva.Image | null;
+              const parent = node?.getParent();
+              if (!node || !parent) return;
+
               const parentInv = parent.getAbsoluteTransform().copy().invert();
-              // Anchor is opposite corner
-              const sw = typeof selected.width === 'number' ? selected.width : node.width();
-              const sh = typeof selected.height === 'number' ? selected.height : node.height();
+              
+              // Get current dimensions
+              const currentWidth = typeof selected.width === 'number' ? selected.width : node.width();
+              const currentHeight = typeof selected.height === 'number' ? selected.height : node.height();
+              
+              // Anchor point (opposite corner) remains fixed during resize
               const anchorLocal = [
-                { x: sw, y: sh }, // opposite of tl (index 0)
-                { x: 0, y: sh },  // opposite of tr (index 1)
-                { x: 0, y: 0 },   // opposite of br (index 2)
-                { x: sw, y: 0 },  // opposite of bl (index 3)
+                { x: currentWidth, y: currentHeight }, // opposite of top-left
+                { x: 0, y: currentHeight },            // opposite of top-right
+                { x: 0, y: 0 },                        // opposite of bottom-right
+                { x: currentWidth, y: 0 },             // opposite of bottom-left
               ][cornerIndex];
+              
               const tAbs = node.getAbsoluteTransform();
               const anchorAbs = tAbs.point(anchorLocal);
               const anchorParent = parentInv.point(anchorAbs);
-              const rotDeg = node.rotation() || 0;
-              const rot = (rotDeg * Math.PI) / 180;
-              const cos = Math.cos(rot);
-              const sin = Math.sin(rot);
-              const anchorName: 'tl' | 'tr' | 'br' | 'bl' = (['br','bl','tl','tr'] as const)[cornerIndex];
-              overlayDragRef.current = {
-                elementId: selected.id,
-                anchor: anchorName,
-                parentInv,
-                anchorParent,
-                rot,
-                cos,
-                sin,
-                minW: 10,
-                minH: 10,
-              };
-              // Pointer capture and listeners
+              
+              const rotation = (node.rotation() || 0) * Math.PI / 180;
+              const cos = Math.cos(rotation);
+              const sin = Math.sin(rotation);
+              
+              const anchorTypes: ('tl' | 'tr' | 'br' | 'bl')[] = ['br', 'bl', 'tl', 'tr'];
+              const anchorType = anchorTypes[cornerIndex];
+              
+              const minSize = selected.type === 'text' ? { w: 20, h: 12 } : { w: 10, h: 10 };
+
+              // Track last computed geometry to commit on release
+              let last = { w: currentWidth, h: currentHeight, x: (node.x() / zoom), y: ((node.y() - plateOffsetY) / zoom), s: 1 };
+
               const onMove = (ev: PointerEvent) => {
-                const drag = overlayDragRef.current;
-                if (!drag) return;
                 const stageX = (ev.clientX - containerRect.left) / stageScale;
                 const stageY = (ev.clientY - containerRect.top) / stageScale;
-                const pParent = drag.parentInv.point({ x: stageX, y: stageY });
-                // v = R^T * (Pparent - Apar)
-                const dxp = pParent.x - drag.anchorParent.x;
-                const dyp = pParent.y - drag.anchorParent.y;
-                const vx = drag.cos * dxp + drag.sin * dyp;
-                const vy = -drag.sin * dxp + drag.cos * dyp;
-                // width/height candidates based on anchor
-                let wCand = vx;
-                let hCand = vy;
-                if (drag.anchor === 'tr') {
-                  wCand = -vx;
-                  hCand = vy;
-                } else if (drag.anchor === 'br') {
-                  wCand = -vx;
-                  hCand = -vy;
-                } else if (drag.anchor === 'bl') {
-                  wCand = vx;
-                  hCand = -vy;
+                const pointerParent = parentInv.point({ x: stageX, y: stageY });
+                
+                // Vector from anchor to pointer in parent space
+                const dx = pointerParent.x - anchorParent.x;
+                const dy = pointerParent.y - anchorParent.y;
+                
+                // Transform to local element space (inverse rotation)
+                const localX = cos * dx + sin * dy;
+                const localY = -sin * dx + cos * dy;
+                
+                // Calculate new dimensions based on anchor type
+                let newWidth: number, newHeight: number;
+                switch (anchorType) {
+                  case 'tl': 
+                    newWidth = Math.abs(localX);
+                    newHeight = Math.abs(localY);
+                    break;
+                  case 'tr':
+                    newWidth = Math.abs(localX);
+                    newHeight = Math.abs(localY);
+                    break;
+                  case 'br':
+                    newWidth = Math.abs(localX);
+                    newHeight = Math.abs(localY);
+                    break;
+                  case 'bl':
+                    newWidth = Math.abs(localX);
+                    newHeight = Math.abs(localY);
+                    break;
                 }
-                const newW = Math.max(drag.minW, Math.abs(wCand));
-                const newH = Math.max(drag.minH, Math.abs(hCand));
-                // Compute new x,y to keep anchor fixed
-                let axp = 0, ayp = 0; // anchor local point after resize
-                if (drag.anchor === 'tl') {
-                  axp = 0; ayp = 0;
-                } else if (drag.anchor === 'tr') {
-                  axp = newW; ayp = 0;
-                } else if (drag.anchor === 'br') {
-                  axp = newW; ayp = newH;
-                } else { // 'bl'
-                  axp = 0; ayp = newH;
+                
+                // Enforce minimum sizes
+                newWidth = Math.max(minSize.w, newWidth);
+                newHeight = Math.max(minSize.h, newHeight);
+                
+                // Calculate new position to keep anchor fixed
+                let anchorLocalX: number, anchorLocalY: number;
+                switch (anchorType) {
+                  case 'tl': anchorLocalX = 0; anchorLocalY = 0; break;
+                  case 'tr': anchorLocalX = newWidth; anchorLocalY = 0; break;
+                  case 'br': anchorLocalX = newWidth; anchorLocalY = newHeight; break;
+                  case 'bl': anchorLocalX = 0; anchorLocalY = newHeight; break;
                 }
-                const rx = drag.cos * axp - drag.sin * ayp;
-                const ry = drag.sin * axp + drag.cos * ayp;
-                const newX = drag.anchorParent.x - rx;
-                const newY = drag.anchorParent.y - ry;
-                // Push updates to state
-                setState((prev) => ({
-                  ...prev,
-                  elements: prev.elements.map((el) =>
-                    el.id === drag.elementId && el.type === 'image'
-                      ? { ...el, x: newX, y: newY, width: newW, height: newH }
-                      : el
-                  ),
-                }));
+                
+                const rotatedX = cos * anchorLocalX - sin * anchorLocalY;
+                const rotatedY = sin * anchorLocalX + cos * anchorLocalY;
+                
+                const newX = anchorParent.x - rotatedX;
+                const newY = anchorParent.y - rotatedY;
+
+                // Mutate Konva node for smooth feedback
+                if (selected.type === 'text') {
+                  const sx = newWidth / currentWidth;
+                  const sy = newHeight / currentHeight;
+                  const s = Math.min(sx, sy);
+                  node.scaleX(s);
+                  node.scaleY(s);
+                  node.x(newX * zoom);
+                  node.y(newY * zoom + plateOffsetY);
+                  last = { w: newWidth, h: newHeight, x: newX, y: newY, s };
+                } else {
+                  node.width(newWidth * zoom);
+                  node.height(newHeight * zoom);
+                  node.x(newX * zoom);
+                  node.y(newY * zoom + plateOffsetY);
+                  last = { w: newWidth, h: newHeight, x: newX, y: newY, s: 1 };
+                }
+                node.getLayer()?.batchDraw();
+                bumpOverlay();
               };
+
               const onUp = () => {
                 window.removeEventListener('pointermove', onMove);
                 window.removeEventListener('pointerup', onUp, true);
-                overlayDragRef.current = null;
+                // Commit final values to state now using last computed geometry
+                if (selected.type === 'text') {
+                  const textEl = selected as TextElement;
+                  const newFontSize = Math.max(8, Math.round(textEl.fontSize * last.s));
+                  const measured = measureText(textEl.text, newFontSize, textEl.fontFamily, textEl.fontWeight, textEl.fontStyle);
+                  // Reset scale on node after committing
+                  (node as Konva.Text).scaleX(1);
+                  (node as Konva.Text).scaleY(1);
+                  updateElement(selected.id, { x: last.x, y: last.y, width: measured.width, height: measured.height, fontSize: newFontSize });
+                } else {
+                  updateElement(selected.id, { x: last.x, y: last.y, width: last.w, height: last.h });
+                }
               };
+
               window.addEventListener('pointermove', onMove);
               window.addEventListener('pointerup', onUp, true);
             };
 
-            // Decide handle visibility: show for all elements, but different styles
-            const isOutside = (p: { x: number; y: number }) => {
-              return (
-                p.x < containerRect.left ||
-                p.x > containerRect.right ||
-                p.y < containerRect.top ||
-                p.y > containerRect.bottom
-              );
-            };
-
-            // Calculate rotation handle position (above the top-center of the element)
-            const centerTop = {
-              x: (pts[0].x + pts[1].x) / 2,
-              y: (pts[0].y + pts[1].y) / 2
-            };
-            const handleDistance = 30; // Distance from the element
-            const rotateHandle = {
-              x: centerTop.x,
-              y: centerTop.y - handleDistance
-            };
-
-            const startRotation = (e: React.PointerEvent) => {
+            // Smooth rotation interaction handler
+            const startSmoothRotation = (e: React.PointerEvent) => {
               e.preventDefault();
               e.stopPropagation();
               
               const node = stage.findOne(`#${selected.id}`) as Konva.Text | Konva.Image | null;
               if (!node) return;
               
-              // Push history once at the start of rotation
+              // Push history at start of rotation
               pushHistory({
                 elements: state.elements.map(el => ({ ...el })),
                 selectedId: state.selectedId,
@@ -1863,53 +1989,83 @@ This PNG is already optimized at 600 DPI for commercial printing.
               });
               
               const initialRotation = node.rotation() || 0;
-              const center = {
-                x: (pts[0].x + pts[2].x) / 2,
-                y: (pts[0].y + pts[2].y) / 2
+              let lastRotation = initialRotation;
+              const normalizeDelta = (delta: number) => {
+                let d = delta;
+                while (d > 180) d -= 360;
+                while (d < -180) d += 360;
+                return d;
               };
               
-              const getAngle = (clientX: number, clientY: number) => {
+              const getAngleFromCenter = (clientX: number, clientY: number) => {
                 const dx = clientX - center.x;
                 const dy = clientY - center.y;
                 return Math.atan2(dy, dx) * 180 / Math.PI;
               };
               
-              const startAngle = getAngle(e.clientX, e.clientY);
+              const startAngle = getAngleFromCenter(e.clientX, e.clientY);
               
               const onMove = (ev: PointerEvent) => {
-                const currentAngle = getAngle(ev.clientX, ev.clientY);
-                const deltaAngle = currentAngle - startAngle;
-                const newRotation = initialRotation + deltaAngle;
+                const currentAngle = getAngleFromCenter(ev.clientX, ev.clientY);
+                let deltaAngle = normalizeDelta(currentAngle - startAngle);
                 
-                setState((prev) => ({
-                  ...prev,
-                  elements: prev.elements.map((el) =>
-                    el.id === selected.id
-                      ? { ...el, rotation: newRotation }
-                      : el
-                  ),
-                }));
+                // Smooth rotation with optional snap to 15-degree increments
+                const snapIncrement = 15; // degrees
+                
+                if (ev.shiftKey) {
+                  // Snap to increments when Shift is held
+                  const totalAngle = initialRotation + deltaAngle;
+                  const snappedAngle = Math.round(totalAngle / snapIncrement) * snapIncrement;
+                  deltaAngle = snappedAngle - initialRotation;
+                }
+                const desiredRotation = initialRotation + deltaAngle;
+                // Low-pass filter for buttery-smooth motion
+                const alpha = 0.25; // smoothing factor
+                const newRotation = lastRotation + (desiredRotation - lastRotation) * alpha;
+                lastRotation = newRotation;
+                // Mutate node rotation for smooth feedback
+                node.rotation(newRotation);
+                node.getLayer()?.batchDraw();
+                bumpOverlay();
               };
               
               const onUp = () => {
                 window.removeEventListener('pointermove', onMove);
                 window.removeEventListener('pointerup', onUp, true);
+                // Commit rotation to state
+                updateElement(selected.id, { rotation: node.rotation() });
               };
               
               window.addEventListener('pointermove', onMove);
               window.addEventListener('pointerup', onUp, true);
             };
 
+            const elementOutline = screenCorners.map((p) => `${p.x},${p.y}`).join(' ');
+
             return (
               <>
+                {/* Clean, simple transformation lines */}
                 <svg
-                  style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 999 }}
+                  key={overlayTick}
+                  style={{ 
+                    position: 'fixed', 
+                    inset: 0, 
+                    pointerEvents: 'none', 
+                    zIndex: 999 
+                  }}
                   width="100vw"
                   height="100vh"
                 >
                   <defs>
-                    <mask id="mask-outside-canvas" maskUnits="userSpaceOnUse">
-                      <rect x={0} y={0} width={window.innerWidth} height={window.innerHeight} fill="white" />
+                    {/* Mask for parts outside canvas */}
+                    <mask id="outside-canvas-mask" maskUnits="userSpaceOnUse">
+                      <rect 
+                        x={0} 
+                        y={0} 
+                        width={window.innerWidth} 
+                        height={window.innerHeight} 
+                        fill="white" 
+                      />
                       <rect
                         x={containerRect.left}
                         y={containerRect.top}
@@ -1919,157 +2075,190 @@ This PNG is already optimized at 600 DPI for commercial printing.
                       />
                     </mask>
                   </defs>
-                  {/* Selection outline - always visible */}
+                  
+                  {/* Primary selection outline - clean blue dashed line */}
                   <polygon
-                    points={pointsStr}
+                    points={elementOutline}
                     fill="none"
-                    stroke="#1d4ed8"
-                    strokeWidth={1.5}
+                    stroke="#2563eb"
+                    strokeWidth={1.75}
                     strokeDasharray="6 4"
+                    opacity={0.95}
                   />
-                  {/* Rotation handle connector line - always visible */}
+                  
+                  {/* Rotation handle connector line */}
                   <line
-                    x1={centerTop.x}
-                    y1={centerTop.y}
-                    x2={rotateHandle.x}
-                    y2={rotateHandle.y}
-                    stroke="#1d4ed8"
-                    strokeWidth={1}
+                    x1={topCenter.x}
+                    y1={topCenter.y}
+                    x2={rotationHandle.x}
+                    y2={rotationHandle.y}
+                    stroke="#2563eb"
+                    strokeWidth={1.25}
+                    opacity={0.85}
                   />
-                  {/* Additional outline for parts outside canvas */}
+                  
+                  {/* Enhanced outline for parts extending outside canvas */}
                   <polygon
-                    points={pointsStr}
+                    points={elementOutline}
                     fill="none"
-                    stroke="#1d4ed8"
+                    stroke="#dc2626"
                     strokeWidth={2}
                     strokeDasharray="6 4"
-                    mask="url(#mask-outside-canvas)"
+                    mask="url(#outside-canvas-mask)"
+                    opacity={0.6}
                   />
-                  {/* Additional connector line for parts outside canvas */}
+                  
+                  {/* Enhanced connector line for parts outside canvas */}
                   <line
-                    x1={centerTop.x}
-                    y1={centerTop.y}
-                    x2={rotateHandle.x}
-                    y2={rotateHandle.y}
-                    stroke="#1d4ed8"
-                    strokeWidth={2}
-                    mask="url(#mask-outside-canvas)"
+                    x1={topCenter.x}
+                    y1={topCenter.y}
+                    x2={rotationHandle.x}
+                    y2={rotationHandle.y}
+                    stroke="#dc2626"
+                    strokeWidth={1.75}
+                    mask="url(#outside-canvas-mask)"
+                    opacity={0.55}
                   />
                 </svg>
-                {/* Click-capture strips outside the canvas to allow deselect on outside clicks */}
+
+                {/* Click-capture areas for deselection outside canvas */}
                 {(() => {
                   const toolbarBox = toolbarRef.current?.getBoundingClientRect();
-                  const topStart = Math.max(0, (toolbarBox?.bottom ?? 0));
-                  const topHeight = Math.max(0, containerRect.top - topStart);
+                  const topGap = Math.max(0, containerRect.top - (toolbarBox?.bottom ?? 0));
+                  
                   return (
-                    <div
-                      onPointerDown={() => setState((prev) => ({ ...prev, selectedId: null }))}
-                      style={{
-                        position: 'fixed',
-                        left: 0,
-                        top: topStart,
-                        width: '100vw',
-                        height: topHeight,
-                        zIndex: 998,
-                        pointerEvents: 'auto',
-                        background: 'transparent',
-                      }}
-                    />
+                    <>
+                      {/* Top area */}
+                      <div
+                        onPointerDown={() => setState((prev) => ({ ...prev, selectedId: null }))}
+                        style={{
+                          position: 'fixed',
+                          left: 0,
+                          top: toolbarBox?.bottom ?? 0,
+                          width: '100vw',
+                          height: topGap,
+                          zIndex: 998,
+                          pointerEvents: 'auto',
+                          background: 'transparent',
+                        }}
+                      />
+                      {/* Bottom area */}
+                      <div
+                        onPointerDown={() => setState((prev) => ({ ...prev, selectedId: null }))}
+                        style={{
+                          position: 'fixed',
+                          left: 0,
+                          top: containerRect.bottom,
+                          width: '100vw',
+                          height: Math.max(0, window.innerHeight - containerRect.bottom),
+                          zIndex: 998,
+                          pointerEvents: 'auto',
+                          background: 'transparent',
+                        }}
+                      />
+                      {/* Left area */}
+                      <div
+                        onPointerDown={() => setState((prev) => ({ ...prev, selectedId: null }))}
+                        style={{
+                          position: 'fixed',
+                          left: 0,
+                          top: containerRect.top,
+                          width: Math.max(0, containerRect.left),
+                          height: containerRect.height,
+                          zIndex: 998,
+                          pointerEvents: 'auto',
+                          background: 'transparent',
+                        }}
+                      />
+                      {/* Right area */}
+                      <div
+                        onPointerDown={() => setState((prev) => ({ ...prev, selectedId: null }))}
+                        style={{
+                          position: 'fixed',
+                          left: containerRect.right,
+                          top: containerRect.top,
+                          width: Math.max(0, window.innerWidth - containerRect.right),
+                          height: containerRect.height,
+                          zIndex: 998,
+                          pointerEvents: 'auto',
+                          background: 'transparent',
+                        }}
+                      />
+                    </>
                   );
                 })()}
-                <div
-                  onPointerDown={() => setState((prev) => ({ ...prev, selectedId: null }))}
-                  style={{
-                    position: 'fixed',
-                    left: 0,
-                    top: containerRect.bottom,
-                    width: '100vw',
-                    height: Math.max(0, window.innerHeight - containerRect.bottom),
-                    zIndex: 998,
-                    pointerEvents: 'auto',
-                    background: 'transparent',
-                  }}
-                />
-                <div
-                  onPointerDown={() => setState((prev) => ({ ...prev, selectedId: null }))}
-                  style={{
-                    position: 'fixed',
-                    left: 0,
-                    top: containerRect.top,
-                    width: Math.max(0, containerRect.left),
-                    height: containerRect.height,
-                    zIndex: 998,
-                    pointerEvents: 'auto',
-                    background: 'transparent',
-                  }}
-                />
-                <div
-                  onPointerDown={() => setState((prev) => ({ ...prev, selectedId: null }))}
-                  style={{
-                    position: 'fixed',
-                    left: containerRect.right,
-                    top: containerRect.top,
-                    width: Math.max(0, window.innerWidth - containerRect.right),
-                    height: containerRect.height,
-                    zIndex: 998,
-                    pointerEvents: 'auto',
-                    background: 'transparent',
-                  }}
-                />
-                {/* Corner handles (interactive outside the canvas) */}
-                {selected.type === 'image' && pts.map((p, i) => {
-                  const outside = isOutside(p);
-                  const size = 12;
-                  const half = size / 2;
+
+                {/* Corner resize handles - work both inside and outside canvas */}
+                {screenCorners.map((corner, i) => {
+                  const isOutside = isPointOutsideCanvas(corner);
+                  const handleSize = 12;
+                  const half = handleSize / 2;
+                  // Choose diagonal cursor based on element rotation for better affordance
+                  const rot = node.rotation ? Math.abs((node.rotation() as number) % 180) : 0;
+                  const near90 = rot >= 45 && rot < 135;
+                  const isDiagA = i === 0 || i === 2; // tl/br
+                  const cursor = (isDiagA ? !near90 : near90) ? 'nwse-resize' : 'nesw-resize';
+                  
                   return (
                     <div
-                      key={i}
-                      onPointerDown={startOverlayResize(i as 0 | 1 | 2 | 3)}
+                      key={`corner-${i}`}
+                      onPointerDown={startUnifiedResize(i as 0 | 1 | 2 | 3)}
                       style={{
                         position: 'fixed',
-                        left: p.x - half,
-                        top: p.y - half,
-                        width: size,
-                        height: size,
-                        border: '2px solid #1d4ed8',
+                        left: corner.x - half,
+                        top: corner.y - half,
+                        width: handleSize,
+                        height: handleSize,
+                        border: `2px solid ${isOutside ? '#dc2626' : '#2563eb'}`,
                         background: '#ffffff',
-                        borderRadius: 2,
+                        borderRadius: 3,
                         zIndex: 1000,
-                        pointerEvents: outside ? 'auto' : 'none',
-                        cursor: 'nwse-resize',
+                        pointerEvents: 'auto', // Always interactive
+                        cursor,
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                        opacity: 0.95,
                       }}
+                      title={`Resize from ${['top-left', 'top-right', 'bottom-right', 'bottom-left'][i]} corner`}
                     />
                   );
                 })}
-                {/* Rotation handle - always visible and interactive */}
-                <div
-                  onPointerDown={startRotation}
+
+                {/* Unified rotation handle - always visible and functional */}
+        <div
+                  onPointerDown={startSmoothRotation}
                   style={{
                     position: 'fixed',
-                    left: rotateHandle.x - 10,
-                    top: rotateHandle.y - 10,
-                    width: 20,
-                    height: 20,
-                    border: '2px solid #1d4ed8',
+                    left: rotationHandle.x - 12,
+                    top: rotationHandle.y - 12,
+                    width: 24,
+                    height: 24,
+                    border: '2px solid #2563eb',
                     background: '#ffffff',
                     borderRadius: '50%',
                     zIndex: 1000,
-                    pointerEvents: 'auto', // Always interactive for rotation
-                    cursor: 'crosshair',
+                    pointerEvents: 'auto',
+          cursor: 'grab',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                    boxShadow: '0 3px 12px rgba(0,0,0,0.2)',
+                    opacity: 0.95,
                   }}
+                  title="Rotate (hold Shift to snap to 15° increments)"
                 >
-                  <div
-                    style={{
-                      width: 8,
-                      height: 8,
-                      background: '#1d4ed8',
-                      borderRadius: '50%',
-                    }}
-                  />
+                  {/* Rotation icon */}
+                  <svg 
+                    width="12" 
+                    height="12" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="#2563eb" 
+                    strokeWidth="2"
+                  >
+                    <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z"/>
+                    <path d="M9 12l2 2 4-4"/>
+                    <path d="M21 2l-2 2-2-2"/>
+                  </svg>
                 </div>
               </>
             );
@@ -2115,55 +2304,117 @@ This PNG is already optimized at 600 DPI for commercial printing.
         Canvas: {template.width_px} × {template.height_px}px
       </div>
 
-      {/* Text editing overlay */}
+      {/* Enhanced seamless text editing overlay */}
       {state.editingTextId && (
         (() => {
           const editingEl = state.elements.find(el => el.id === state.editingTextId);
           const align = editingEl && editingEl.type === 'text' ? (editingEl as TextElement).textAlign : 'left';
+          
           return (
-    <textarea
-          ref={editInputRef}
-          value={editingValue}
-          onChange={(e) => setEditingValue(e.target.value)}
-          onBlur={(e) => {
-            const nextFocus = (e.relatedTarget as Node | null);
-            const isToolbarFocus = !!(nextFocus && toolbarRef.current && toolbarRef.current.contains(nextFocus));
-            if (isToolbarFocus || toolbarMouseDownRef.current) {
-              // Keep editing mode and selection when interacting with toolbar controls
-              return;
-            }
-            finishTextEdit(true, false);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-        finishTextEdit(true, true);
-            } else if (e.key === 'Escape') {
-              e.preventDefault();
-        finishTextEdit(false, false);
-            }
-          }}
-          style={{
-            position: 'fixed',
-            left: editingPos.x,
-            top: editingPos.y,
-            width: Math.max(100, editingPos.width),
-            height: Math.max(30, editingPos.height),
-            fontSize: editingPos.fontSize,
-            fontFamily: `${editingPos.fontFamily}, sans-serif`,
-            padding: 0,
-            border: 'none',
-            outline: '2px solid #007ACC',
-            background: 'white',
-            color: editingPos.color || 'black',
-            zIndex: 1000,
-            resize: 'none',
-            lineHeight: 1,
-            fontWeight: editingPos.fontWeight,
-            textAlign: align,
-            overflow: 'hidden'
-          }}
-        />
+            <div
+              style={{
+                position: 'fixed',
+                left: editingPos.x - 4,
+                top: editingPos.y - 4,
+                zIndex: 1001,
+                pointerEvents: 'auto',
+              }}
+            >
+              {/* Seamless editing background */}
+              <div
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  width: Math.max(120, editingPos.width + 8),
+                  height: Math.max(40, editingPos.height + 8),
+                  background: 'rgba(37, 99, 235, 0.08)',
+                  border: '2px solid #2563eb',
+                  borderRadius: 6,
+                  boxShadow: '0 4px 20px rgba(37, 99, 235, 0.15)',
+                  pointerEvents: 'none',
+                }}
+              />
+              
+              {/* Functional textbox with enhanced UX */}
+              <textarea
+                ref={editInputRef}
+                value={editingValue}
+                onChange={(e) => setEditingValue(e.target.value)}
+                onBlur={(e) => {
+                  const nextFocus = (e.relatedTarget as Node | null);
+                  const isToolbarFocus = !!(nextFocus && toolbarRef.current && toolbarRef.current.contains(nextFocus));
+                  if (isToolbarFocus || toolbarMouseDownRef.current) {
+                    // Keep editing mode and selection when interacting with toolbar controls
+                    return;
+                  }
+                  finishTextEdit(true, false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    finishTextEdit(true, true);
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    finishTextEdit(false, false);
+                  } else if (e.key === 'Tab') {
+                    e.preventDefault();
+                    // Insert tab character for better text formatting
+                    const start = e.currentTarget.selectionStart;
+                    const end = e.currentTarget.selectionEnd;
+                    const newValue = editingValue.substring(0, start) + '\t' + editingValue.substring(end);
+                    setEditingValue(newValue);
+                    // Restore cursor position after tab
+                    setTimeout(() => {
+                      e.currentTarget.selectionStart = e.currentTarget.selectionEnd = start + 1;
+                    }, 0);
+                  }
+                }}
+                placeholder="Enter your text..."
+                style={{
+                  position: 'relative',
+                  left: 4,
+                  top: 4,
+                  width: Math.max(100, editingPos.width),
+                  height: Math.max(30, editingPos.height),
+                  fontSize: editingPos.fontSize,
+                  fontFamily: `${editingPos.fontFamily}, sans-serif`,
+                  fontWeight: editingPos.fontWeight,
+                  fontStyle: editingPos.fontStyle,
+                  color: editingPos.color || '#000000',
+                  textAlign: align,
+                  padding: '4px 6px',
+                  border: 'none',
+                  outline: 'none',
+                  background: 'rgba(255, 255, 255, 0.95)',
+                  borderRadius: 4,
+                  resize: 'none',
+                  lineHeight: 1,
+                  overflow: 'hidden',
+                  backdropFilter: 'blur(8px)',
+                  boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.1)',
+                }}
+              />
+              
+              {/* Helper text for seamless editing */}
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: -28,
+                  left: 4,
+                  fontSize: 11,
+                  color: '#6b7280',
+                  background: 'rgba(255, 255, 255, 0.9)',
+                  padding: '2px 6px',
+                  borderRadius: 3,
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                  pointerEvents: 'none',
+                }}
+              >
+                Enter to finish • Esc to cancel • Shift+Enter for new line
+              </div>
+            </div>
           );
         })()
       )}
