@@ -9,7 +9,6 @@ import EditorHistory from '@/lib/editorHistory';
 import { Undo2, Redo2, ZoomIn, ZoomOut, RotateCcw, Bold, Italic, Underline, Type, ImagePlus, Trash2, Save, Download, ChevronDown, FlipHorizontal, FlipVertical } from 'lucide-react';
 import { saveDesign } from '@/lib/designUtils';
 import { useAuth } from '@/contexts/AuthContext';
-import jsPDF from 'jspdf';
 
 interface EditorProps {
   template: PlateTemplate;
@@ -50,7 +49,7 @@ const generalFonts = [
   { name: 'Lucida Grande', value: 'Lucida Grande, sans-serif' }
 ];
 
-export default function Editor({ template, existingDesign }: EditorProps) {
+const Editor = React.memo(function Editor({ template, existingDesign }: EditorProps) {
   // Authentication
   const { user, isAdmin } = useAuth();
   
@@ -79,13 +78,28 @@ export default function Editor({ template, existingDesign }: EditorProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // Background image state
+  // Background image state - load asynchronously
   const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null);
 
+  // Load background image without blocking initial render
   useEffect(() => {
-    const img = new window.Image();
-    img.src = '/img2.png'; // Make sure this path is correct (public/img2.png)
-    img.onload = () => setBgImage(img);
+    // Use requestIdleCallback to load image when browser is idle
+    const loadImage = () => {
+      const img = new window.Image();
+      img.src = '/img2.png';
+      img.onload = () => setBgImage(img);
+      img.onerror = (error) => {
+        console.error('Failed to load background image:', error);
+        setBgImage(null);
+      };
+    };
+
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(loadImage);
+    } else {
+      // Fallback for browsers without requestIdleCallback
+      setTimeout(loadImage, 0);
+    }
   }, []);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -103,7 +117,6 @@ export default function Editor({ template, existingDesign }: EditorProps) {
 
   // Placement configuration
   const gridSize = 32; // px grid snapping for initial placement
-  const margin = 16; // margin from canvas edges
 
   // Deterministic PRNG (mulberry32) seeded by template + user id for reproducible placements
   const seed = useMemo(() => {
@@ -252,25 +265,8 @@ export default function Editor({ template, existingDesign }: EditorProps) {
   const clampZoom = useCallback((z: number) => Math.max(minZoom, Math.min(maxZoom, z)), [minZoom, maxZoom]);
   const zoomRef = useRef(0.7);
   useEffect(() => { zoomRef.current = zoom; }, [zoom]);
-  // Track last pointer position in viewport coords for anchor-based zoom
+  // Track last pointer position (still used by Stage event handlers)
   const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
-  const setZoomWithAnchor = useCallback((target: number, anchor: { x: number; y: number }) => {
-    const stage = stageRef.current;
-    const container = stage?.container();
-    if (!container) { setZoom(clampZoom(target)); return; }
-    const rect = container.getBoundingClientRect();
-    const z0 = zoomRef.current;
-    const z1 = clampZoom(target);
-    const vx0 = viewRef.current.x;
-    const vy0 = viewRef.current.y;
-    const ax = anchor.x - rect.left;
-    const ay = anchor.y - rect.top;
-    const vx1 = ax - ((ax - vx0) / z0) * z1;
-    const vy1 = ay - ((ay - vy0) / z0) * z1;
-    setView({ x: vx1, y: vy1 });
-    setZoom(z1);
-    bumpOverlay();
-  }, [clampZoom, bumpOverlay]);
   // Note: we use setZoomWithAnchor for immediate updates; animated zoom can be added if needed
 
   const [editingValue, setEditingValue] = useState('');
@@ -319,70 +315,75 @@ export default function Editor({ template, existingDesign }: EditorProps) {
 
   // Zoom functions
   const zoomIn = useCallback(() => {
-    // Ultra gentle step, anchored to viewport center
-  const stage = stageRef.current;
-  const rect = stage?.container().getBoundingClientRect();
-  const anchor = lastPointerRef.current || (rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : { x: window.innerWidth / 2, y: window.innerHeight / 2 });
-  setZoomWithAnchor(zoom * 1.02, anchor);
-  }, [zoom, setZoomWithAnchor]);
+    // For zoom in, also center the canvas to prevent cutoff
+    const newZoom = clampZoom(zoom * 1.2);
+    setZoom(newZoom);
+    
+    // Always center the view to prevent PNG cutoff
+    setView({ x: 0, y: 0 });
+    bumpOverlay();
+  }, [zoom, clampZoom, bumpOverlay]);
 
   const zoomOut = useCallback(() => {
-    // Ultra gentle step, anchored to viewport center
-  const stage = stageRef.current;
-  const rect = stage?.container().getBoundingClientRect();
-  const anchor = lastPointerRef.current || (rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : { x: window.innerWidth / 2, y: window.innerHeight / 2 });
-  setZoomWithAnchor(zoom / 1.02, anchor);
-  }, [zoom, setZoomWithAnchor]);
+    // For zoom out, always center the canvas to prevent cutoff
+    const newZoom = clampZoom(zoom / 1.2);
+    setZoom(newZoom);
+    
+    // Reset view to center when zooming out to prevent PNG cutoff
+    setView({ x: 0, y: 0 });
+    bumpOverlay();
+  }, [zoom, clampZoom, bumpOverlay]);
 
   const resetZoom = useCallback(() => {
-    const stage = stageRef.current;
-    const rect = stage?.container().getBoundingClientRect();
-    const anchor = rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-    setZoomWithAnchor(0.7, anchor); // Reset to default 70% zoom
-  }, [setZoomWithAnchor]);
+    // Reset zoom and center the view
+    setZoom(0.7);
+    setView({ x: 0, y: 0 }); // Reset view offset to center
+    bumpOverlay();
+  }, [bumpOverlay]);
 
   // Trackpad pinch (ctrlKey) smooth zoom on stage
   useEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;
     const container = stage.container();
+    
     // Debounced wheel handling to avoid overly-aggressive zoom
     const accum = { sum: 0, raf: 0 as number | null };
-  const onWheel = (e: WheelEvent) => {
+    const onWheel = (e: WheelEvent) => {
       // Zoom on pinch (ctrlKey) or when holding Alt as an explicit gesture
       const isZoomGesture = e.ctrlKey || e.altKey;
       if (!isZoomGesture) return;
       e.preventDefault();
+      
       accum.sum += e.deltaY;
       if (accum.raf) return;
+      
       accum.raf = requestAnimationFrame(() => {
         const sum = accum.sum;
         accum.sum = 0;
         if (accum.raf) cancelAnimationFrame(accum.raf);
         accum.raf = null;
-        // Very gentle sensitivity; negative deltaY zooms in
-        const S = e.altKey && !e.ctrlKey ? 0.00005 : 0.0001; // even slower with Alt-only
-    let factor = Math.exp(-sum * S);
-        // Clamp per-frame factor to avoid jumps
-  factor = Math.max(0.995, Math.min(1.005, factor));
-  const z0 = zoomRef.current;
-  const z1 = clampZoom(z0 * factor);
-    // Anchor to cursor: adjust view offset so the point under the mouse stays put
-    const rect = container.getBoundingClientRect();
-    const relX = (e.clientX - rect.left);
-    const relY = (e.clientY - rect.top);
-    const vx0 = viewRef.current.x;
-    const vy0 = viewRef.current.y;
-    const vx1 = relX - ((relX - vx0) / z0) * z1;
-    const vy1 = relY - ((relY - vy0) / z0) * z1;
-    setView({ x: vx1, y: vy1 });
-    setZoom(z1);
-    bumpOverlay();
+        
+        // Better sensitivity for smooth wheel zoom
+        const sensitivity = e.altKey && !e.ctrlKey ? 0.0008 : 0.001;
+        let factor = Math.exp(-sum * sensitivity);
+        
+        // Clamp per-frame factor to avoid jumps but allow more noticeable changes
+        factor = Math.max(0.9, Math.min(1.1, factor));
+        
+        const z0 = zoomRef.current;
+        const z1 = clampZoom(z0 * factor);
+        
+        // Always center the canvas for both zoom in and zoom out to prevent cutoff
+        setZoom(z1);
+        setView({ x: 0, y: 0 });
+        bumpOverlay();
       });
     };
+    
     container.addEventListener('wheel', onWheel, { passive: false });
     return () => container.removeEventListener('wheel', onWheel as EventListener);
-  }, [clampZoom, bumpOverlay]);
+  }, [clampZoom, bumpOverlay, template.width_px, template.height_px]);
 
   // Measure text width/height in pixels for given font settings
   const measureText = useCallback((text: string, fontSize: number, fontFamily: string, fontWeight: string | number, fontStyle: string = 'normal') => {
@@ -600,21 +601,27 @@ export default function Editor({ template, existingDesign }: EditorProps) {
         case 'pdf': {
           const dataURL = exportToDataURL('image/png', 1);
           if (dataURL) {
-            // Convert pixels to millimeters for PDF (exact plate dimensions)
-            // Using 600 DPI: 1 inch = 25.4mm, 600px = 1 inch
-            const mmWidth = (template.width_px * 25.4) / 600;
-            const mmHeight = (template.height_px * 25.4) / 600;
-            
-            const pdf = new jsPDF({
-              orientation: mmWidth > mmHeight ? 'landscape' : 'portrait',
-              unit: 'mm',
-              format: [mmWidth, mmHeight],
-              compress: false // No compression for print quality
+            // Lazy load jsPDF only when needed
+            import('jspdf').then(({ default: jsPDF }) => {
+              // Convert pixels to millimeters for PDF (exact plate dimensions)
+              // Using 600 DPI: 1 inch = 25.4mm, 600px = 1 inch
+              const mmWidth = (template.width_px * 25.4) / 600;
+              const mmHeight = (template.height_px * 25.4) / 600;
+              
+              const pdf = new jsPDF({
+                orientation: mmWidth > mmHeight ? 'landscape' : 'portrait',
+                unit: 'mm',
+                format: [mmWidth, mmHeight],
+                compress: false // No compression for print quality
+              });
+              
+              // Add image at exact size with no margins
+              pdf.addImage(dataURL, 'PNG', 0, 0, mmWidth, mmHeight, undefined, 'NONE');
+              pdf.save(`${designName}_${timestamp}_print_ready.pdf`);
+            }).catch(error => {
+              console.error('Failed to load PDF library:', error);
+              alert('PDF export failed. Please try again.');
             });
-            
-            // Add image at exact size with no margins
-            pdf.addImage(dataURL, 'PNG', 0, 0, mmWidth, mmHeight, undefined, 'NONE');
-            pdf.save(`${designName}_${timestamp}_print_ready.pdf`);
           }
           break;
         }
@@ -764,23 +771,41 @@ This PNG is already optimized at 600 DPI for commercial printing.
     reader.onload = (e) => {
       const img = new window.Image();
       img.onload = () => {
-        // Scale down if image larger than canvas (respecting margins)
-        let targetW = img.width;
-        let targetH = img.height;
-        const maxAvailW = template.width_px - margin * 2;
-        const maxAvailH = template.height_px - margin * 2;
-        if (targetW > maxAvailW || targetH > maxAvailH) {
-          const scale = Math.min(maxAvailW / targetW, maxAvailH / targetH, 1);
-            targetW = Math.max(10, targetW * scale);
-            targetH = Math.max(10, targetH * scale);
+        // Calculate a reasonable size for the image - make it fit well on canvas but not too small
+        const maxWidth = template.width_px * 0.6;  // Use 60% of template width as max
+        const maxHeight = template.height_px * 0.6; // Use 60% of template height as max
+        const minSize = 100; // Minimum size to ensure visibility
+        
+        // Calculate scale to fit within max dimensions while preserving aspect ratio
+        const scaleW = maxWidth / img.width;
+        const scaleH = maxHeight / img.height;
+        const scale = Math.min(scaleW, scaleH, 1); // Don't upscale, only downscale
+        
+        let targetW = Math.max(minSize, img.width * scale);
+        let targetH = Math.max(minSize, img.height * scale);
+        
+        // If applying min size changed aspect ratio, recalculate to maintain it
+        if (img.width * scale < minSize || img.height * scale < minSize) {
+          const aspectRatio = img.width / img.height;
+          if (aspectRatio > 1) {
+            targetW = minSize * aspectRatio;
+            targetH = minSize;
+          } else {
+            targetW = minSize;
+            targetH = minSize / aspectRatio;
+          }
         }
-        const { x: randX, y: randY } = computeSpawnPosition({ width: targetW, height: targetH });
+        
+        // Center the image on the canvas
+        const centerX = (template.width_px - targetW) / 2;
+        const centerY = (template.height_px - targetH) / 2;
+        
         const newImage: ImageElement = {
           id: uuidv4(),
           type: 'image',
           imageUrl: e.target?.result as string,
-          x: randX,
-          y: randY,
+          x: centerX,
+          y: centerY,
           width: targetW,
           height: targetH,
           originalWidth: img.width,
@@ -804,7 +829,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
       img.src = e.target?.result as string;
     };
     reader.readAsDataURL(file);
-  }, [state.elements.length, pushHistory, template.width_px, template.height_px, computeSpawnPosition]);
+  }, [state.elements.length, pushHistory, template.width_px, template.height_px]);
 
   // Handle element selection
   const selectElement = useCallback((id: string) => {
@@ -1580,67 +1605,11 @@ This PNG is already optimized at 600 DPI for commercial printing.
             {/* Elements Layer (preserve order; per-text clipping) */}
             <Layer offsetX={-view.x} offsetY={-view.y}>
               {(() => {
-                // Geometry for plate interior (still used for images), but text is allowed on the frame
+                // Geometry for plate interior
                 const W = template.width_px * zoom;
                 const H = template.height_px * zoom;
                 const textSpace = Math.min(W, H) * 0.15; // Same space as in background layer
                 const plateOffsetY = textSpace; // Same offset as background layer
-                
-                const cornerR = 30 * zoom;
-                const border = Math.min(W, H) * 0.05;
-                const tabRadius = Math.min(W, H) * 0.085;
-                const tabXOffset = [0.22, 0.78];
-                const inset = border * 0.4;
-                const innerX = border, innerY = border + plateOffsetY; // Add offset here
-                const innerW = W - border * 2, innerH = H - border * 2;
-                const safeX = innerX + inset, safeY = innerY + inset;
-                const safeW = innerW - inset * 2, safeH = innerH - inset * 2;
-                const r = cornerR * 0.5;
-                const tabCenters = tabXOffset.map(tx => W * tx);
-                const cutoutWidth = tabRadius * 2.8;
-                const cutoutDepth = tabRadius * 0.85;
-                const [firstCenter, secondCenter] = tabCenters;
-                const dipHalf = cutoutWidth / 2;
-                const left = safeX, right = safeX + safeW, top = safeY, bottom = safeY + safeH;
-                
-                // Bounds constraint function - keeps elements within the black frame
-                const constrainToBounds = (x: number, y: number, width: number, height: number) => {
-                  const minX = innerX / zoom;
-                  const minY = (innerY - plateOffsetY) / zoom;
-                  const maxX = (innerX + innerW - width * zoom) / zoom;
-                  const maxY = (innerY + innerH - height * zoom - plateOffsetY) / zoom;
-                  
-                  return {
-                    x: Math.max(minX, Math.min(maxX, x)),
-                    y: Math.max(minY, Math.min(maxY, y))
-                  };
-                };
-                
-                const clipBuilder = (ctx: Konva.Context) => {
-                  ctx.beginPath();
-                  ctx.moveTo(left + r, top);
-                  ctx.lineTo(firstCenter - dipHalf, top);
-                  ctx.quadraticCurveTo(firstCenter - dipHalf * 0.55, top + cutoutDepth, firstCenter, top + cutoutDepth);
-                  ctx.quadraticCurveTo(firstCenter + dipHalf * 0.55, top + cutoutDepth, firstCenter + dipHalf, top);
-                  ctx.lineTo(secondCenter - dipHalf, top);
-                  ctx.quadraticCurveTo(secondCenter - dipHalf * 0.55, top + cutoutDepth, secondCenter, top + cutoutDepth);
-                  ctx.quadraticCurveTo(secondCenter + dipHalf * 0.55, top + cutoutDepth, secondCenter + dipHalf, top);
-                  ctx.lineTo(right - r, top);
-                  ctx.quadraticCurveTo(right, top, right, top + r);
-                  ctx.lineTo(right, bottom - r);
-                  ctx.quadraticCurveTo(right, bottom, right - r, bottom);
-                  ctx.lineTo(secondCenter + dipHalf, bottom);
-                  ctx.quadraticCurveTo(secondCenter + dipHalf * 0.55, bottom - cutoutDepth, secondCenter, bottom - cutoutDepth);
-                  ctx.quadraticCurveTo(secondCenter - dipHalf * 0.55, bottom - cutoutDepth, secondCenter - dipHalf, bottom);
-                  ctx.lineTo(firstCenter + dipHalf, bottom);
-                  ctx.quadraticCurveTo(firstCenter + dipHalf * 0.55, bottom - cutoutDepth, firstCenter, bottom - cutoutDepth);
-                  ctx.quadraticCurveTo(firstCenter - dipHalf * 0.55, bottom - cutoutDepth, firstCenter - dipHalf, bottom);
-                  ctx.lineTo(left + r, bottom);
-                  ctx.quadraticCurveTo(left, bottom, left, bottom - r);
-                  ctx.lineTo(left, top + r);
-                  ctx.quadraticCurveTo(left, top, left + r, top);
-                  ctx.closePath();
-                };
                 return state.elements.map(element => {
                   if (element.type === 'text') {
                     const textEl = element as TextElement;
@@ -1725,23 +1694,13 @@ This PNG is already optimized at 600 DPI for commercial printing.
                   } else if (element.type === 'image') {
                     const imageEl = element as ImageElement;
                     return (
-                      <Group key={element.id} clipFunc={clipBuilder}>
+                      <Group key={element.id}>
                         <ImageComponent
                           element={imageEl}
                           zoom={zoom}
                           plateOffsetY={plateOffsetY}
-                          constrainToBounds={constrainToBounds}
                           onSelect={() => selectElement(element.id)}
                           onUpdate={(updates) => {
-                            // Apply bounds constraints to image updates
-                            if (updates.x !== undefined || updates.y !== undefined) {
-                              const newX = updates.x !== undefined ? updates.x : element.x;
-                              const newY = updates.y !== undefined ? updates.y : element.y;
-                              const width = updates.width !== undefined ? updates.width : element.width || 100;
-                              const height = updates.height !== undefined ? updates.height : element.height || 100;
-                              const constrained = constrainToBounds(newX, newY, width, height);
-                              updates = { ...updates, x: constrained.x, y: constrained.y };
-                            }
                             updateElement(element.id, updates);
                           }}
                         />
@@ -1776,14 +1735,11 @@ This PNG is already optimized at 600 DPI for commercial printing.
 
             // Compute element bounding box in screen coordinates 
             const t = node.getAbsoluteTransform();
-            let sw: number, sh: number;
-            if (selected.type === 'text') {
-              sw = typeof selected.width === 'number' ? selected.width : node.width();
-              sh = typeof selected.height === 'number' ? selected.height : node.height();
-            } else {
-              sw = typeof selected.width === 'number' ? selected.width : node.width();
-              sh = typeof selected.height === 'number' ? selected.height : node.height();
-            }
+            
+            // Use the actual rendered dimensions from the Konva node
+            // This ensures the overlay matches exactly what's rendered
+            const sw = node.width();
+            const sh = node.height();
             
             const localCorners = [
               { x: 0, y: 0 },         // top-left
@@ -1850,9 +1806,9 @@ This PNG is already optimized at 600 DPI for commercial printing.
 
               const parentInv = parent.getAbsoluteTransform().copy().invert();
               
-              // Get current dimensions
-              const currentWidth = typeof selected.width === 'number' ? selected.width : node.width();
-              const currentHeight = typeof selected.height === 'number' ? selected.height : node.height();
+              // Get current dimensions - use actual rendered dimensions for consistency
+              const currentWidth = node.width() / zoom;  // Convert back to logical units
+              const currentHeight = node.height() / zoom; // Convert back to logical units
               
               // Anchor point (opposite corner) remains fixed during resize
               const anchorLocal = [
@@ -2267,32 +2223,32 @@ This PNG is already optimized at 600 DPI for commercial printing.
       </div>
 
       {/* Bottom-right Zoom Controls (fixed) */}
-      <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-white border border-gray-200 rounded-lg p-2 shadow-lg">
+      <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-white border border-gray-200 rounded-lg p-2 shadow-lg backdrop-blur-sm">
         <button
           onClick={zoomOut}
           disabled={zoom <= minZoom}
-          className="p-2 rounded hover:bg-gray-100 text-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-200"
-          title="Zoom Out"
+          className="p-2 rounded hover:bg-gray-100 text-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 hover:scale-105"
+          title="Zoom Out (Ctrl/Cmd + Scroll)"
           aria-label="Zoom Out"
         >
           <ZoomOut className="w-4 h-4" />
         </button>
-        <span className="text-sm text-black min-w-[3rem] text-center font-medium">
+        <div className="text-sm text-black min-w-[3rem] text-center font-medium bg-gray-50 px-2 py-1 rounded border">
           {Math.round(zoom * 100)}%
-        </span>
+        </div>
         <button
           onClick={zoomIn}
           disabled={zoom >= maxZoom}
-          className="p-2 rounded hover:bg-gray-100 text-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-200"
-          title="Zoom In"
+          className="p-2 rounded hover:bg-gray-100 text-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 hover:scale-105"
+          title="Zoom In (Ctrl/Cmd + Scroll)"
           aria-label="Zoom In"
         >
           <ZoomIn className="w-4 h-4" />
         </button>
         <button
           onClick={resetZoom}
-          className="p-2 rounded hover:bg-gray-100 text-gray-800 transition-colors duration-200"
-          title="Reset Zoom (70%)"
+          className="p-2 rounded hover:bg-gray-100 text-gray-800 transition-all duration-200 hover:scale-105"
+          title="Reset Zoom to 70%"
           aria-label="Reset Zoom"
         >
           <RotateCcw className="w-4 h-4" />
@@ -2420,21 +2376,21 @@ This PNG is already optimized at 600 DPI for commercial printing.
       )}
     </div>
   );
-}
+});
 
-// Image component with proper loading
-function ImageComponent({ 
+export default Editor;
+
+// Optimized Image component with memoization
+const ImageComponent = React.memo(function ImageComponent({ 
   element, 
   zoom,
   plateOffsetY,
-  constrainToBounds,
   onSelect, 
   onUpdate 
 }: {
   element: ImageElement;
   zoom: number;
   plateOffsetY?: number;
-  constrainToBounds?: (x: number, y: number, width: number, height: number) => { x: number; y: number };
   onSelect: () => void;
   onUpdate: (updates: Partial<ImageElement>) => void;
 }) {
@@ -2444,10 +2400,24 @@ function ImageComponent({
     const img = new window.Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => setImage(img);
+    img.onerror = () => console.error('Failed to load image:', element.imageUrl);
     img.src = element.imageUrl;
   }, [element.imageUrl]);
 
-  if (!image) return null;
+  if (!image) {
+    // Show loading placeholder
+    return (
+      <Group>
+        <Text
+          x={element.x * zoom}
+          y={element.y * zoom + (plateOffsetY || 0)}
+          text="Loading..."
+          fontSize={14 * zoom}
+          fill="#666"
+        />
+      </Group>
+    );
+  }
 
   return (
     <KonvaImage
@@ -2463,15 +2433,6 @@ function ImageComponent({
       offsetX={element.flippedH ? (element.width || 100) * zoom : 0}
       offsetY={element.flippedV ? (element.height || 100) * zoom : 0}
       draggable
-      dragBoundFunc={constrainToBounds && plateOffsetY !== undefined ? (pos) => {
-        const elementWidth = element.width || 100;
-        const elementHeight = element.height || 100;
-        const constrainedPos = constrainToBounds(pos.x / zoom, (pos.y - plateOffsetY) / zoom, elementWidth, elementHeight);
-        return {
-          x: constrainedPos.x * zoom,
-          y: constrainedPos.y * zoom + plateOffsetY
-        };
-      } : undefined}
       onClick={onSelect}
       onTap={onSelect}
       onDragEnd={(e) => {
@@ -2485,6 +2446,7 @@ function ImageComponent({
         const scaleX = node.scaleX();
         const scaleY = node.scaleY();
         
+        // Reset scale and apply to dimensions
         node.scaleX(1);
         node.scaleY(1);
         
@@ -2498,4 +2460,4 @@ function ImageComponent({
       }}
     />
   );
-}
+});

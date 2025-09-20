@@ -45,7 +45,7 @@ const nextConfig: NextConfig = {
     ];
   },
 
-  webpack: (config, { isServer }) => {
+  webpack: (config, { isServer, dev }) => {
     if (!isServer) {
       // Client-side only: resolve canvas to false for browser
       config.resolve.fallback = {
@@ -59,6 +59,24 @@ const nextConfig: NextConfig = {
       ...config.resolve.alias,
       canvas: false,
     };
+    
+    // Production optimizations
+    if (!dev) {
+      // Aggressive chunk splitting for better caching
+      config.optimization.splitChunks = {
+        ...config.optimization.splitChunks,
+        chunks: 'all',
+        cacheGroups: {
+          ...config.optimization.splitChunks.cacheGroups,
+          editorComponents: {
+            test: /[\\/]components[\\/]Editor[\\/]/,
+            chunks: 'async',
+            priority: 10,
+            enforce: true,
+          },
+        },
+      };
+    }
     
     return config;
   },

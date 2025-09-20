@@ -3,6 +3,10 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "License Plate Designer - Editor",
   description: "Design custom license plates with our visual editor",
+  other: {
+    // Preload critical editor resources
+    'x-preload': 'editor-chunk',
+  }
 };
 
 export default function EditorLayout({

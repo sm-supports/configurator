@@ -8,6 +8,13 @@ import { getDesign } from '@/lib/designUtils';
 import ClientOnlyEditor from '@/components/Editor/ClientOnlyEditor';
 import EditorNavigation from '@/components/Navigation/EditorNavigation';
 
+// Preload the editor chunk immediately
+if (typeof window !== 'undefined') {
+  import('@/components/Editor/Editor').catch(() => {
+    // Silently fail if preload fails
+  });
+}
+
 export default function EditorPage() {
   const params = useParams();
   const searchParams = useSearchParams();
