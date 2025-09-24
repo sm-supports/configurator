@@ -22,6 +22,7 @@ interface EditorState {
   elements: Element[];
   selectedId: string | null;
   editingTextId: string | null;
+  activeLayer: 'base' | 'licenseplate';
 }
 
 // Font lists for vehicle number plates and general fonts
@@ -71,7 +72,8 @@ const Editor = React.memo(function Editor({ template, existingDesign }: EditorPr
   const [state, setState] = useState<EditorState>({
     elements: createDefaultElements(),
     selectedId: null,
-    editingTextId: null
+    editingTextId: null,
+    activeLayer: 'base'
   });
 
   // Save-related state
@@ -80,6 +82,7 @@ const Editor = React.memo(function Editor({ template, existingDesign }: EditorPr
 
   // Background image state - load asynchronously
   const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null);
+  const [licensePlateFrame, setLicensePlateFrame] = useState<HTMLImageElement | null>(null);
 
   // Load background image without blocking initial render
   useEffect(() => {
@@ -99,6 +102,25 @@ const Editor = React.memo(function Editor({ template, existingDesign }: EditorPr
     } else {
       // Fallback for browsers without requestIdleCallback
       setTimeout(loadImage, 0);
+    }
+  }, []);
+
+  // Load license plate frame overlay
+  useEffect(() => {
+    const loadFrame = () => {
+      const img = new window.Image();
+      img.src = '/license-plate-frame.png';
+      img.onload = () => setLicensePlateFrame(img);
+      img.onerror = (error) => {
+        console.error('Failed to load license plate frame:', error);
+        setLicensePlateFrame(null);
+      };
+    };
+
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(loadFrame);
+    } else {
+      setTimeout(loadFrame, 0);
     }
   }, []);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -752,7 +774,8 @@ This PNG is already optimized at 600 DPI for commercial printing.
       visible: true,
       locked: false,
       flippedH: false,
-      flippedV: false
+      flippedV: false,
+      layer: state.activeLayer
     };
 
     setState(prev => {
@@ -763,7 +786,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
         selectedId: newText.id
       };
     });
-  }, [state.elements.length, pushHistory, measureText, computeSpawnPosition]);
+  }, [state.elements.length, state.activeLayer, pushHistory, measureText, computeSpawnPosition]);
 
   // Add image element
   const addImage = useCallback((file: File) => {
@@ -814,7 +837,8 @@ This PNG is already optimized at 600 DPI for commercial printing.
           visible: true,
           locked: false,
           flippedH: false,
-          flippedV: false
+          flippedV: false,
+          layer: state.activeLayer
         };
 
         setState(prev => {
@@ -829,7 +853,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
       img.src = e.target?.result as string;
     };
     reader.readAsDataURL(file);
-  }, [state.elements.length, pushHistory, template.width_px, template.height_px]);
+  }, [state.elements.length, state.activeLayer, pushHistory, template.width_px, template.height_px]);
 
   // Handle element selection
   const selectElement = useCallback((id: string) => {
@@ -944,6 +968,16 @@ This PNG is already optimized at 600 DPI for commercial printing.
       };
     });
   }, [pushHistory]);
+
+  // Toggle active layer
+  const toggleLayer = useCallback((layer: 'base' | 'licenseplate') => {
+    setState(prev => ({ 
+      ...prev, 
+      activeLayer: layer,
+      selectedId: null, // Deselect when switching layers
+      editingTextId: null 
+    }));
+  }, []);
 
   // Handle clicks on stage background
   const handleStageClick = useCallback((e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
@@ -1203,33 +1237,68 @@ This PNG is already optimized at 600 DPI for commercial printing.
               </div>
             )}
           </div>
-          {/* Add Text Button */}
-          <button
-            onClick={addText}
-            className="p-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors duration-200 shadow-sm hover:shadow-md"
-            title="Add Text Element"
-            aria-label="Add Text"
-          >
-            <Type className="w-5 h-5" />
-          </button>
+
+          {/* Layer Switching Toggle */}
+          <div className="flex items-center gap-3 bg-white rounded-xl p-3 shadow-sm border border-gray-200">
+            <span className={`text-sm font-medium transition-colors duration-300 ${
+              state.activeLayer === 'base' ? 'text-blue-600' : 'text-gray-400'
+            }`}>
+              Base Canvas
+            </span>
+            
+            <div 
+              className="relative inline-flex h-6 w-11 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              style={{ 
+                backgroundColor: state.activeLayer === 'licenseplate' ? '#3B82F6' : '#D1D5DB' 
+              }}
+              onClick={() => toggleLayer(state.activeLayer === 'base' ? 'licenseplate' : 'base')}
+              title={`Switch to ${state.activeLayer === 'base' ? 'License Plate' : 'Base Canvas'} Layer`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition-transform duration-300 ${
+                  state.activeLayer === 'licenseplate' ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </div>
+            
+            <span className={`text-sm font-medium transition-colors duration-300 ${
+              state.activeLayer === 'licenseplate' ? 'text-blue-600' : 'text-gray-400'
+            }`}>
+              License Plate
+            </span>
+          </div>
+
+          {/* Add Text Button - Only visible on License Plate layer */}
+          {state.activeLayer === 'licenseplate' && (
+            <button
+              onClick={addText}
+              className="p-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors duration-200 shadow-sm hover:shadow-md"
+              title="Add Text Element (License Plate Only)"
+              aria-label="Add Text"
+            >
+              <Type className="w-5 h-5" />
+            </button>
+          )}
           
-          {/* Add Image Button */}
-          <label 
-            className="p-3 bg-green-500 text-white rounded-lg hover:bg-green-600 cursor-pointer transition-colors duration-200 shadow-sm hover:shadow-md"
-            title="Add Image"
-            aria-label="Add Image"
-          >
-            <ImagePlus className="w-5 h-5" />
-            <input
-              type="file"
-              accept="image/*"
+          {/* Add Image Button - Only visible on Base Canvas layer */}
+          {state.activeLayer === 'base' && (
+            <label 
+              className="p-3 bg-green-500 text-white rounded-lg hover:bg-green-600 cursor-pointer transition-colors duration-200 shadow-sm hover:shadow-md"
+              title="Add Image (Base Canvas Only)"
+              aria-label="Add Image"
+            >
+              <ImagePlus className="w-5 h-5" />
+              <input
+                type="file"
+                accept="image/*"
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) addImage(file);
               }}
               className="hidden"
             />
-          </label>
+            </label>
+          )}
 
           {/* Delete Button - only show when element is selected */}
           {state.selectedId && (
@@ -1562,7 +1631,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
       {/* Canvas Area - add top padding for fixed toolbar */}
       <div className="flex-1 flex items-center justify-center p-8 pt-24 overflow-auto"
            style={{ paddingTop: '5rem' }}>
-        <div className="relative">
+        <div className="relative overflow-hidden shadow-lg border border-gray-200 bg-white" style={{ borderRadius: '2.5rem' }}>
           {/* Placeholder text outside canvas when no elements exist */}
           {state.elements.length === 0 && (
             <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 text-center">
@@ -1610,7 +1679,25 @@ This PNG is already optimized at 600 DPI for commercial printing.
                 const H = template.height_px * zoom;
                 const textSpace = Math.min(W, H) * 0.15; // Same space as in background layer
                 const plateOffsetY = textSpace; // Same offset as background layer
-                return state.elements.map(element => {
+                
+                // Filter elements by active layer
+                // When on license plate layer, show base canvas elements in background (non-interactive)
+                // and license plate elements as interactive
+                const filteredElements = state.elements.filter(element => {
+                  const elementLayer = element.layer || 'base';
+                  if (state.activeLayer === 'licenseplate') {
+                    // Show both base (background) and license plate (interactive) elements
+                    return elementLayer === 'base' || elementLayer === 'licenseplate';
+                  } else {
+                    // Only show current layer elements
+                    return elementLayer === state.activeLayer;
+                  }
+                });
+                
+                return filteredElements.map(element => {
+                  const elementLayer = element.layer || 'base';
+                  const isInteractive = state.activeLayer === elementLayer;
+                  const isBackgroundElement = state.activeLayer === 'licenseplate' && elementLayer === 'base';
                   if (element.type === 'text') {
                     const textEl = element as TextElement;
                     return (
@@ -1636,8 +1723,10 @@ This PNG is already optimized at 600 DPI for commercial printing.
                           offsetX={element.flippedH ? (element.width || 100) * zoom : 0}
                           offsetY={element.flippedV ? (element.height || 50) * zoom : 0}
                           visible={state.editingTextId !== element.id}
-                          draggable
-                          dragBoundFunc={(pos) => {
+                          opacity={isBackgroundElement ? 0.6 : 1} // Dim background elements
+                          draggable={isInteractive}
+                          listening={isInteractive} // Only interactive elements respond to events
+                          dragBoundFunc={isInteractive ? (pos) => {
                             // Let text move anywhere on the visible stage, but commit bounds on drag end
                             const stageW = template.width_px * zoom;
                             const stageH = template.height_px * zoom + (Math.min(template.width_px, template.height_px) * zoom * 0.2);
@@ -1645,12 +1734,12 @@ This PNG is already optimized at 600 DPI for commercial printing.
                             const y = Math.max(0, Math.min(stageH - (element.height || 50) * zoom, pos.y));
                             bumpOverlay();
                             return { x, y };
-                          }}
-                          onClick={() => selectElement(element.id)}
-                          onTap={() => selectElement(element.id)}
-                          onDblClick={() => startTextEdit(element.id)}
-                          onDblTap={() => startTextEdit(element.id)}
-                          onDragEnd={(e) => {
+                          } : undefined}
+                          onClick={isInteractive ? () => selectElement(element.id) : undefined}
+                          onTap={isInteractive ? () => selectElement(element.id) : undefined}
+                          onDblClick={isInteractive ? () => startTextEdit(element.id) : undefined}
+                          onDblTap={isInteractive ? () => startTextEdit(element.id) : undefined}
+                          onDragEnd={isInteractive ? (e) => {
                             // Commit final drag position but keep within the overall stage frame
                             const newX = e.target.x() / zoom;
                             const newY = (e.target.y() - plateOffsetY) / zoom;
@@ -1661,14 +1750,14 @@ This PNG is already optimized at 600 DPI for commercial printing.
                             const cx = Math.max(stageMinX, Math.min(stageMaxX, newX));
                             const cy = Math.max(stageMinY, Math.min(stageMaxY, newY));
                             updateElement(element.id, { x: cx, y: cy });
-                          }}
-                          onTransform={(e) => {
+                          } : undefined}
+                          onTransform={isInteractive ? (e) => {
                             // Live feedback without state churn
                             const node = e.target as unknown as Konva.Text;
                             node.getLayer()?.batchDraw();
                             bumpOverlay();
-                          }}
-                          onTransformEnd={(e) => {
+                          } : undefined}
+                          onTransformEnd={isInteractive ? (e) => {
                             // Commit proportional font sizing for text on end
                             const node = e.target as unknown as Konva.Text;
                             const scaleX = node.scaleX();
@@ -1687,7 +1776,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
                             const cx = Math.max(stageMinX, Math.min(stageMaxX, newX));
                             const cy = Math.max(stageMinY, Math.min(stageMaxY, newY));
                             updateElement(element.id, { x: cx, y: cy, width: measured.width, height: measured.height, rotation: node.rotation(), fontSize: newFontSize });
-                          }}
+                          } : undefined}
                         />
                       </Group>
                     );
@@ -1699,9 +1788,11 @@ This PNG is already optimized at 600 DPI for commercial printing.
                           element={imageEl}
                           zoom={zoom}
                           plateOffsetY={plateOffsetY}
-                          onSelect={() => selectElement(element.id)}
+                          isInteractive={isInteractive}
+                          isBackgroundElement={isBackgroundElement}
+                          onSelect={() => isInteractive && selectElement(element.id)}
                           onUpdate={(updates) => {
-                            updateElement(element.id, updates);
+                            isInteractive && updateElement(element.id, updates);
                           }}
                         />
                       </Group>
@@ -1712,7 +1803,19 @@ This PNG is already optimized at 600 DPI for commercial printing.
               })()}
             </Layer>
 
-            {/* Removed separate mounting holes layer (integrated into background frame) */}
+            {/* License Plate Frame Overlay Layer - only visible when license plate layer is active */}
+            {state.activeLayer === 'licenseplate' && licensePlateFrame && (
+              <Layer offsetX={-view.x} offsetY={-view.y}>
+                <KonvaImage
+                  image={licensePlateFrame}
+                  x={0}
+                  y={0}
+                  width={template.width_px * zoom}
+                  height={template.height_px * zoom + (Math.min(template.width_px, template.height_px) * zoom * 0.2)}
+                  listening={false} // Does not block pointer events
+                />
+              </Layer>
+            )}
 
           </Stage>
           {/* Unified transformation overlay system - meets all 7 requirements */}
@@ -1797,6 +1900,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
                 elements: state.elements.map(el => ({ ...el })),
                 selectedId: state.selectedId,
                 editingTextId: null,
+                activeLayer: state.activeLayer,
               });
 
               const stageScale = zoom;
@@ -1942,6 +2046,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
                 elements: state.elements.map(el => ({ ...el })),
                 selectedId: state.selectedId,
                 editingTextId: null,
+                activeLayer: state.activeLayer,
               });
               
               const initialRotation = node.rotation() || 0;
@@ -2385,12 +2490,16 @@ const ImageComponent = React.memo(function ImageComponent({
   element, 
   zoom,
   plateOffsetY,
+  isInteractive = true,
+  isBackgroundElement = false,
   onSelect, 
   onUpdate 
 }: {
   element: ImageElement;
   zoom: number;
   plateOffsetY?: number;
+  isInteractive?: boolean;
+  isBackgroundElement?: boolean;
   onSelect: () => void;
   onUpdate: (updates: Partial<ImageElement>) => void;
 }) {
@@ -2432,16 +2541,18 @@ const ImageComponent = React.memo(function ImageComponent({
       scaleY={element.flippedV ? -1 : 1}
       offsetX={element.flippedH ? (element.width || 100) * zoom : 0}
       offsetY={element.flippedV ? (element.height || 100) * zoom : 0}
-      draggable
-      onClick={onSelect}
-      onTap={onSelect}
-      onDragEnd={(e) => {
+      opacity={isBackgroundElement ? 0.6 : 1}
+      draggable={isInteractive}
+      listening={isInteractive}
+      onClick={isInteractive ? onSelect : undefined}
+      onTap={isInteractive ? onSelect : undefined}
+      onDragEnd={isInteractive ? (e) => {
         onUpdate({
           x: e.target.x() / zoom,
           y: plateOffsetY !== undefined ? (e.target.y() - plateOffsetY) / zoom : e.target.y() / zoom
         });
-      }}
-      onTransformEnd={(e) => {
+      } : undefined}
+      onTransformEnd={isInteractive ? (e) => {
         const node = e.target;
         const scaleX = node.scaleX();
         const scaleY = node.scaleY();
@@ -2457,7 +2568,7 @@ const ImageComponent = React.memo(function ImageComponent({
           height: Math.max(10, node.height() * Math.abs(scaleY) / zoom),
           rotation: node.rotation()
         });
-      }}
+      } : undefined}
     />
   );
 });

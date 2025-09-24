@@ -52,6 +52,7 @@ export interface DesignElement {
   visible?: boolean;
   flippedH?: boolean;
   flippedV?: boolean;
+  layer?: 'base' | 'licenseplate';
 }
 
 export interface TextElement extends DesignElement {
