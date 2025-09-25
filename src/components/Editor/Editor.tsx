@@ -84,15 +84,17 @@ const Editor = React.memo(function Editor({ template, existingDesign }: EditorPr
   const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null);
   const [licensePlateFrame, setLicensePlateFrame] = useState<HTMLImageElement | null>(null);
 
-  // Load background image without blocking initial render
+  // Load background image without blocking initial render (optional)
   useEffect(() => {
     // Use requestIdleCallback to load image when browser is idle
     const loadImage = () => {
       const img = new window.Image();
-      img.src = '/img2.png';
+      // Use a template image as background, or leave empty for two-layer system
+      img.src = '/templates/us-standard.png';
       img.onload = () => setBgImage(img);
-      img.onerror = (error) => {
-        console.error('Failed to load background image:', error);
+      img.onerror = () => {
+        // Background image is optional in the two-layer system
+        console.log('No background image loaded, using transparent background');
         setBgImage(null);
       };
     };
@@ -1268,37 +1270,32 @@ This PNG is already optimized at 600 DPI for commercial printing.
             </span>
           </div>
 
-          {/* Add Text Button - Only visible on License Plate layer */}
-          {state.activeLayer === 'licenseplate' && (
-            <button
-              onClick={addText}
-              className="p-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors duration-200 shadow-sm hover:shadow-md"
-              title="Add Text Element (License Plate Only)"
-              aria-label="Add Text"
-            >
-              <Type className="w-5 h-5" />
-            </button>
-          )}
+          {/* Add Text and Image Buttons - Available on both layers */}
+          <button
+            onClick={addText}
+            className="p-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors duration-200 shadow-sm hover:shadow-md"
+            title="Add Text Element"
+            aria-label="Add Text"
+          >
+            <Type className="w-5 h-5" />
+          </button>
           
-          {/* Add Image Button - Only visible on Base Canvas layer */}
-          {state.activeLayer === 'base' && (
-            <label 
-              className="p-3 bg-green-500 text-white rounded-lg hover:bg-green-600 cursor-pointer transition-colors duration-200 shadow-sm hover:shadow-md"
-              title="Add Image (Base Canvas Only)"
-              aria-label="Add Image"
-            >
-              <ImagePlus className="w-5 h-5" />
-              <input
-                type="file"
-                accept="image/*"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) addImage(file);
-              }}
-              className="hidden"
-            />
-            </label>
-          )}
+          <label 
+            className="p-3 bg-green-500 text-white rounded-lg hover:bg-green-600 cursor-pointer transition-colors duration-200 shadow-sm hover:shadow-md"
+            title="Add Image"
+            aria-label="Add Image"
+          >
+            <ImagePlus className="w-5 h-5" />
+            <input
+              type="file"
+              accept="image/*"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) addImage(file);
+            }}
+            className="hidden"
+          />
+          </label>
 
           {/* Delete Button - only show when element is selected */}
           {state.selectedId && (
@@ -1671,7 +1668,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
             {/* Background Layer (currently just the image) */}
             <Layer offsetX={-view.x} offsetY={-view.y}>{/* background visuals are provided by the image above */}</Layer>
 
-            {/* Elements Layer (preserve order; per-text clipping) */}
+            {/* Images Layer - renders BEFORE license plate frame so images appear behind it */}
             <Layer offsetX={-view.x} offsetY={-view.y}>
               {(() => {
                 // Geometry for plate interior
@@ -1680,30 +1677,72 @@ This PNG is already optimized at 600 DPI for commercial printing.
                 const textSpace = Math.min(W, H) * 0.15; // Same space as in background layer
                 const plateOffsetY = textSpace; // Same offset as background layer
                 
-                // Filter elements by active layer
-                // When on license plate layer, show base canvas elements in background (non-interactive)
-                // and license plate elements as interactive
-                const filteredElements = state.elements.filter(element => {
-                  const elementLayer = element.layer || 'base';
-                  if (state.activeLayer === 'licenseplate') {
-                    // Show both base (background) and license plate (interactive) elements
-                    return elementLayer === 'base' || elementLayer === 'licenseplate';
-                  } else {
-                    // Only show current layer elements
-                    return elementLayer === state.activeLayer;
-                  }
-                });
+                // Show all elements on both layers for full functionality
+                // Elements are differentiated by interactivity based on active layer
+                const filteredElements = state.elements;
                 
-                return filteredElements.map(element => {
+                // Only render IMAGE elements in this layer
+                return filteredElements.filter(element => element.type === 'image').map(element => {
                   const elementLayer = element.layer || 'base';
                   const isInteractive = state.activeLayer === elementLayer;
-                  const isBackgroundElement = state.activeLayer === 'licenseplate' && elementLayer === 'base';
-                  if (element.type === 'text') {
-                    const textEl = element as TextElement;
-                    return (
-                      // Do NOT clip text; it can live on the frame too
-                      <Group key={element.id}>
-                        <Text
+                  
+                  const imageEl = element as ImageElement;
+                  return (
+                    <Group key={element.id}>
+                      <ImageComponent
+                        element={imageEl}
+                        zoom={zoom}
+                        plateOffsetY={plateOffsetY}
+                        isInteractive={isInteractive}
+                        onSelect={() => isInteractive && selectElement(element.id)}
+                        onUpdate={(updates) => {
+                          isInteractive && updateElement(element.id, updates);
+                        }}
+                      />
+                    </Group>
+                  );
+                });
+              })()}
+            </Layer>
+
+            {/* License Plate Frame Layer - renders AFTER images but BEFORE text */}
+            {licensePlateFrame && (
+              <Layer offsetX={-view.x} offsetY={-view.y}>
+                <KonvaImage
+                  image={licensePlateFrame}
+                  x={0}
+                  y={0}
+                  width={template.width_px * zoom}
+                  height={template.height_px * zoom + (Math.min(template.width_px, template.height_px) * zoom * 0.2)}
+                  opacity={state.activeLayer === 'base' ? 0 : 1} // Completely transparent on base layer
+                  listening={false} // Does not block pointer events
+                />
+              </Layer>
+            )}
+
+            {/* Text Elements Layer - renders AFTER license plate frame so text appears above it */}
+            <Layer offsetX={-view.x} offsetY={-view.y}>
+              {(() => {
+                // Geometry for plate interior
+                const W = template.width_px * zoom;
+                const H = template.height_px * zoom;
+                const textSpace = Math.min(W, H) * 0.15; // Same space as in background layer
+                const plateOffsetY = textSpace; // Same offset as background layer
+                
+                // Show all elements on both layers for full functionality
+                // Elements are differentiated by interactivity based on active layer
+                const filteredElements = state.elements;
+                
+                // Only render TEXT elements in this layer
+                return filteredElements.filter(element => element.type === 'text').map(element => {
+                  const elementLayer = element.layer || 'base';
+                  const isInteractive = state.activeLayer === elementLayer;
+                  
+                  const textEl = element as TextElement;
+                  return (
+                    // Do NOT clip text; it can live on the frame too
+                    <Group key={element.id}>
+                      <Text
                           id={element.id}
                           text={textEl.text}
                           x={element.x * zoom}
@@ -1723,7 +1762,7 @@ This PNG is already optimized at 600 DPI for commercial printing.
                           offsetX={element.flippedH ? (element.width || 100) * zoom : 0}
                           offsetY={element.flippedV ? (element.height || 50) * zoom : 0}
                           visible={state.editingTextId !== element.id}
-                          opacity={isBackgroundElement ? 0.6 : 1} // Dim background elements
+                          opacity={1} // Always full opacity - no background dimming
                           draggable={isInteractive}
                           listening={isInteractive} // Only interactive elements respond to events
                           dragBoundFunc={isInteractive ? (pos) => {
@@ -1780,42 +1819,9 @@ This PNG is already optimized at 600 DPI for commercial printing.
                         />
                       </Group>
                     );
-                  } else if (element.type === 'image') {
-                    const imageEl = element as ImageElement;
-                    return (
-                      <Group key={element.id}>
-                        <ImageComponent
-                          element={imageEl}
-                          zoom={zoom}
-                          plateOffsetY={plateOffsetY}
-                          isInteractive={isInteractive}
-                          isBackgroundElement={isBackgroundElement}
-                          onSelect={() => isInteractive && selectElement(element.id)}
-                          onUpdate={(updates) => {
-                            isInteractive && updateElement(element.id, updates);
-                          }}
-                        />
-                      </Group>
-                    );
-                  }
-                  return null;
                 });
               })()}
             </Layer>
-
-            {/* License Plate Frame Overlay Layer - only visible when license plate layer is active */}
-            {state.activeLayer === 'licenseplate' && licensePlateFrame && (
-              <Layer offsetX={-view.x} offsetY={-view.y}>
-                <KonvaImage
-                  image={licensePlateFrame}
-                  x={0}
-                  y={0}
-                  width={template.width_px * zoom}
-                  height={template.height_px * zoom + (Math.min(template.width_px, template.height_px) * zoom * 0.2)}
-                  listening={false} // Does not block pointer events
-                />
-              </Layer>
-            )}
 
           </Stage>
           {/* Unified transformation overlay system - meets all 7 requirements */}
@@ -2491,7 +2497,6 @@ const ImageComponent = React.memo(function ImageComponent({
   zoom,
   plateOffsetY,
   isInteractive = true,
-  isBackgroundElement = false,
   onSelect, 
   onUpdate 
 }: {
@@ -2499,7 +2504,6 @@ const ImageComponent = React.memo(function ImageComponent({
   zoom: number;
   plateOffsetY?: number;
   isInteractive?: boolean;
-  isBackgroundElement?: boolean;
   onSelect: () => void;
   onUpdate: (updates: Partial<ImageElement>) => void;
 }) {
@@ -2541,7 +2545,7 @@ const ImageComponent = React.memo(function ImageComponent({
       scaleY={element.flippedV ? -1 : 1}
       offsetX={element.flippedH ? (element.width || 100) * zoom : 0}
       offsetY={element.flippedV ? (element.height || 100) * zoom : 0}
-      opacity={isBackgroundElement ? 0.6 : 1}
+      opacity={1} // Always full opacity - no background dimming
       draggable={isInteractive}
       listening={isInteractive}
       onClick={isInteractive ? onSelect : undefined}
