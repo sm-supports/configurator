@@ -37,10 +37,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Update last activity time
-  const updateActivity = useCallback(() => {
+  // Update last activity time - use ref to avoid dependency issues
+  const updateActivityRef = useRef(() => {
     setLastActivity(new Date());
     setShowSessionWarning(false);
+  });
+
+  // Keep ref updated
+  useEffect(() => {
+    updateActivityRef.current = () => {
+      setLastActivity(new Date());
+      setShowSessionWarning(false);
+    };
+  });
+
+  const updateActivity = useCallback(() => {
+    updateActivityRef.current();
   }, []);
 
   // Handle session timeout
@@ -55,23 +67,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setShowSessionWarning(true);
   }, []);
 
-  // Reset session timeout
-  const resetSessionTimeout = useCallback(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    if (warningTimeoutRef.current) {
-      clearTimeout(warningTimeoutRef.current);
-    }
+  // Reset session timeout - use ref to avoid dependency cycles
+  const resetSessionTimeoutRef = useRef(() => {});
+  
+  useEffect(() => {
+    resetSessionTimeoutRef.current = () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      if (warningTimeoutRef.current) {
+        clearTimeout(warningTimeoutRef.current);
+      }
 
-    if (session && isSessionValid) {
-      // Set warning timeout
-      warningTimeoutRef.current = setTimeout(showWarning, SESSION_TIMEOUT - WARNING_TIME);
-      
-      // Set session timeout
-      timeoutRef.current = setTimeout(handleSessionTimeout, SESSION_TIMEOUT);
-    }
+      if (session && isSessionValid) {
+        // Set warning timeout
+        warningTimeoutRef.current = setTimeout(showWarning, SESSION_TIMEOUT - WARNING_TIME);
+        
+        // Set session timeout
+        timeoutRef.current = setTimeout(handleSessionTimeout, SESSION_TIMEOUT);
+      }
+    };
   }, [session, isSessionValid, showWarning, handleSessionTimeout]);
+
+  const resetSessionTimeout = useCallback(() => {
+    resetSessionTimeoutRef.current();
+  }, []);
 
   // Track user activity
   useEffect(() => {
@@ -89,8 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       document.addEventListener(event, handleActivity, true);
     });
 
-    // Initial activity tracking
-    updateActivity();
+    // Initial session timeout setup only
     resetSessionTimeout();
 
     return () => {
