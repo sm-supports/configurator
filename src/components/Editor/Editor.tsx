@@ -66,6 +66,13 @@ const EditorCore: React.FC = () => {
     toggleLayer,
     startTextEdit,
     
+    // Paint tool operations
+    setActiveTool,
+    setPaintSettings,
+    startPainting,
+    addPaintPoint,
+    finishPainting,
+    
     // Save/Export operations
     handleSaveDesign,
     handleDownload,
@@ -110,6 +117,8 @@ const EditorCore: React.FC = () => {
       measureText={measureText}
       flipHorizontal={flipHorizontal}
       flipVertical={flipVertical}
+      setActiveTool={setActiveTool}
+      setPaintSettings={setPaintSettings}
     />
   );
 
@@ -148,6 +157,9 @@ const EditorCore: React.FC = () => {
           updateElement={updateElement}
           startTextEdit={startTextEdit}
           bumpOverlay={bumpOverlay}
+          startPainting={startPainting}
+          addPaintPoint={addPaintPoint}
+          finishPainting={finishPainting}
         />
       </EditorLayout>
 

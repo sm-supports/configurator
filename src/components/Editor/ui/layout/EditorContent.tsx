@@ -2,7 +2,7 @@ import React from 'react';
 import { Canvas } from '../../canvas/Canvas';
 import type Konva from 'konva';
 import { PlateTemplate, TextElement, ImageElement } from '@/types';
-import { EditorState } from '../../core/types';
+import { EditorState, Element } from '../../core/types';
 
 export interface EditorContentProps {
   template: PlateTemplate;
@@ -14,9 +14,12 @@ export interface EditorContentProps {
   licensePlateFrame: HTMLImageElement | null;
   state: EditorState;
   selectElement: (id: string) => void;
-  updateElement: (id: string, updates: Partial<TextElement> | Partial<ImageElement>) => void;
+  updateElement: (id: string, updates: Partial<Element>) => void;
   startTextEdit: (id: string) => void;
   bumpOverlay: () => void;
+  startPainting: (x: number, y: number) => void;
+  addPaintPoint: (x: number, y: number) => void;
+  finishPainting: () => void;
 }
 
 export const EditorContent: React.FC<EditorContentProps> = ({
@@ -32,6 +35,9 @@ export const EditorContent: React.FC<EditorContentProps> = ({
   updateElement,
   startTextEdit,
   bumpOverlay,
+  startPainting,
+  addPaintPoint,
+  finishPainting,
 }) => {
   return (
     <div className="relative">
@@ -61,6 +67,9 @@ export const EditorContent: React.FC<EditorContentProps> = ({
           updateElement={updateElement}
           startTextEdit={startTextEdit}
           bumpOverlay={bumpOverlay}
+          startPainting={startPainting}
+          addPaintPoint={addPaintPoint}
+          finishPainting={finishPainting}
         />
       </div>
 

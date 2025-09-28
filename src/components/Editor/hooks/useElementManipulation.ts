@@ -2,7 +2,7 @@
 import { useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { TextElement, ImageElement, PlateTemplate } from '@/types';
-import { EditorState, Element } from '../core/types';
+import { EditorState, Element, PaintElement, PaintPoint, ToolType } from '../core/types';
 import { measureText, computeSpawnPosition } from '../canvas/utils/canvasUtils';
 
 export const useElementManipulation = (
@@ -14,6 +14,7 @@ export const useElementManipulation = (
   vehiclePlateFonts: Array<{ name: string; value: string }>,
   editingValue: string,
   setEditingValue: React.Dispatch<React.SetStateAction<string>>,
+  zoom: number = 1,
 ) => {
 
   const addText = useCallback(() => {
@@ -122,7 +123,7 @@ export const useElementManipulation = (
     setState(prev => ({ ...prev, selectedId: id }));
   }, [setState]);
 
-  const updateElement = useCallback((id: string, updates: Partial<TextElement> | Partial<ImageElement>) => {
+  const updateElement = useCallback((id: string, updates: Partial<Element>) => {
     setState(prev => {
       pushHistory(prev);
       return {
@@ -209,5 +210,115 @@ export const useElementManipulation = (
     setEditingValue('');
   }, [state.editingTextId, state.elements, editingValue, updateElement, setState, setEditingValue]);
 
-  return { addText, addImage, selectElement, updateElement, deleteElement, flipHorizontal, flipVertical, toggleLayer, finishTextEdit };
+  // Paint functionality
+  const setActiveTool = useCallback((tool: ToolType) => {
+    setState(prev => ({ ...prev, activeTool: tool, selectedId: null }));
+  }, [setState]);
+
+  const setPaintSettings = useCallback((settings: Partial<EditorState['paintSettings']>) => {
+    setState(prev => ({
+      ...prev,
+      paintSettings: { ...prev.paintSettings, ...settings }
+    }));
+  }, [setState]);
+
+  const startPainting = useCallback((x: number, y: number, pressure?: number) => {
+    const point: PaintPoint = {
+      x: x / zoom,
+      y: y / zoom,
+      pressure: pressure || 1.0,
+      timestamp: Date.now()
+    };
+    
+    setState(prev => ({
+      ...prev,
+      isPainting: true,
+      currentPaintStroke: [point],
+      selectedId: null
+    }));
+  }, [setState, zoom]);
+
+  const addPaintPoint = useCallback((x: number, y: number, pressure?: number) => {
+    if (!state.isPainting || !state.currentPaintStroke) return;
+
+    const point: PaintPoint = {
+      x: x / zoom,
+      y: y / zoom,
+      pressure: pressure || 1.0,
+      timestamp: Date.now()
+    };
+
+    setState(prev => ({
+      ...prev,
+      currentPaintStroke: prev.currentPaintStroke ? [...prev.currentPaintStroke, point] : [point]
+    }));
+  }, [setState, state.isPainting, state.currentPaintStroke, zoom]);
+
+  const finishPainting = useCallback(() => {
+    if (!state.isPainting || !state.currentPaintStroke || state.currentPaintStroke.length === 0) {
+      setState(prev => ({ ...prev, isPainting: false, currentPaintStroke: null }));
+      return;
+    }
+
+    pushHistory(state);
+
+    // Calculate bounding box for the stroke
+    const xs = state.currentPaintStroke.map(p => p.x);
+    const ys = state.currentPaintStroke.map(p => p.y);
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    const maxX = Math.max(...xs);
+    const maxY = Math.max(...ys);
+
+    // Normalize points relative to the element's position
+    const normalizedPoints = state.currentPaintStroke.map(point => ({
+      ...point,
+      x: point.x - minX,
+      y: point.y - minY
+    }));
+
+    const newPaintElement: PaintElement = {
+      id: uuidv4(),
+      type: 'paint',
+      points: normalizedPoints,
+      color: state.paintSettings.color,
+      brushSize: state.paintSettings.brushSize,
+      opacity: state.paintSettings.opacity,
+      brushType: state.paintSettings.brushType,
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+      rotation: 0,
+      zIndex: state.elements.length,
+      locked: false,
+      visible: true,
+      layer: state.activeLayer
+    };
+
+    setState(prev => ({
+      ...prev,
+      elements: [...prev.elements, newPaintElement],
+      isPainting: false,
+      currentPaintStroke: null,
+      selectedId: newPaintElement.id
+    }));
+  }, [state, pushHistory, setState]);
+
+  return { 
+    addText, 
+    addImage, 
+    selectElement, 
+    updateElement, 
+    deleteElement, 
+    flipHorizontal, 
+    flipVertical, 
+    toggleLayer, 
+    finishTextEdit,
+    setActiveTool,
+    setPaintSettings,
+    startPainting,
+    addPaintPoint,
+    finishPainting
+  };
 };

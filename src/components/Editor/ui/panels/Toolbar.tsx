@@ -1,10 +1,10 @@
 
 import React from 'react';
 import {
-  Undo2, Redo2, Type, ImagePlus, Trash2, Save, Download, ChevronDown, FlipHorizontal, FlipVertical, Bold, Italic, Underline
+  Undo2, Redo2, Type, ImagePlus, Trash2, Save, Download, ChevronDown, FlipHorizontal, FlipVertical, Bold, Italic, Underline, Brush, Palette
 } from 'lucide-react';
 import { PlateTemplate, TextElement } from '@/types';
-import { EditorState } from '../../core/types';
+import { EditorState, Element, ToolType, PaintSettings } from '../../core/types';
 import { vehiclePlateFonts, generalFonts } from '../../core/constants';
 
 interface ToolbarProps {
@@ -31,10 +31,12 @@ interface ToolbarProps {
   showDownloadDropdown: boolean;
   setShowDownloadDropdown: React.Dispatch<React.SetStateAction<boolean>>;
   handleDownload: (format: 'png' | 'jpeg' | 'pdf' | 'eps' | 'tiff') => void;
-  updateElement: (id: string, updates: Partial<TextElement>) => void;
+  updateElement: (id: string, updates: Partial<Element>) => void;
   measureText: (text: string, fontSize: number, fontFamily: string, fontWeight: string | number, fontStyle?: string) => { width: number, height: number };
   flipHorizontal: (id: string) => void;
   flipVertical: (id: string) => void;
+  setActiveTool: (tool: ToolType) => void;
+  setPaintSettings: (settings: Partial<PaintSettings>) => void;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({
@@ -65,6 +67,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   measureText,
   flipHorizontal,
   flipVertical,
+  setActiveTool,
+  setPaintSettings,
 }) => {
   const selectedElement = state.elements.find(el => el.id === state.selectedId);
   const isTextElement = selectedElement?.type === 'text';
@@ -289,6 +293,83 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             className="hidden"
           />
         </label>
+
+        {/* Paint Tools */}
+        <button
+          onClick={() => setActiveTool('brush')}
+          className={`p-3 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md ${
+            state.activeTool === 'brush' 
+              ? 'bg-purple-600 text-white' 
+              : 'bg-purple-500 text-white hover:bg-purple-600'
+          }`}
+          title="Brush Tool"
+          aria-label="Brush Tool"
+        >
+          <Brush className="w-5 h-5" />
+        </button>
+        
+        <button
+          onClick={() => setActiveTool('airbrush')}
+          className={`p-3 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md ${
+            state.activeTool === 'airbrush' 
+              ? 'bg-purple-600 text-white' 
+              : 'bg-purple-500 text-white hover:bg-purple-600'
+          }`}
+          title="Airbrush Tool"
+          aria-label="Airbrush Tool"
+        >
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="4" opacity="0.8"/>
+            <circle cx="12" cy="12" r="7" opacity="0.3"/>
+          </svg>
+        </button>
+        
+        <button
+          onClick={() => setActiveTool('spray')}
+          className={`p-3 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md ${
+            state.activeTool === 'spray' 
+              ? 'bg-purple-600 text-white' 
+              : 'bg-purple-500 text-white hover:bg-purple-600'
+          }`}
+          title="Spray Tool"
+          aria-label="Spray Tool"
+        >
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+            <circle cx="8" cy="8" r="1"/>
+            <circle cx="16" cy="8" r="1"/>
+            <circle cx="12" cy="12" r="1"/>
+            <circle cx="6" cy="16" r="1"/>
+            <circle cx="18" cy="16" r="1"/>
+            <circle cx="10" cy="18" r="1"/>
+            <circle cx="14" cy="6" r="1"/>
+          </svg>
+        </button>
+
+        {/* Paint Settings - only show when paint tool is active */}
+        {(state.activeTool === 'brush' || state.activeTool === 'airbrush' || state.activeTool === 'spray') && (
+          <>
+            <div className="h-6 w-px bg-gray-200 mx-2" />
+            <input
+              type="color"
+              value={state.paintSettings.color}
+              onChange={(e) => setPaintSettings({ color: e.target.value })}
+              className="w-10 h-10 border-2 border-gray-300 rounded-lg cursor-pointer"
+              title="Paint Color"
+            />
+            <input
+              type="range"
+              min="1"
+              max="50"
+              value={state.paintSettings.brushSize}
+              onChange={(e) => setPaintSettings({ brushSize: parseInt(e.target.value) })}
+              className="w-20"
+              title="Brush Size"
+            />
+            <span className="text-xs text-gray-600 min-w-[30px]">
+              {state.paintSettings.brushSize}px
+            </span>
+          </>
+        )}
 
         {state.selectedId && (
           <button

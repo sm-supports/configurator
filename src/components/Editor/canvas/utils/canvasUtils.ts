@@ -1,5 +1,6 @@
 
 import type Konva from 'konva';
+import type { RefObject } from 'react';
 import { PlateTemplate } from '@/types';
 import { Element } from '../../core/types';
 
@@ -143,7 +144,7 @@ export const computeSpawnPosition = (opts: SpawnOptions, template: PlateTemplate
 };
 
 // Download/Export functions for high-quality printing
-export const exportToDataURL = (stageRef: React.RefObject<Konva.Stage>, format: string, quality: number = 1): string | null => {
+export const exportToDataURL = (stageRef: RefObject<Konva.Stage>, format: string, quality: number = 1): string | null => {
   if (!stageRef.current) return null;
   
   // Set ultra-high DPI for professional printing

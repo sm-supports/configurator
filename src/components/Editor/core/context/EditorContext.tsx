@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useRef, useCallback, useEff
 import type Konva from 'konva';
 import { PlateTemplate } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
-import { EditorState, Element } from '../types';
+import { EditorState, Element, ToolType, PaintSettings } from '../types';
 import { TextElement } from '@/types';
 import { vehiclePlateFonts } from '../constants';
 import { User } from '@supabase/supabase-js';
@@ -71,6 +71,13 @@ export interface EditorContextValue {
   finishTextEdit: (save?: boolean, reselect?: boolean) => void;
   startTextEdit: (id: string) => void;
   
+  // Paint tool operations
+  setActiveTool: (tool: ToolType) => void;
+  setPaintSettings: (settings: Partial<PaintSettings>) => void;
+  startPainting: (x: number, y: number) => void;
+  addPaintPoint: (x: number, y: number) => void;
+  finishPainting: () => void;
+  
   // Save/Export operations
   handleSaveDesign: () => Promise<void>;
   handleDownload: (format: 'png' | 'jpeg' | 'pdf' | 'eps' | 'tiff') => Promise<void>;
@@ -123,7 +130,16 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
     elements: createDefaultElements(),
     selectedId: null,
     editingTextId: null,
-    activeLayer: 'base'
+    activeLayer: 'base',
+    activeTool: 'select',
+    paintSettings: {
+      color: '#000000',
+      brushSize: 10,
+      opacity: 1.0,
+      brushType: 'brush'
+    },
+    isPainting: false,
+    currentPaintStroke: null
   });
 
   // UI state
@@ -174,9 +190,10 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
   const { zoom, view, zoomIn, zoomOut, resetZoom } = useZoom(stageRef as React.RefObject<Konva.Stage>, template, bumpOverlay);
   const { 
     addText, addImage, selectElement, updateElement, deleteElement, 
-    flipHorizontal, flipVertical, toggleLayer, finishTextEdit 
+    flipHorizontal, flipVertical, toggleLayer, finishTextEdit,
+    setActiveTool, setPaintSettings, startPainting, addPaintPoint, finishPainting
   } = useElementManipulation(
-    state, setState, pushHistory, template, nextRand, vehiclePlateFonts, editingValue, setEditingValue
+    state, setState, pushHistory, template, nextRand, vehiclePlateFonts, editingValue, setEditingValue, zoom
   );
 
   useKeyboardShortcuts(state, deleteElement, undo, redo);
@@ -328,6 +345,13 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
     finishTextEdit,
     startTextEdit,
     
+    // Paint tool operations
+    setActiveTool,
+    setPaintSettings,
+    startPainting,
+    addPaintPoint,
+    finishPainting,
+    
     // Save/Export operations
     handleSaveDesign,
     handleDownload,
@@ -347,6 +371,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
     zoom, view, zoomIn, zoomOut, resetZoom, bumpOverlay,
     addText, addImage, selectElement, updateElement, deleteElement,
     flipHorizontal, flipVertical, toggleLayer, finishTextEdit, startTextEdit,
+    setActiveTool, setPaintSettings, startPainting, addPaintPoint, finishPainting,
     handleSaveDesign, handleDownload, setEditingPos,
     user, isAdmin, setShowDownloadDropdown, setShowLayersPanel, setEditingValue
   ]);

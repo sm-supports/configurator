@@ -1,5 +1,5 @@
 import type Konva from 'konva';
-import { PlateTemplate, DesignData } from '@/types';
+import { PlateTemplate, DesignData, DesignElement } from '@/types';
 import { EditorState } from '../core/types';
 import { exportToDataURL, downloadFile } from '../canvas/utils/canvasUtils';
 import { saveDesign, SaveDesignParams } from '@/lib/designUtils';
@@ -72,7 +72,7 @@ export class EditorExportService {
       }
 
       const designData: DesignData = {
-        elements: state.elements,
+        elements: state.elements.filter(el => el.type !== 'paint') as DesignElement[],
         template_id: this.template.id,
         width: this.template.width_px,
         height: this.template.height_px,
