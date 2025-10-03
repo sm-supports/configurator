@@ -42,9 +42,20 @@ export class EditorImageService {
         const errorMessage = `Failed to load background image from ${this.template.image_url}: ${
           error instanceof Error ? error.message : 'Image failed to load'
         }`;
-        console.error(errorMessage);
+        console.warn(errorMessage); // Changed from console.error to console.warn
         errors.push(errorMessage);
-        this.bgImage = null;
+        
+        // Generate a fallback placeholder image
+        this.bgImage = this.generatePlaceholderImage(
+          this.template.width_px,
+          this.template.height_px + Math.min(this.template.width_px, this.template.height_px) * 0.2,
+          this.template.name || 'Template'
+        );
+        
+        if (this.bgImage) {
+          this.onImageLoad?.('background', this.bgImage);
+          console.log('Using generated placeholder background image');
+        }
       }
     }
 
@@ -62,16 +73,19 @@ export class EditorImageService {
       const errorMessage = `Failed to load frame image from /license-plate-frame.png: ${
         error instanceof Error ? error.message : 'Image failed to load'
       }`;
-      console.error(errorMessage);
+      console.warn(errorMessage); // Changed from console.error to console.warn
       errors.push(errorMessage);
+      
+      // Frame is optional - editor can work without it
       this.frameImage = null;
+      console.log('Editor will continue without frame image (frame is optional)');
     }
 
     // Log summary of loading results
     if (errors.length > 0) {
-      console.warn(`Template image loading completed with ${errors.length} error(s)`);
+      console.info(`Template image loading completed with ${errors.length} warning(s) - editor will use fallbacks`);
     } else {
-      console.log('Template images loaded successfully');
+      console.log('✓ All template images loaded successfully');
     }
   }
 
@@ -134,6 +148,76 @@ export class EditorImageService {
         reject(error instanceof Error ? error : new Error('Unknown image load error'));
       }
     });
+  }
+
+  /**
+   * Generate a placeholder image when template image fails to load
+   */
+  private generatePlaceholderImage(width: number, height: number, text: string): HTMLImageElement | null {
+    try {
+      if (typeof document === 'undefined') return null;
+
+      // Create canvas
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+
+      // Background gradient
+      const gradient = ctx.createLinearGradient(0, 0, 0, height);
+      gradient.addColorStop(0, '#f0f0f0');
+      gradient.addColorStop(1, '#d0d0d0');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, width, height);
+
+      // Border
+      ctx.strokeStyle = '#999999';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(2, 2, width - 4, height - 4);
+
+      // Grid pattern (subtle)
+      ctx.strokeStyle = '#e0e0e0';
+      ctx.lineWidth = 1;
+      const gridSize = 50;
+      for (let x = 0; x < width; x += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+        ctx.stroke();
+      }
+      for (let y = 0; y < height; y += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+      }
+
+      // Text
+      ctx.fillStyle = '#666666';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      
+      // Main text
+      const fontSize = Math.min(width, height) * 0.08;
+      ctx.font = `bold ${fontSize}px Arial, sans-serif`;
+      ctx.fillText(text, width / 2, height / 2 - fontSize * 0.5);
+      
+      // Sub text
+      ctx.font = `${fontSize * 0.6}px Arial, sans-serif`;
+      ctx.fillStyle = '#999999';
+      ctx.fillText('Placeholder Template', width / 2, height / 2 + fontSize * 0.8);
+
+      // Convert canvas to image
+      const img = new Image();
+      img.src = canvas.toDataURL('image/png');
+      
+      return img;
+    } catch (error) {
+      console.error('Failed to generate placeholder image:', error);
+      return null;
+    }
   }
 
   async processUserImage(file: File, options: ImageLoadOptions = {}): Promise<ImageElement | null> {

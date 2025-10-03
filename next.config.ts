@@ -59,6 +59,18 @@ const nextConfig: NextConfig = {
       ...config.resolve.alias,
       canvas: false,
     };
+
+    // WebAssembly support
+    config.experiments = {
+      ...config.experiments,
+      asyncWebAssembly: true,
+    };
+
+    // WASM file handling
+    config.module.rules.push({
+      test: /\.wasm$/,
+      type: 'webassembly/async',
+    });
     
     // Production optimizations
     if (!dev) {

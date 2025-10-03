@@ -8,17 +8,18 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm run asbuild && next build",
     "start": "next start",
     "lint": "eslint",
     "type-check": "tsc --noEmit",
-    "vercel-build": "next build"
+    "vercel-build": "npm run asbuild && next build",
+    "asbuild:debug": "asc wasm/assembly/canvas-performance.ts --target debug --outFile public/wasm/canvas-performance.debug.wasm",
+    "asbuild:release": "asc wasm/assembly/canvas-performance.ts --target release --outFile public/wasm/canvas-performance.wasm",
+    "asbuild": "npm run asbuild:debug && npm run asbuild:release"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.0",
     "@types/uuid": "^10.0.0",
-    "fabric": "^6.7.1",
-    "html2canvas": "^1.4.1",
     "jspdf": "^3.0.2",
     "konva": "^9.3.22",
     "lucide-react": "^0.542.0",
@@ -27,8 +28,7 @@
     "react-dom": "19.1.0",
     "react-konva": "^19.0.7",
     "uuid": "^11.1.0",
-    "zod": "^4.1.5",
-    "zustand": "^5.0.8"
+    "zod": "^4.1.5"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -36,6 +36,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "assemblyscript": "^0.27.34",
     "eslint": "^9",
     "eslint-config-next": "15.5.2",
     "tailwindcss": "^4",

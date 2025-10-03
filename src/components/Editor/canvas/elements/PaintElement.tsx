@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Line, Circle, Group } from 'react-konva';
 import { PaintElement } from '../../core/types';
+import { wasmOps } from '@/lib/wasmBridge';
 
 interface PaintElementProps {
   element: PaintElement;
@@ -23,11 +24,12 @@ export const PaintElementComponent: React.FC<PaintElementProps> = React.memo(fun
   const linePoints = useMemo(() => {
     const points: number[] = [];
     element.points.forEach(point => {
+      // Points are already in canvas coordinates, just scale by zoom
       points.push((element.x + point.x) * zoom);
-      points.push((element.y + point.y) * zoom + plateOffsetY);
+      points.push((element.y + point.y) * zoom);
     });
     return points;
-  }, [element.points, element.x, element.y, zoom, plateOffsetY]);
+  }, [element.points, element.x, element.y, zoom]);
 
   // Render different brush types
   const renderBrushStroke = () => {
@@ -82,33 +84,37 @@ export const PaintElementComponent: React.FC<PaintElementProps> = React.memo(fun
 
       case 'spray':
         // Spray effect using circles for each point with pressure variation
+        // Use WASM for faster spray dot generation
         return (
           <Group {...baseProps}>
             {element.points.map((point, index) => {
               const pressure = point.pressure || 1.0;
               const sprayRadius = (element.brushSize * pressure) * zoom;
               
-              // Create multiple spray dots around each point
-              const sprayDots = [];
+              // Use WASM to calculate spray dot positions (much faster for many dots)
               const dotsCount = Math.max(3, Math.floor(sprayRadius / 2));
+              // Points are already in canvas coordinates, just scale by zoom
+              const centerX = (element.x + point.x) * zoom;
+              const centerY = (element.y + point.y) * zoom;
               
-              for (let i = 0; i < dotsCount; i++) {
-                const angle = (i / dotsCount) * Math.PI * 2;
-                const distance = Math.random() * sprayRadius * 0.7;
-                const dotX = (element.x + point.x) * zoom + Math.cos(angle) * distance;
-                const dotY = (element.y + point.y) * zoom + plateOffsetY + Math.sin(angle) * distance;
-                
-                sprayDots.push(
-                  <Circle
-                    key={`${index}-${i}`}
-                    x={dotX}
-                    y={dotY}
-                    radius={Math.random() * 2 + 0.5}
-                    fill={element.color}
-                    opacity={element.opacity * pressure * (0.3 + Math.random() * 0.7)}
-                  />
-                );
-              }
+              // Calculate spray dots with WASM (falls back to JS if unavailable)
+              const sprayDotPositions = wasmOps.calculateSprayDots(
+                centerX,
+                centerY,
+                sprayRadius * 0.7,
+                dotsCount
+              );
+              
+              const sprayDots = sprayDotPositions.map((dot, i) => (
+                <Circle
+                  key={`${index}-${i}`}
+                  x={dot.x}
+                  y={dot.y}
+                  radius={Math.random() * 2 + 0.5}
+                  fill={element.color}
+                  opacity={element.opacity * pressure * (0.3 + Math.random() * 0.7)}
+                />
+              ));
               
               return sprayDots;
             })}

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Canvas } from '../../canvas/Canvas';
 import type Konva from 'konva';
-import { PlateTemplate, TextElement, ImageElement } from '@/types';
+import { PlateTemplate } from '@/types';
 import { EditorState, Element } from '../../core/types';
 
 export interface EditorContentProps {
@@ -20,6 +20,7 @@ export interface EditorContentProps {
   startPainting: (x: number, y: number) => void;
   addPaintPoint: (x: number, y: number) => void;
   finishPainting: () => void;
+  eraseAtPoint: (x: number, y: number, eraserSize: number) => void;
 }
 
 export const EditorContent: React.FC<EditorContentProps> = ({
@@ -38,6 +39,7 @@ export const EditorContent: React.FC<EditorContentProps> = ({
   startPainting,
   addPaintPoint,
   finishPainting,
+  eraseAtPoint,
 }) => {
   return (
     <div className="relative">
@@ -52,7 +54,7 @@ export const EditorContent: React.FC<EditorContentProps> = ({
       )}
 
       {/* Canvas wrapper with styling */}
-      <div className="relative overflow-hidden shadow-2xl border border-gray-300 bg-white rounded-lg">
+      <div className="relative overflow-hidden shadow-2xl border-2 border-gray-300 bg-white" style={{ borderRadius: '3rem' }}>
         <Canvas
           template={template}
           zoom={zoom}
@@ -70,6 +72,7 @@ export const EditorContent: React.FC<EditorContentProps> = ({
           startPainting={startPainting}
           addPaintPoint={addPaintPoint}
           finishPainting={finishPainting}
+          eraseAtPoint={eraseAtPoint}
         />
       </div>
 

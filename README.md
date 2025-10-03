@@ -40,8 +40,9 @@ This project is optimized for **Vercel deployment** with all production configur
 - **Styling**: TailwindCSS
 - **Canvas**: Konva.js (React-Konva)
 - **Backend**: Supabase (PostgreSQL + Auth + Storage)
-- **State Management**: React hooks + Zustand
+- **State Management**: React hooks + Context API
 - **Icons**: Lucide React
+- **Performance**: WebAssembly (AssemblyScript)
 
 ## Getting Started
 

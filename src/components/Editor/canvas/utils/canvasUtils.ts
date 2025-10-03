@@ -3,6 +3,7 @@ import type Konva from 'konva';
 import type { RefObject } from 'react';
 import { PlateTemplate } from '@/types';
 import { Element } from '../../core/types';
+import { wasmOps } from '@/lib/wasmBridge';
 
 let measureCanvasRef: HTMLCanvasElement | null = null;
 
@@ -109,38 +110,27 @@ export const computeSpawnPosition = (opts: SpawnOptions, template: PlateTemplate
     h: (el.height || 50)
   }));
 
-  const maxAttempts = 150;
+  // Use WASM for optimal spawn position calculation
+  // Generate deterministic seed from nextRand
+  const seed = Math.floor(nextRand() * 0x7fffffff);
   
-  // Try each zone in priority order
-  for (const zone of viableZones) {
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      // Deterministic random position within the zone
-      const rx = zone.width > elW ? nextRand() * (zone.width - elW) : 0;
-      const ry = zone.height > elH ? nextRand() * (zone.height - elH) : 0;
-      
-      // Snap to grid
-      const snappedX = zone.x + Math.round(rx / gridSize) * gridSize;
-      const snappedY = zone.y + Math.round(ry / gridSize) * gridSize;
-      
-      const clampedX = Math.min(zone.x + zone.width - elW, Math.max(zone.x, snappedX));
-      const clampedY = Math.min(zone.y + zone.height - elH, Math.max(zone.y, snappedY));
-
-      const overlaps = boxes.some(b => !(
-        clampedX + elW <= b.x || 
-        clampedY + elH <= b.y || 
-        clampedX >= b.x + b.w || 
-        clampedY >= b.y + b.h
-      ));
-      
-      if (!overlaps) {
-        return { x: clampedX, y: clampedY };
-      }
-    }
+  try {
+    const result = wasmOps.findOptimalSpawnPosition(
+      elW, elH,
+      viableZones,
+      boxes,
+      gridSize,
+      seed,
+      150 // maxAttempts
+    );
+    
+    return { x: result.x, y: result.y };
+  } catch (error) {
+    console.error('[computeSpawnPosition] WASM error, using fallback:', error);
+    // Fallback: place at the start of the highest priority viable zone
+    const firstZone = viableZones[0];
+    return { x: firstZone.x, y: firstZone.y };
   }
-  
-  // Final fallback: place at the start of the highest priority viable zone
-  const firstZone = viableZones[0];
-  return { x: firstZone.x, y: firstZone.y };
 };
 
 // Download/Export functions for high-quality printing

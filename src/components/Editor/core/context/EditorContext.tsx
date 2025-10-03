@@ -77,6 +77,7 @@ export interface EditorContextValue {
   startPainting: (x: number, y: number) => void;
   addPaintPoint: (x: number, y: number) => void;
   finishPainting: () => void;
+  eraseAtPoint: (x: number, y: number, eraserSize: number) => void;
   
   // Save/Export operations
   handleSaveDesign: () => Promise<void>;
@@ -191,7 +192,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
   const { 
     addText, addImage, selectElement, updateElement, deleteElement, 
     flipHorizontal, flipVertical, toggleLayer, finishTextEdit,
-    setActiveTool, setPaintSettings, startPainting, addPaintPoint, finishPainting
+    setActiveTool, setPaintSettings, startPainting, addPaintPoint, finishPainting, eraseAtPoint
   } = useElementManipulation(
     state, setState, pushHistory, template, nextRand, vehiclePlateFonts, editingValue, setEditingValue, zoom
   );
@@ -351,6 +352,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
     startPainting,
     addPaintPoint,
     finishPainting,
+    eraseAtPoint,
     
     // Save/Export operations
     handleSaveDesign,
@@ -371,7 +373,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
     zoom, view, zoomIn, zoomOut, resetZoom, bumpOverlay,
     addText, addImage, selectElement, updateElement, deleteElement,
     flipHorizontal, flipVertical, toggleLayer, finishTextEdit, startTextEdit,
-    setActiveTool, setPaintSettings, startPainting, addPaintPoint, finishPainting,
+    setActiveTool, setPaintSettings, startPainting, addPaintPoint, finishPainting, eraseAtPoint,
     handleSaveDesign, handleDownload, setEditingPos,
     user, isAdmin, setShowDownloadDropdown, setShowLayersPanel, setEditingValue
   ]);

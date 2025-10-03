@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { TextElement, ImageElement, PlateTemplate } from '@/types';
 import { EditorState, Element, PaintElement, PaintPoint, ToolType } from '../core/types';
 import { measureText, computeSpawnPosition } from '../canvas/utils/canvasUtils';
+import { wasmOps } from '@/lib/wasmBridge';
 
 export const useElementManipulation = (
   state: EditorState,
@@ -223,9 +224,10 @@ export const useElementManipulation = (
   }, [setState]);
 
   const startPainting = useCallback((x: number, y: number, pressure?: number) => {
+    // Coordinates are already in canvas space (divided by zoom in Canvas.tsx)
     const point: PaintPoint = {
-      x: x / zoom,
-      y: y / zoom,
+      x: x,
+      y: y,
       pressure: pressure || 1.0,
       timestamp: Date.now()
     };
@@ -236,14 +238,15 @@ export const useElementManipulation = (
       currentPaintStroke: [point],
       selectedId: null
     }));
-  }, [setState, zoom]);
+  }, [setState]);
 
   const addPaintPoint = useCallback((x: number, y: number, pressure?: number) => {
     if (!state.isPainting || !state.currentPaintStroke) return;
 
+    // Coordinates are already in canvas space (divided by zoom in Canvas.tsx)
     const point: PaintPoint = {
-      x: x / zoom,
-      y: y / zoom,
+      x: x,
+      y: y,
       pressure: pressure || 1.0,
       timestamp: Date.now()
     };
@@ -252,7 +255,7 @@ export const useElementManipulation = (
       ...prev,
       currentPaintStroke: prev.currentPaintStroke ? [...prev.currentPaintStroke, point] : [point]
     }));
-  }, [setState, state.isPainting, state.currentPaintStroke, zoom]);
+  }, [setState, state.isPainting, state.currentPaintStroke]);
 
   const finishPainting = useCallback(() => {
     if (!state.isPainting || !state.currentPaintStroke || state.currentPaintStroke.length === 0) {
@@ -262,16 +265,39 @@ export const useElementManipulation = (
 
     pushHistory(state);
 
+    // Use WASM for paint stroke smoothing (if available, falls back to JS)
+    // This significantly improves performance for long strokes
+    const strokePoints = state.currentPaintStroke;
+    let processedPoints = strokePoints;
+    
+    if (state.paintSettings.brushType === 'brush' && strokePoints.length > 2) {
+      // Apply Catmull-Rom spline smoothing via WASM for brush strokes
+      const smoothedPoints = wasmOps.smoothPaintStroke(
+        strokePoints.map(p => ({ x: p.x, y: p.y })),
+        0.5 // tension
+      );
+      
+      // Convert smoothed points back to PaintPoint format
+      if (smoothedPoints.length > 0) {
+        processedPoints = smoothedPoints.map((p, i) => ({
+          x: p.x,
+          y: p.y,
+          pressure: strokePoints[Math.min(i, strokePoints.length - 1)].pressure,
+          timestamp: Date.now() + i
+        }));
+      }
+    }
+
     // Calculate bounding box for the stroke
-    const xs = state.currentPaintStroke.map(p => p.x);
-    const ys = state.currentPaintStroke.map(p => p.y);
+    const xs = processedPoints.map(p => p.x);
+    const ys = processedPoints.map(p => p.y);
     const minX = Math.min(...xs);
     const minY = Math.min(...ys);
     const maxX = Math.max(...xs);
     const maxY = Math.max(...ys);
 
     // Normalize points relative to the element's position
-    const normalizedPoints = state.currentPaintStroke.map(point => ({
+    const normalizedPoints = processedPoints.map(point => ({
       ...point,
       x: point.x - minX,
       y: point.y - minY
@@ -300,10 +326,45 @@ export const useElementManipulation = (
       ...prev,
       elements: [...prev.elements, newPaintElement],
       isPainting: false,
-      currentPaintStroke: null,
-      selectedId: newPaintElement.id
+      currentPaintStroke: null
     }));
   }, [state, pushHistory, setState]);
+
+  // Eraser functionality (using WASM for intersection detection)
+  const eraseAtPoint = useCallback((x: number, y: number, eraserSize: number) => {
+    // Find and remove paint elements that intersect with the eraser circle
+    const elementsToDelete: string[] = [];
+    
+    state.elements.forEach((element) => {
+      if (element.type === 'paint') {
+        const paintEl = element as PaintElement;
+        
+        // Transform paint points to absolute coordinates for WASM check
+        const absolutePoints = paintEl.points.map(point => ({
+          x: paintEl.x + point.x,
+          y: paintEl.y + point.y
+        }));
+        
+        // Use WASM for fast intersection detection
+        const hasIntersection = wasmOps.eraserIntersectsStroke(x, y, eraserSize / 2, absolutePoints);
+        
+        if (hasIntersection) {
+          elementsToDelete.push(paintEl.id);
+        }
+      }
+    });
+    
+    // Delete all intersecting elements
+    if (elementsToDelete.length > 0) {
+      setState(prev => {
+        pushHistory(prev);
+        return {
+          ...prev,
+          elements: prev.elements.filter(el => !elementsToDelete.includes(el.id))
+        };
+      });
+    }
+  }, [state.elements, setState, pushHistory]);
 
   return { 
     addText, 
@@ -319,6 +380,7 @@ export const useElementManipulation = (
     setPaintSettings,
     startPainting,
     addPaintPoint,
-    finishPainting
+    finishPainting,
+    eraseAtPoint
   };
 };

@@ -1,11 +1,12 @@
-import React, { useRef, useEffect } from 'react';
-import { Stage, Layer, Image as KonvaImage, Group, Transformer } from 'react-konva';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
+import { Stage, Layer, Image as KonvaImage, Group, Transformer, Line, Rect } from 'react-konva';
 import type Konva from 'konva';
 import { PlateTemplate, ImageElement, TextElement } from '@/types';
 import { EditorState, Element, PaintElement } from '../core/types';
 import { ImageElementComponent } from './elements/ImageElement';
 import { TextElementComponent } from './elements/TextElement';
 import { PaintElementComponent } from './elements/PaintElement';
+import { getWASMStatus } from '@/lib/wasmBridge';
 
 interface CanvasProps {
   template: PlateTemplate;
@@ -24,22 +25,7 @@ interface CanvasProps {
   startPainting: (x: number, y: number) => void;
   addPaintPoint: (x: number, y: number) => void;
   finishPainting: () => void;
-}
-
-interface CanvasProps {
-  template: PlateTemplate;
-  zoom: number;
-  view: { x: number; y: number };
-  stageRef: React.RefObject<Konva.Stage>;
-  handleStageClick: (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => void;
-  lastPointerRef: React.MutableRefObject<{ x: number; y: number; } | null>;
-  bgImage: HTMLImageElement | null;
-  licensePlateFrame: HTMLImageElement | null;
-  state: EditorState;
-  selectElement: (id: string) => void;
-  updateElement: (id: string, updates: Partial<Element>) => void;
-  startTextEdit: (id: string) => void;
-  bumpOverlay: () => void;
+  eraseAtPoint: (x: number, y: number, eraserSize: number) => void;
 }
 
 export const Canvas: React.FC<CanvasProps> = ({
@@ -59,9 +45,46 @@ export const Canvas: React.FC<CanvasProps> = ({
   startPainting,
   addPaintPoint,
   finishPainting,
+  eraseAtPoint,
 }) => {
   const transformerRef = useRef<Konva.Transformer>(null);
   const selectedNodeRef = useRef<Konva.Node | null>(null);
+  const [wasmReady, setWasmReady] = useState(false);
+
+  // Check WASM status on mount
+  useEffect(() => {
+    const checkWasm = () => {
+      const status = getWASMStatus();
+      if (status.isActive) {
+        setWasmReady(true);
+        console.log('[Canvas] WASM initialized and ready');
+      } else {
+        // Retry after a short delay
+        setTimeout(checkWasm, 100);
+      }
+    };
+    checkWasm();
+  }, []);
+  const lastPaintTimeRef = useRef<number>(0);
+  const paintThrottleMs = 16; // ~60 FPS for smooth painting
+
+  // Throttled paint point addition
+  const throttledAddPaintPoint = useCallback((x: number, y: number) => {
+    const now = Date.now();
+    if (now - lastPaintTimeRef.current >= paintThrottleMs) {
+      lastPaintTimeRef.current = now;
+      addPaintPoint(x, y);
+    }
+  }, [addPaintPoint]);
+
+  // Throttled eraser
+  const throttledEraseAtPoint = useCallback((x: number, y: number, eraserSize: number) => {
+    const now = Date.now();
+    if (now - lastPaintTimeRef.current >= paintThrottleMs) {
+      lastPaintTimeRef.current = now;
+      eraseAtPoint(x, y, eraserSize);
+    }
+  }, [eraseAtPoint]);
 
   useEffect(() => {
     if (!transformerRef.current) return;
@@ -80,14 +103,21 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
   }, [state.selectedId, stageRef]);
 
-  return (
-    <div className="relative overflow-hidden shadow-lg border border-gray-200 bg-white" style={{ borderRadius: '2.5rem' }}>
-      {state.elements.length === 0 && (
-        <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 text-center">
-          <p className="text-2xl text-gray-500 font-medium">Create Your Design</p>
+  // Show loading state while WASM initializes
+  if (!wasmReady) {
+    return (
+      <div className="relative overflow-hidden shadow-lg border border-gray-200 bg-white flex items-center justify-center" style={{ borderRadius: '2.5rem', width: template.width_px * zoom, height: template.height_px * zoom + (Math.min(template.width_px, template.height_px) * zoom * 0.2) }}>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-lg text-gray-600 font-medium">Initializing Canvas...</p>
+          <p className="text-sm text-gray-500 mt-1">Loading WebAssembly performance module</p>
         </div>
-      )}
-      
+      </div>
+    );
+  }
+
+  return (
+    <>
       <Stage
         ref={stageRef}
         width={template.width_px * zoom}
@@ -99,10 +129,27 @@ export const Canvas: React.FC<CanvasProps> = ({
           if (state.activeTool === 'brush' || state.activeTool === 'airbrush' || state.activeTool === 'spray') {
             const pos = e.target.getStage()?.getPointerPosition();
             if (pos) {
-              // Convert stage coordinates to canvas coordinates
-              const x = (pos.x + view.x) / zoom;
-              const y = (pos.y + view.y) / zoom;
+              // Layer already has offsetX/offsetY applied, so we just need to divide by zoom
+              // and subtract plateOffsetY to get correct canvas coordinates
+              const textSpace = Math.min(template.width_px, template.height_px) * 0.15;
+              const plateOffsetY = textSpace * zoom;
+              const x = pos.x / zoom;
+              const y = (pos.y - plateOffsetY) / zoom;
               startPainting(x, y);
+            }
+            e.evt.preventDefault();
+            return;
+          }
+          
+          // Handle eraser tool activation
+          if (state.activeTool === 'eraser') {
+            const pos = e.target.getStage()?.getPointerPosition();
+            if (pos) {
+              const textSpace = Math.min(template.width_px, template.height_px) * 0.15;
+              const plateOffsetY = textSpace * zoom;
+              const x = pos.x / zoom;
+              const y = (pos.y - plateOffsetY) / zoom;
+              throttledEraseAtPoint(x, y, state.paintSettings.brushSize);
             }
             e.evt.preventDefault();
             return;
@@ -114,14 +161,29 @@ export const Canvas: React.FC<CanvasProps> = ({
             lastPointerRef.current = { x: evt.clientX, y: evt.clientY };
           }
           
-          // Handle paint point addition during painting
+          // Handle paint point addition during painting (throttled for smoothness)
           if (state.isPainting && (state.activeTool === 'brush' || state.activeTool === 'airbrush' || state.activeTool === 'spray')) {
             const pos = e.target.getStage()?.getPointerPosition();
             if (pos) {
-              // Convert stage coordinates to canvas coordinates
-              const x = (pos.x + view.x) / zoom;
-              const y = (pos.y + view.y) / zoom;
-              addPaintPoint(x, y);
+              // Layer already has offsetX/offsetY applied, so we just need to divide by zoom
+              // and subtract plateOffsetY to get correct canvas coordinates
+              const textSpace = Math.min(template.width_px, template.height_px) * 0.15;
+              const plateOffsetY = textSpace * zoom;
+              const x = pos.x / zoom;
+              const y = (pos.y - plateOffsetY) / zoom;
+              throttledAddPaintPoint(x, y);
+            }
+          }
+          
+          // Handle eraser during mouse move (when left mouse button is pressed)
+          if (state.activeTool === 'eraser' && evt.buttons === 1) {
+            const pos = e.target.getStage()?.getPointerPosition();
+            if (pos) {
+              const textSpace = Math.min(template.width_px, template.height_px) * 0.15;
+              const plateOffsetY = textSpace * zoom;
+              const x = pos.x / zoom;
+              const y = (pos.y - plateOffsetY) / zoom;
+              throttledEraseAtPoint(x, y, state.paintSettings.brushSize);
             }
           }
         }}
@@ -168,10 +230,12 @@ export const Canvas: React.FC<CanvasProps> = ({
               .map(element => {
                 const elementLayer = element.layer || 'base';
                 const isInteractive = state.activeLayer === elementLayer;
+                // Show all elements with reduced opacity when not on active layer
+                const elementOpacity = isInteractive ? 1 : 0.4;
                 
                 const imageEl = element as ImageElement;
                 return (
-                  <Group key={element.id}>
+                  <Group key={element.id} opacity={elementOpacity}>
                     <ImageElementComponent
                       element={imageEl}
                       zoom={zoom}
@@ -190,6 +254,20 @@ export const Canvas: React.FC<CanvasProps> = ({
           })()}
         </Layer>
 
+        {/* Black background for License Plate mode to simulate final print */}
+        {state.activeLayer === 'licenseplate' && (
+          <Layer offsetX={-view.x} offsetY={-view.y}>
+            <Rect
+              x={0}
+              y={0}
+              width={template.width_px * zoom}
+              height={template.height_px * zoom + (Math.min(template.width_px, template.height_px) * zoom * 0.2)}
+              fill="#000000"
+              listening={false}
+            />
+          </Layer>
+        )}
+
         {licensePlateFrame && (
           <Layer offsetX={-view.x} offsetY={-view.y}>
             <KonvaImage
@@ -198,7 +276,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               y={0}
               width={template.width_px * zoom}
               height={template.height_px * zoom + (Math.min(template.width_px, template.height_px) * zoom * 0.2)}
-              opacity={state.activeLayer === 'base' ? 0 : 1}
+              opacity={state.activeLayer === 'licenseplate' ? 1 : 0.3}
               listening={false}
             />
           </Layer>
@@ -219,10 +297,12 @@ export const Canvas: React.FC<CanvasProps> = ({
               .map(element => {
                 const elementLayer = element.layer || 'base';
                 const isInteractive = state.activeLayer === elementLayer;
+                // Show all elements with reduced opacity when not on active layer
+                const elementOpacity = isInteractive ? 1 : 0.4;
                 
                 const imageEl = element as ImageElement;
                 return (
-                  <Group key={element.id}>
+                  <Group key={element.id} opacity={elementOpacity}>
                     <ImageElementComponent
                       element={imageEl}
                       zoom={zoom}
@@ -253,10 +333,12 @@ export const Canvas: React.FC<CanvasProps> = ({
             return filteredElements.filter(element => element.type === 'text').map(element => {
               const elementLayer = element.layer || 'base';
               const isInteractive = state.activeLayer === elementLayer;
+              // Show all elements with reduced opacity when not on active layer
+              const elementOpacity = isInteractive ? 1 : 0.4;
               
               const textEl = element as TextElement;
               return (
-                <Group key={element.id}>
+                <Group key={element.id} opacity={elementOpacity}>
                   <TextElementComponent
                     element={textEl}
                     zoom={zoom}
@@ -288,10 +370,12 @@ export const Canvas: React.FC<CanvasProps> = ({
             return filteredElements.filter(element => element.type === 'paint').map(element => {
               const elementLayer = element.layer || 'base';
               const isInteractive = state.activeLayer === elementLayer;
+              // Show all elements with reduced opacity when not on active layer
+              const elementOpacity = isInteractive ? 1 : 0.4;
               
               const paintEl = element as PaintElement;
               return (
-                <Group key={element.id}>
+                <Group key={element.id} opacity={elementOpacity}>
                   <PaintElementComponent
                     element={paintEl}
                     zoom={zoom}
@@ -307,6 +391,28 @@ export const Canvas: React.FC<CanvasProps> = ({
                 </Group>
               );
             });
+          })()}
+          
+          {/* Live paint stroke preview */}
+          {state.isPainting && state.currentPaintStroke && state.currentPaintStroke.length > 1 && (() => {
+            const points: number[] = [];
+            state.currentPaintStroke.forEach(point => {
+              points.push(point.x * zoom);
+              points.push(point.y * zoom);
+            });
+            
+            return (
+              <Line
+                points={points}
+                stroke={state.paintSettings.color}
+                strokeWidth={state.paintSettings.brushSize * zoom}
+                opacity={state.paintSettings.opacity}
+                lineCap="round"
+                lineJoin="round"
+                tension={0.5}
+                listening={false}
+              />
+            );
           })()}
         </Layer>
 
@@ -344,6 +450,6 @@ export const Canvas: React.FC<CanvasProps> = ({
         </Layer>
 
       </Stage>
-    </div>
+    </>
   );
 };

@@ -39,7 +39,7 @@ export interface PaintElement {
 
 export type Element = TextElement | ImageElement | PaintElement;
 
-export type ToolType = 'select' | 'text' | 'image' | 'brush' | 'airbrush' | 'spray';
+export type ToolType = 'select' | 'text' | 'image' | 'brush' | 'airbrush' | 'spray' | 'eraser';
 
 export interface PaintSettings {
   color: string;

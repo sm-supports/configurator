@@ -72,6 +72,7 @@ const EditorCore: React.FC = () => {
     startPainting,
     addPaintPoint,
     finishPainting,
+    eraseAtPoint,
     
     // Save/Export operations
     handleSaveDesign,
@@ -160,6 +161,7 @@ const EditorCore: React.FC = () => {
           startPainting={startPainting}
           addPaintPoint={addPaintPoint}
           finishPainting={finishPainting}
+          eraseAtPoint={eraseAtPoint}
         />
       </EditorLayout>
 

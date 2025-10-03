@@ -1,7 +1,7 @@
-
-import React from 'react';
+import React, { useState } from 'react';
 import {
-  Undo2, Redo2, Type, ImagePlus, Trash2, Save, Download, ChevronDown, FlipHorizontal, FlipVertical, Bold, Italic, Underline, Brush, Palette
+  Undo2, Redo2, Type, ImagePlus, Trash2, Save, Download, ChevronDown, FlipHorizontal, FlipVertical, 
+  Bold, Italic, Underline, Brush, Eraser, Layers, Home, Sparkles
 } from 'lucide-react';
 import { PlateTemplate, TextElement } from '@/types';
 import { EditorState, Element, ToolType, PaintSettings } from '../../core/types';
@@ -73,97 +73,547 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const selectedElement = state.elements.find(el => el.id === state.selectedId);
   const isTextElement = selectedElement?.type === 'text';
   const textElement = isTextElement ? selectedElement as TextElement : null;
+  const [showPaintSettings, setShowPaintSettings] = useState(false);
+
+  const isPaintToolActive = ['brush', 'airbrush', 'spray', 'eraser'].includes(state.activeTool);
 
   return (
-    <div
-      className="fixed top-0 left-0 right-0 z-50 bg-white border-b p-4 flex gap-2 items-center shadow-sm h-20 overflow-visible"
-    >
-      <button
-        onClick={() => window.location.href = '/'}
-        className="p-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors duration-200 shadow-sm hover:shadow-md"
-        title="Go to Home"
-        aria-label="Home"
-      >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-        </svg>
-      </button>
-      
-      <div className="h-6 w-px bg-gray-200 mx-2" />
+    <>
+      {/* Main Toolbar */}
+      <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b border-slate-700 shadow-2xl">
+        <div className="px-4 py-2.5 flex items-center gap-3">
+          {/* Left Section - Navigation & History */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => window.location.href = '/'}
+              className="p-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-all duration-200"
+              title="Go to Home"
+            >
+              <Home className="w-5 h-5" />
+            </button>
+            
+            <div className="w-px h-6 bg-slate-700" />
+            
+            <button
+              onClick={undo}
+              disabled={!canUndo}
+              className="p-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Undo (Cmd/Ctrl+Z)"
+            >
+              <Undo2 className="w-5 h-5" />
+            </button>
+            <button
+              onClick={redo}
+              disabled={!canRedo}
+              className="p-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Redo (Cmd/Ctrl+Shift+Z)"
+            >
+              <Redo2 className="w-5 h-5" />
+            </button>
+          </div>
 
-      <button
-        onClick={undo}
-        disabled={!canUndo}
-        className="p-3 rounded-lg hover:bg-gray-100 text-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm hover:shadow-md disabled:hover:shadow-sm"
-        title="Undo (Cmd/Ctrl+Z)"
-        aria-label="Undo"
-      >
-        <Undo2 className="w-5 h-5" />
-      </button>
-      <button
-        onClick={redo}
-        disabled={!canRedo}
-        className="p-3 rounded-lg hover:bg-gray-100 text-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-200 shadow-sm hover:shadow-md disabled:hover:shadow-sm"
-        title="Redo (Cmd/Ctrl+Shift+Z or Cmd/Ctrl+Y)"
-        aria-label="Redo"
-      >
-        <Redo2 className="w-5 h-5" />
-      </button>
+          {/* Center Section - Template Name & Layer Toggle */}
+          <div className="flex-1 flex items-center justify-center gap-4">
+            <div className="flex items-center gap-3 bg-slate-800/50 backdrop-blur-sm rounded-xl px-4 py-2 border border-slate-700">
+              <Sparkles className="w-4 h-4 text-amber-400" />
+              <h1 className="text-base font-semibold text-white">{template.name}</h1>
+            </div>
 
-      <div className="h-6 w-px bg-gray-200 mx-2" />
+            <div className="flex items-center gap-3 bg-slate-800/50 backdrop-blur-sm rounded-xl px-3 py-1.5 border border-slate-700">
+              <span className={`text-xs font-medium transition-colors ${
+                state.activeLayer === 'base' ? 'text-blue-400' : 'text-slate-500'
+              }`}>
+                Base
+              </span>
+              
+              <button
+                onClick={() => toggleLayer(state.activeLayer === 'base' ? 'licenseplate' : 'base')}
+                className={`relative inline-flex h-6 w-11 rounded-full transition-all ${
+                  state.activeLayer === 'licenseplate' ? 'bg-blue-500' : 'bg-slate-600'
+                }`}
+                title={`Switch to ${state.activeLayer === 'base' ? 'License Plate' : 'Base Canvas'} Layer`}
+              >
+                <span
+                  className={`inline-block h-5 w-5 m-0.5 transform rounded-full bg-white shadow-lg transition-transform ${
+                    state.activeLayer === 'licenseplate' ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+              
+              <span className={`text-xs font-medium transition-colors ${
+                state.activeLayer === 'licenseplate' ? 'text-blue-400' : 'text-slate-500'
+              }`}>
+                Plate
+              </span>
+            </div>
+          </div>
 
-      <div className="h-6 w-px bg-gray-200 mx-1" />
+          {/* Right Section - Tools & Actions */}
+          <div className="flex items-center gap-2">
+            {/* Add Tools */}
+            <div className="flex items-center gap-1 bg-slate-800/50 backdrop-blur-sm rounded-lg p-1 border border-slate-700">
+              <button
+                onClick={addText}
+                className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md transition-all shadow-sm"
+                title="Add Text"
+              >
+                <Type className="w-4 h-4" />
+              </button>
+              
+              <label className="p-2 bg-green-500 hover:bg-green-600 text-white rounded-md cursor-pointer transition-all shadow-sm">
+                <ImagePlus className="w-4 h-4" />
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) addImage(file);
+                  }}
+                  className="hidden"
+                />
+              </label>
+            </div>
 
-      <h1 className="text-lg font-bold flex-shrink-0">{template.name}</h1>
-      
-      <div className="flex gap-2 flex-1 justify-end">
-        {/* Layers Panel Toggle */}
-        <div className="relative">
-          <button
-            data-layers-button
-            onClick={() => setShowLayersPanel(p => !p)}
-            className={`p-3 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md flex items-center gap-1 ${showLayersPanel ? 'bg-indigo-600 text-white' : 'bg-indigo-500 text-white hover:bg-indigo-600'}`}
-            aria-label="Layers"
-            title="Show Layers Panel"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-              <path d="M12 3L3 9l9 6 9-6-9-6Z" />
-              <path d="M3 15l9 6 9-6" />
-            </svg>
-          </button>
-          {showLayersPanel && (
-            <div className="layers-panel absolute top-full right-0 mt-2 w-72 max-h-[60vh] overflow-auto bg-white border border-gray-200 rounded-lg shadow-xl z-[120] p-2 flex flex-col gap-2 text-sm">
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-semibold text-black">Layers</span>
-                <button
-                  onClick={() => setShowLayersPanel(false)}
-                  className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-black"
-                >Close</button>
-              </div>
-              <div className="text-[11px] text-black mb-1">Top is front-most. Reorder instantly.</div>
-              {state.elements.length === 0 && (
-                <div className="text-xs text-black italic py-4 text-center">No elements yet</div>
-              )}
-              {[...state.elements].map((el, idx) => ({ el, idx }))
-                .sort((a,b) => a.idx - b.idx)
-                .reverse()
-                .map(({ el }, visualIndex, arr) => {
-                  const isSelected = el.id === state.selectedId;
-                  const frontMost = visualIndex === 0;
-                  const backMost = visualIndex === arr.length - 1;
-                  const label = el.type === 'text'
-                    ? `Text: "${(el as TextElement).text.slice(0,20)}${(el as TextElement).text.length>20?'…':''}"`
-                    : 'Image';
-                  return (
-                    <div
-                      key={el.id}
-                      className={`group border rounded-md px-2 py-1 flex items-center gap-2 ${isSelected ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 bg-white hover:bg-gray-50'}`}
+            <div className="w-px h-6 bg-slate-700" />
+
+            {/* Paint Tools */}
+            <div className="relative">
+              <button
+                onClick={() => setShowPaintSettings(!showPaintSettings)}
+                className={`p-2 rounded-lg transition-all ${
+                  isPaintToolActive
+                    ? 'bg-purple-500 text-white'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-700'
+                }`}
+                title="Paint Tools"
+              >
+                <Brush className="w-5 h-5" />
+              </button>
+
+              {showPaintSettings && (
+                <div className="absolute top-full right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-2xl z-[100] p-3">
+                  <div className="text-xs font-semibold text-slate-300 mb-2">Paint Tools</div>
+                  
+                  <div className="grid grid-cols-4 gap-1 mb-3">
+                    <button
+                      onClick={() => {
+                        setActiveTool('brush');
+                        setShowPaintSettings(false);
+                      }}
+                      className={`p-2 rounded ${
+                        state.activeTool === 'brush'
+                          ? 'bg-purple-500 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      }`}
+                      title="Brush"
                     >
+                      <Brush className="w-4 h-4" />
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        setActiveTool('airbrush');
+                        setShowPaintSettings(false);
+                      }}
+                      className={`p-2 rounded ${
+                        state.activeTool === 'airbrush'
+                          ? 'bg-purple-500 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      }`}
+                      title="Airbrush"
+                    >
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="4" opacity="0.8"/>
+                        <circle cx="12" cy="12" r="7" opacity="0.3"/>
+                      </svg>
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        setActiveTool('spray');
+                        setShowPaintSettings(false);
+                      }}
+                      className={`p-2 rounded ${
+                        state.activeTool === 'spray'
+                          ? 'bg-purple-500 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      }`}
+                      title="Spray"
+                    >
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <circle cx="8" cy="8" r="1"/><circle cx="16" cy="8" r="1"/>
+                        <circle cx="12" cy="12" r="1"/><circle cx="6" cy="16" r="1"/>
+                        <circle cx="18" cy="16" r="1"/><circle cx="10" cy="18" r="1"/>
+                        <circle cx="14" cy="6" r="1"/>
+                      </svg>
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        setActiveTool('eraser');
+                        setShowPaintSettings(false);
+                      }}
+                      className={`p-2 rounded ${
+                        state.activeTool === 'eraser'
+                          ? 'bg-red-500 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      }`}
+                      title="Eraser"
+                    >
+                      <Eraser className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {isPaintToolActive && (
+                    <>
+                      <div className="mb-2">
+                        <label className="text-xs text-slate-400 block mb-1">Color</label>
+                        <input
+                          type="color"
+                          value={state.paintSettings.color}
+                          onChange={(e) => setPaintSettings({ color: e.target.value })}
+                          className="w-full h-8 rounded cursor-pointer"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="text-xs text-slate-400 block mb-1">
+                          Size: {state.paintSettings.brushSize}px
+                        </label>
+                        <input
+                          type="range"
+                          min="1"
+                          max="50"
+                          value={state.paintSettings.brushSize}
+                          onChange={(e) => setPaintSettings({ brushSize: parseInt(e.target.value) })}
+                          className="w-full"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => setShowLayersPanel(!showLayersPanel)}
+              className={`p-2 rounded-lg transition-all ${
+                showLayersPanel
+                  ? 'bg-indigo-500 text-white'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-700'
+              }`}
+              title="Layers"
+            >
+              <Layers className="w-5 h-5" />
+            </button>
+
+            {state.selectedId && (
+              <button
+                onClick={() => state.selectedId && deleteElement(state.selectedId)}
+                className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all"
+                title="Delete Selected"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+
+            <div className="w-px h-6 bg-slate-700" />
+
+            <button
+              onClick={handleSaveDesign}
+              disabled={isSaving}
+              className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                isSaving
+                  ? 'bg-slate-600 text-slate-400 cursor-not-allowed'
+                  : saveSuccess
+                  ? 'bg-green-500 text-white'
+                  : 'bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white shadow-lg'
+              }`}
+              title="Save Design"
+            >
+              <Save className="w-4 h-4 inline-block mr-2" />
+              {isSaving ? 'Saving...' : saveSuccess ? 'Saved!' : 'Save'}
+            </button>
+
+            {isAdmin && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowDownloadDropdown(!showDownloadDropdown)}
+                  disabled={isDownloading}
+                  className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-lg font-medium transition-all shadow-lg disabled:opacity-50"
+                  title="Download (Admin)"
+                >
+                  <Download className="w-4 h-4 inline-block mr-2" />
+                  Export
+                  <ChevronDown className="w-3 h-3 inline-block ml-1" />
+                </button>
+
+                {showDownloadDropdown && (
+                  <div className="absolute top-full right-0 mt-2 w-72 bg-slate-800 border border-slate-700 rounded-lg shadow-2xl z-[100]">
+                    <div className="p-3 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border-b border-slate-700">
+                      <div className="text-sm font-semibold text-white">Professional Export</div>
+                      <div className="text-xs text-slate-400">600 DPI Ultra-High Quality</div>
+                    </div>
+                    
+                    <div className="p-2">
+                      <button
+                        onClick={() => handleDownload('png')}
+                        className="w-full px-3 py-2 text-left text-sm text-white hover:bg-slate-700 rounded-md mb-1 flex items-center justify-between"
+                      >
+                        <div>
+                          <div className="font-medium">PNG (Lossless)</div>
+                          <div className="text-xs text-slate-400">Best for digital</div>
+                        </div>
+                        <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">Best</span>
+                      </button>
+                      
+                      <button
+                        onClick={() => handleDownload('jpeg')}
+                        className="w-full px-3 py-2 text-left text-sm text-white hover:bg-slate-700 rounded-md mb-1 flex items-center justify-between"
+                      >
+                        <div>
+                          <div className="font-medium">JPEG (High Quality)</div>
+                          <div className="text-xs text-slate-400">Smaller file size</div>
+                        </div>
+                        <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded">Fast</span>
+                      </button>
+                      
+                      <button
+                        onClick={() => handleDownload('pdf')}
+                        className="w-full px-3 py-2 text-left text-sm text-white hover:bg-slate-700 rounded-md mb-1 flex items-center justify-between"
+                      >
+                        <div>
+                          <div className="font-medium">PDF (Print Ready)</div>
+                          <div className="text-xs text-slate-400">Vector quality</div>
+                        </div>
+                        <span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-1 rounded">Print</span>
+                      </button>
+                      
+                      <button
+                        onClick={() => handleDownload('eps')}
+                        className="w-full px-3 py-2 text-left text-sm text-white hover:bg-slate-700 rounded-md mb-1"
+                      >
+                        <div className="font-medium">EPS (Vector)</div>
+                        <div className="text-xs text-slate-400">Professional format</div>
+                      </button>
+                      
+                      <button
+                        onClick={() => handleDownload('tiff')}
+                        className="w-full px-3 py-2 text-left text-sm text-white hover:bg-slate-700 rounded-md"
+                      >
+                        <div className="font-medium">TIFF (Uncompressed)</div>
+                        <div className="text-xs text-slate-400">Maximum quality</div>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Text Formatting Bar (appears when text is selected) */}
+        {textElement && (
+          <div className="px-4 py-2 bg-slate-800/50 backdrop-blur-sm border-t border-slate-700">
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-medium text-slate-400">Size:</label>
+                <input
+                  type="number"
+                  min="8"
+                  max="200"
+                  value={textElement.fontSize}
+                  onChange={(e) => {
+                    const newSize = parseInt(e.target.value);
+                    if (!isNaN(newSize) && newSize >= 8 && newSize <= 200) {
+                      const measured = measureText(textElement.text, newSize, textElement.fontFamily, textElement.fontWeight, textElement.fontStyle);
+                      updateElement(state.selectedId!, { fontSize: newSize, width: measured.width, height: measured.height });
+                    }
+                  }}
+                  className="w-16 px-2 py-1 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <span className="text-sm text-slate-400">px</span>
+              </div>
+
+              <div className="w-px h-6 bg-slate-700" />
+
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-medium text-slate-400">Font:</label>
+                <select
+                  value={textElement.fontFamily}
+                  onChange={(e) => {
+                    const newFontFamily = e.target.value;
+                    const measured = measureText(textElement.text, textElement.fontSize, newFontFamily, textElement.fontWeight, textElement.fontStyle);
+                    updateElement(state.selectedId!, { fontFamily: newFontFamily, width: measured.width, height: measured.height });
+                  }}
+                  className="px-2 py-1 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <optgroup label="License Plate Fonts">
+                    {vehiclePlateFonts.map(font => (
+                      <option key={font.value} value={font.value}>{font.name}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Other Fonts">
+                    {generalFonts.map(font => (
+                      <option key={font.value} value={font.value}>{font.name}</option>
+                    ))}
+                  </optgroup>
+                </select>
+              </div>
+
+              <div className="w-px h-6 bg-slate-700" />
+
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-medium text-slate-400">Color:</label>
+                <input
+                  type="color"
+                  value={textElement.color}
+                  onChange={(e) => updateElement(state.selectedId!, { color: e.target.value })}
+                  className="w-10 h-8 border-2 border-slate-600 rounded cursor-pointer"
+                />
+              </div>
+
+              <div className="w-px h-6 bg-slate-700" />
+
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => {
+                    const newWeight = textElement.fontWeight === 'bold' ? 'normal' : 'bold';
+                    const measured = measureText(textElement.text, textElement.fontSize, textElement.fontFamily, newWeight, textElement.fontStyle);
+                    updateElement(state.selectedId!, { fontWeight: newWeight, width: measured.width, height: measured.height });
+                  }}
+                  className={`p-2 rounded ${
+                    textElement.fontWeight === 'bold'
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  }`}
+                  title="Bold"
+                >
+                  <Bold className="w-4 h-4" />
+                </button>
+
+                <button
+                  onClick={() => {
+                    const newStyle = textElement.fontStyle === 'italic' ? 'normal' : 'italic';
+                    const measured = measureText(textElement.text, textElement.fontSize, textElement.fontFamily, textElement.fontWeight, newStyle);
+                    updateElement(state.selectedId!, { fontStyle: newStyle, width: measured.width, height: measured.height });
+                  }}
+                  className={`p-2 rounded ${
+                    textElement.fontStyle === 'italic'
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  }`}
+                  title="Italic"
+                >
+                  <Italic className="w-4 h-4" />
+                </button>
+
+                <button
+                  onClick={() => {
+                    const newDecoration = textElement.textDecoration === 'underline' ? 'none' : 'underline';
+                    updateElement(state.selectedId!, { textDecoration: newDecoration });
+                  }}
+                  className={`p-2 rounded ${
+                    textElement.textDecoration === 'underline'
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  }`}
+                  title="Underline"
+                >
+                  <Underline className="w-4 h-4" />
+                </button>
+
+                <div className="w-px h-6 bg-slate-700 mx-1" />
+
+                <button
+                  onClick={() => flipHorizontal(state.selectedId!)}
+                  className={`p-2 rounded ${
+                    textElement.flippedH
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  }`}
+                  title="Flip Horizontal"
+                >
+                  <FlipHorizontal className="w-4 h-4" />
+                </button>
+
+                <button
+                  onClick={() => flipVertical(state.selectedId!)}
+                  className={`p-2 rounded ${
+                    textElement.flippedV
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  }`}
+                  title="Flip Vertical"
+                >
+                  <FlipVertical className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Status Messages */}
+        {(saveSuccess || saveError) && (
+          <div className="px-4 py-1.5 bg-slate-800/50 border-t border-slate-700">
+            {saveSuccess && (
+              <div className="text-sm text-green-400 font-medium">✓ Design saved successfully!</div>
+            )}
+            {saveError && (
+              <div className="text-sm text-red-400 font-medium">✗ {saveError}</div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Layers Panel (same as before but styled to match) */}
+      {showLayersPanel && (
+        <div className="fixed top-16 right-4 w-80 max-h-[70vh] bg-slate-800 border border-slate-700 rounded-lg shadow-2xl z-[120] overflow-hidden">
+          <div className="p-3 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border-b border-slate-700 flex items-center justify-between">
+            <div>
+              <div className="font-semibold text-white">Layers</div>
+              <div className="text-xs text-slate-400">Drag to reorder</div>
+            </div>
+            <button
+              onClick={() => setShowLayersPanel(false)}
+              className="text-slate-400 hover:text-white"
+            >
+              ✕
+            </button>
+          </div>
+          
+          <div className="p-2 overflow-auto max-h-[calc(70vh-60px)]">
+            {state.elements.length === 0 ? (
+              <div className="text-center py-8 text-slate-400 text-sm">No elements yet</div>
+            ) : (
+              [...state.elements].reverse().map((el, visualIndex, arr) => {
+                const isSelected = el.id === state.selectedId;
+                const frontMost = visualIndex === 0;
+                const backMost = visualIndex === arr.length - 1;
+                const label = el.type === 'text'
+                  ? `"${(el as TextElement).text.slice(0, 30)}${(el as TextElement).text.length > 30 ? '...' : ''}"`
+                  : 'Image';
+                  
+                return (
+                  <div
+                    key={el.id}
+                    className={`group mb-1 p-2 rounded-lg border transition-all ${
+                      isSelected
+                        ? 'border-indigo-500 bg-indigo-500/10'
+                        : 'border-slate-700 bg-slate-900/50 hover:bg-slate-700/50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
                       <button
                         onClick={() => setState(p => ({ ...p, selectedId: el.id }))}
-                        className={`flex-1 text-left truncate text-xs ${isSelected ? 'text-indigo-700 font-medium' : 'text-black'}`}
-                        title={label}
-                      >{label}</button>
+                        className="flex-1 text-left"
+                      >
+                        <div className={`text-sm font-medium ${isSelected ? 'text-white' : 'text-slate-300'}`}>
+                          {el.type === 'text' ? <Type className="w-3 h-3 inline mr-1" /> : <ImagePlus className="w-3 h-3 inline mr-1" />}
+                          {label}
+                        </div>
+                      </button>
+                      
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => {
@@ -172,16 +622,17 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                               if (idx === -1 || idx === prev.elements.length - 1) return prev;
                               pushHistory(prev);
                               const elems = [...prev.elements];
-                              const tmp = elems[idx];
-                              elems[idx] = elems[idx + 1];
-                              elems[idx + 1] = tmp;
+                              [elems[idx], elems[idx + 1]] = [elems[idx + 1], elems[idx]];
                               return { ...prev, elements: elems };
                             });
                           }}
                           disabled={frontMost}
-                          className="p-1 rounded border border-gray-300 text-[10px] text-black leading-none disabled:opacity-40 hover:bg-gray-100"
+                          className="p-1 text-xs text-slate-400 hover:text-white disabled:opacity-30 hover:bg-slate-600 rounded"
                           title="Bring Forward"
-                        >↑</button>
+                        >
+                          ↑
+                        </button>
+                        
                         <button
                           onClick={() => {
                             setState(prev => {
@@ -189,424 +640,25 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                               if (idx <= 0) return prev;
                               pushHistory(prev);
                               const elems = [...prev.elements];
-                              const tmp = elems[idx];
-                              elems[idx] = elems[idx - 1];
-                              elems[idx - 1] = tmp;
+                              [elems[idx], elems[idx - 1]] = [elems[idx - 1], elems[idx]];
                               return { ...prev, elements: elems };
                             });
                           }}
                           disabled={backMost}
-                          className="p-1 rounded border border-gray-300 text-[10px] text-black leading-none disabled:opacity-40 hover:bg-gray-100"
+                          className="p-1 text-xs text-slate-400 hover:text-white disabled:opacity-30 hover:bg-slate-600 rounded"
                           title="Send Backward"
-                        >↓</button>
-                        <button
-                          onClick={() => {
-                            setState(prev => {
-                              const idx = prev.elements.findIndex(e => e.id === el.id);
-                              if (idx === -1 || idx === prev.elements.length - 1) return prev;
-                              pushHistory(prev);
-                              const elems = [...prev.elements];
-                              const [item] = elems.splice(idx,1);
-                              elems.push(item);
-                              return { ...prev, elements: elems };
-                            });
-                          }}
-                          disabled={frontMost}
-                          className="p-1 rounded border border-gray-300 text-[10px] text-black leading-none disabled:opacity-40 hover:bg-gray-100"
-                          title="Bring to Front"
-                        >Top</button>
-                        <button
-                          onClick={() => {
-                            setState(prev => {
-                              const idx = prev.elements.findIndex(e => e.id === el.id);
-                              if (idx <= 0) return prev;
-                              pushHistory(prev);
-                              const elems = [...prev.elements];
-                              const [item] = elems.splice(idx,1);
-                              elems.unshift(item);
-                              return { ...prev, elements: elems };
-                            });
-                          }}
-                          disabled={backMost}
-                          className="p-1 rounded border border-gray-300 text-[10px] text-black leading-none disabled:opacity-40 hover:bg-gray-100"
-                          title="Send to Back"
-                        >Bottom</button>
+                        >
+                          ↓
+                        </button>
                       </div>
                     </div>
-                  );
-                })}
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center gap-3 bg-white rounded-xl p-3 shadow-sm border border-gray-200">
-          <span className={`text-sm font-medium transition-colors duration-300 ${
-            state.activeLayer === 'base' ? 'text-blue-600' : 'text-gray-400'
-          }`}>
-            Base Canvas
-          </span>
-          
-          <div 
-            className="relative inline-flex h-6 w-11 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-            style={{ 
-              backgroundColor: state.activeLayer === 'licenseplate' ? '#3B82F6' : '#D1D5DB' 
-            }}
-            onClick={() => toggleLayer(state.activeLayer === 'base' ? 'licenseplate' : 'base')}
-            title={`Switch to ${state.activeLayer === 'base' ? 'License Plate' : 'Base Canvas'} Layer`}
-          >
-            <span
-              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition-transform duration-300 ${
-                state.activeLayer === 'licenseplate' ? 'translate-x-5' : 'translate-x-0'
-              }`}
-            />
-          </div>
-          
-          <span className={`text-sm font-medium transition-colors duration-300 ${
-            state.activeLayer === 'licenseplate' ? 'text-blue-600' : 'text-gray-400'
-          }`}>
-            License Plate
-          </span>
-        </div>
-
-        <button
-          onClick={addText}
-          className="p-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors duration-200 shadow-sm hover:shadow-md"
-          title="Add Text Element"
-          aria-label="Add Text"
-        >
-          <Type className="w-5 h-5" />
-        </button>
-        
-        <label 
-          className="p-3 bg-green-500 text-white rounded-lg hover:bg-green-600 cursor-pointer transition-colors duration-200 shadow-sm hover:shadow-md"
-          title="Add Image"
-          aria-label="Add Image"
-        >
-          <ImagePlus className="w-5 h-5" />
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) addImage(file);
-            }}
-            className="hidden"
-          />
-        </label>
-
-        {/* Paint Tools */}
-        <button
-          onClick={() => setActiveTool('brush')}
-          className={`p-3 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md ${
-            state.activeTool === 'brush' 
-              ? 'bg-purple-600 text-white' 
-              : 'bg-purple-500 text-white hover:bg-purple-600'
-          }`}
-          title="Brush Tool"
-          aria-label="Brush Tool"
-        >
-          <Brush className="w-5 h-5" />
-        </button>
-        
-        <button
-          onClick={() => setActiveTool('airbrush')}
-          className={`p-3 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md ${
-            state.activeTool === 'airbrush' 
-              ? 'bg-purple-600 text-white' 
-              : 'bg-purple-500 text-white hover:bg-purple-600'
-          }`}
-          title="Airbrush Tool"
-          aria-label="Airbrush Tool"
-        >
-          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="4" opacity="0.8"/>
-            <circle cx="12" cy="12" r="7" opacity="0.3"/>
-          </svg>
-        </button>
-        
-        <button
-          onClick={() => setActiveTool('spray')}
-          className={`p-3 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md ${
-            state.activeTool === 'spray' 
-              ? 'bg-purple-600 text-white' 
-              : 'bg-purple-500 text-white hover:bg-purple-600'
-          }`}
-          title="Spray Tool"
-          aria-label="Spray Tool"
-        >
-          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-            <circle cx="8" cy="8" r="1"/>
-            <circle cx="16" cy="8" r="1"/>
-            <circle cx="12" cy="12" r="1"/>
-            <circle cx="6" cy="16" r="1"/>
-            <circle cx="18" cy="16" r="1"/>
-            <circle cx="10" cy="18" r="1"/>
-            <circle cx="14" cy="6" r="1"/>
-          </svg>
-        </button>
-
-        {/* Paint Settings - only show when paint tool is active */}
-        {(state.activeTool === 'brush' || state.activeTool === 'airbrush' || state.activeTool === 'spray') && (
-          <>
-            <div className="h-6 w-px bg-gray-200 mx-2" />
-            <input
-              type="color"
-              value={state.paintSettings.color}
-              onChange={(e) => setPaintSettings({ color: e.target.value })}
-              className="w-10 h-10 border-2 border-gray-300 rounded-lg cursor-pointer"
-              title="Paint Color"
-            />
-            <input
-              type="range"
-              min="1"
-              max="50"
-              value={state.paintSettings.brushSize}
-              onChange={(e) => setPaintSettings({ brushSize: parseInt(e.target.value) })}
-              className="w-20"
-              title="Brush Size"
-            />
-            <span className="text-xs text-gray-600 min-w-[30px]">
-              {state.paintSettings.brushSize}px
-            </span>
-          </>
-        )}
-
-        {state.selectedId && (
-          <button
-            onClick={() => state.selectedId && deleteElement(state.selectedId)}
-            className="p-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors duration-200 shadow-sm hover:shadow-md"
-            title="Delete Selected Element"
-            aria-label="Delete"
-          >
-            <Trash2 className="w-5 h-5" />
-          </button>
-        )}
-
-        <button
-          onClick={handleSaveDesign}
-          disabled={isSaving}
-          className={`p-3 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md ${
-            isSaving
-              ? 'bg-gray-400 text-white cursor-not-allowed'
-              : saveSuccess
-              ? 'bg-green-500 text-white'
-              : 'bg-purple-500 text-white hover:bg-purple-600'
-          }`}
-          title={isSaving ? "Saving..." : "Save Design"}
-          aria-label="Save Design"
-        >
-          <Save className="w-5 h-5" />
-        </button>
-
-        {isAdmin && (
-          <div className="relative download-dropdown z-[100]">
-            <button
-              onClick={() => setShowDownloadDropdown(!showDownloadDropdown)}
-              disabled={isDownloading}
-              className={`p-3 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md flex items-center gap-1 ${
-                isDownloading
-                  ? 'bg-gray-400 text-white cursor-not-allowed'
-                  : 'bg-blue-500 text-white hover:bg-blue-600'
-              }`}
-              title={isDownloading ? "Downloading..." : "Download (Admin Only)"}
-              aria-label="Download Design"
-            >
-              <Download className="w-5 h-5" />
-              <ChevronDown className="w-3 h-3" />
-            </button>
-            {showDownloadDropdown && (
-              <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-[100] min-w-56">
-                <div className="py-1">
-                  <div className="px-4 py-2 bg-blue-50 border-b border-gray-200">
-                    <div className="text-xs font-semibold text-blue-700">Professional Print Formats</div>
-                    <div className="text-xs text-blue-600">600 DPI Ultra-High Quality</div>
                   </div>
-                  <button onClick={() => handleDownload('png')} className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-100 border-b border-gray-100">
-                    <div className="flex items-center justify-between"><div><div className="font-medium">PNG (Lossless)</div><div className="text-xs text-gray-500">Perfect for digital plates</div></div><span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">Best</span></div>
-                  </button>
-                  <button onClick={() => handleDownload('jpeg')} className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-100 border-b border-gray-100">
-                    <div className="flex items-center justify-between"><div><div className="font-medium">JPEG (Maximum Quality)</div><div className="text-xs text-gray-500">Smaller file, excellent quality</div></div><span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">Fast</span></div>
-                  </button>
-                  <button onClick={() => handleDownload('pdf')} className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-100 border-b border-gray-200">
-                    <div className="flex items-center justify-between"><div><div className="font-medium">PDF (Print Ready)</div><div className="text-xs text-gray-500">Exact dimensions, vector quality</div></div><span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">Print</span></div>
-                  </button>
-                  <div className="px-4 py-2 bg-amber-50 border-b border-gray-200">
-                    <div className="text-xs font-semibold text-amber-700">Professional Formats</div>
-                    <div className="text-xs text-amber-600">Includes conversion instructions</div>
-                  </div>
-                  <button onClick={() => handleDownload('eps')} className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-100 border-b border-gray-100">
-                    <div className="flex items-center justify-between"><div><div className="font-medium">EPS (Vector Format)</div><div className="text-xs text-gray-500">For professional printing</div></div><span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded">Pro</span></div>
-                  </button>
-                  <button onClick={() => handleDownload('tiff')} className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-100">
-                    <div className="flex items-center justify-between"><div><div className="font-medium">TIFF (Uncompressed)</div><div className="text-xs text-gray-500">Maximum quality archive</div></div><span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">Archive</span></div>
-                  </button>
-                </div>
-                <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 text-xs text-gray-600">
-                  <div className="flex items-center gap-1 mb-1"><div className="w-2 h-2 bg-green-500 rounded-full"></div><span className="font-medium">Vehicle Plate Optimized</span></div>
-                  <div>600 DPI • Commercial Print Quality • Exact Dimensions</div>
-                </div>
-              </div>
+                );
+              })
             )}
           </div>
-        )}
-      </div>
-
-      {(saveSuccess || saveError) && (
-        <div className="flex items-center gap-2 ml-4">
-          {saveSuccess && (
-            <span className="text-green-600 text-sm font-medium">Design saved!</span>
-          )}
-          {saveError && (
-            <span className="text-red-600 text-sm font-medium" title={saveError}>
-              {saveError.length > 30 ? saveError.substring(0, 30) + '...' : saveError}
-            </span>
-          )}
         </div>
       )}
-
-      {textElement && (
-        <div className="flex items-center gap-3 ml-4">
-          <div className="flex items-center gap-1">
-            <label className="text-xs font-medium text-black flex-shrink-0">Size:</label>
-            <input
-              type="number"
-              min="8"
-              max="200"
-              value={textElement.fontSize}
-              onChange={(e) => {
-                const newSize = parseInt(e.target.value);
-                if (!isNaN(newSize) && newSize >= 8 && newSize <= 200) {
-                  const measured = measureText(textElement.text, newSize, textElement.fontFamily, textElement.fontWeight, textElement.fontStyle);
-                  updateElement(state.selectedId!, { fontSize: newSize, width: measured.width, height: measured.height });
-                  // Note: setEditingPos is now a no-op placeholder
-                }
-              }}
-              className="w-14 px-1 py-1 border border-gray-300 rounded text-xs text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <span className="text-sm text-black">px</span>
-          </div>
-
-          <div className="flex items-center gap-1">
-            <label className="text-xs font-medium text-black flex-shrink-0">Font:</label>
-            <select
-              value={textElement.fontFamily}
-              onChange={(e) => {
-                const newFontFamily = e.target.value;
-                const measured = measureText(textElement.text, textElement.fontSize, newFontFamily, textElement.fontWeight, textElement.fontStyle);
-                updateElement(state.selectedId!, { fontFamily: newFontFamily, width: measured.width, height: measured.height });
-                // Note: setEditingPos is now a no-op placeholder
-              }}
-              className="px-2 py-1 border border-gray-300 rounded text-xs text-black focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white min-w-[120px]"
-            >
-              <optgroup label="License Plate Fonts (Recommended)">
-                {vehiclePlateFonts.map(font => (
-                  <option key={font.value} value={font.value} style={{ fontFamily: font.value, color: 'black' }}>
-                    {font.name}
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label="Other Fonts">
-                {generalFonts.map(font => (
-                  <option key={font.value} value={font.value} style={{ fontFamily: font.value, color: 'black' }}>
-                    {font.name}
-                  </option>
-                ))}
-              </optgroup>
-            </select>
-          </div>
-
-          <div className="flex items-center gap-1">
-            <label className="text-xs font-medium text-black flex-shrink-0">Color:</label>
-            <div className="relative">
-              <input
-                type="color"
-                value={textElement.color}
-                onChange={(e) => {
-                  const newColor = e.target.value;
-                  updateElement(state.selectedId!, { color: newColor });
-                }}
-                className="w-8 h-6 border border-gray-300 rounded cursor-pointer"
-                title="Text Color"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1">
-            <label className="text-xs font-medium text-black flex-shrink-0 mr-1">Style:</label>
-            
-            <button
-              onClick={() => {
-                const newWeight = textElement.fontWeight === 'bold' ? 'normal' : 'bold';
-                const measured = measureText(textElement.text, textElement.fontSize, textElement.fontFamily, newWeight, textElement.fontStyle);
-                updateElement(state.selectedId!, { fontWeight: newWeight, width: measured.width, height: measured.height });
-              }}
-              className={`p-1 rounded text-xs border ${
-                textElement.fontWeight === 'bold' 
-                  ? 'bg-blue-500 text-white border-blue-500' 
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-              }`}
-              title="Bold"
-            >
-              <Bold className="w-3 h-3" />
-            </button>
-
-            <button
-              onClick={() => {
-                const newStyle = textElement.fontStyle === 'italic' ? 'normal' : 'italic';
-                const measured = measureText(textElement.text, textElement.fontSize, textElement.fontFamily, textElement.fontWeight, newStyle);
-                updateElement(state.selectedId!, { fontStyle: newStyle, width: measured.width, height: measured.height });
-              }}
-              className={`p-1 rounded text-xs border ${
-                textElement.fontStyle === 'italic' 
-                  ? 'bg-blue-500 text-white border-blue-500' 
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-              }`}
-              title="Italic"
-            >
-              <Italic className="w-3 h-3" />
-            </button>
-
-            <button
-              onClick={() => {
-                const newDecoration = textElement.textDecoration === 'underline' ? 'none' : 'underline';
-                updateElement(state.selectedId!, { textDecoration: newDecoration });
-              }}
-              className={`p-1 rounded text-xs border ${
-                textElement.textDecoration === 'underline' 
-                  ? 'bg-blue-500 text-white border-blue-500' 
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-              }`}
-              title="Underline"
-            >
-              <Underline className="w-3 h-3" />
-            </button>
-
-            <button
-              onClick={() => flipHorizontal(state.selectedId!)}
-              className={`p-1 rounded text-xs border ${
-                textElement.flippedH 
-                  ? 'bg-blue-500 text-white border-blue-500' 
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-              }`}
-              title="Flip Horizontal"
-            >
-              <FlipHorizontal className="w-3 h-3" />
-            </button>
-
-            <button
-              onClick={() => flipVertical(state.selectedId!)}
-              className={`p-1 rounded text-xs border ${
-                textElement.flippedV 
-                  ? 'bg-blue-500 text-white border-blue-500' 
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-              }`}
-              title="Flip Vertical"
-            >
-              <FlipVertical className="w-3 h-3" />
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
+    </>
   );
 };

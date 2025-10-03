@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generate Template Images</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .template-section {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 4px;
+        }
+        canvas {
+            border: 2px solid #ddd;
+            margin: 10px 0;
+            display: block;
+            max-width: 100%;
+        }
+        button {
+            background: #0055A4;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #003d7a;
+        }
+        .info {
+            color: #666;
+            font-size: 14px;
+            margin: 10px 0;
+        }
+        .success {
+            color: #28a745;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚗 License Plate Template Image Generator</h1>
+        <p class="info">Generate placeholder template images for the configurator. Click each button to download the image.</p>
+        
+        <div class="template-section">
+            <h3>UK Standard Plate (520 x 110px)</h3>
+            <canvas id="uk-canvas" width="520" height="110"></canvas>
+            <button onclick="downloadImage('uk-canvas', 'uk-standard.png')">Download UK Standard</button>
+            <p class="info">Yellow background with black text (rear plate style)</p>
+        </div>
+
+        <div class="template-section">
+            <h3>US Standard Plate (600 x 300px)</h3>
+            <canvas id="us-canvas" width="600" height="300"></canvas>
+            <button onclick="downloadImage('us-canvas', 'us-standard.png')">Download US Standard</button>
+            <p class="info">White background with blue border</p>
+        </div>
+
+        <div class="template-section">
+            <h3>US Motorcycle Plate (400 x 200px)</h3>
+            <canvas id="motorcycle-canvas" width="400" height="200"></canvas>
+            <button onclick="downloadImage('motorcycle-canvas', 'us-motorcycle.png')">Download US Motorcycle</button>
+            <p class="info">Smaller size for motorcycle plates</p>
+        </div>
+
+        <div class="template-section">
+            <h3>📝 Instructions</h3>
+            <ol>
+                <li>Click each download button to save the template images</li>
+                <li>Move the downloaded images to <code>public/templates/</code> folder</li>
+                <li>Replace the existing empty placeholder files</li>
+                <li>Reload your application to see the templates</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        // UK Standard Plate
+        function drawUKPlate() {
+            const canvas = document.getElementById('uk-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Yellow background (UK rear plate)
+            ctx.fillStyle = '#FFCC00';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Black border
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 8;
+            ctx.strokeRect(4, 4, canvas.width - 8, canvas.height - 8);
+            
+            // Blue EU strip (left side)
+            ctx.fillStyle = '#003399';
+            ctx.fillRect(0, 0, 45, canvas.height);
+            
+            // Yellow stars
+            ctx.fillStyle = '#FFCC00';
+            const stars = 6;
+            for (let i = 0; i < stars; i++) {
+                const y = 20 + (i * 15);
+                drawStar(ctx, 22, y, 4, 5, 2);
+            }
+            
+            // "GB" text
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'bold 18px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('GB', 22, canvas.height - 15);
+        }
+
+        // US Standard Plate
+        function drawUSPlate() {
+            const canvas = document.getElementById('us-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // White background
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Blue border
+            ctx.strokeStyle = '#0055A4';
+            ctx.lineWidth = 12;
+            ctx.strokeRect(6, 6, canvas.width - 12, canvas.height - 12);
+            
+            // Subtle gradient
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, 'rgba(0, 85, 164, 0.05)');
+            gradient.addColorStop(1, 'rgba(0, 85, 164, 0.15)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(20, 20, canvas.width - 40, canvas.height - 40);
+            
+            // State name
+            ctx.fillStyle = '#0055A4';
+            ctx.font = 'bold 32px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('SAMPLE STATE', canvas.width / 2, 50);
+            
+            // Plate number
+            ctx.font = 'bold 72px monospace';
+            ctx.fillText('ABC-1234', canvas.width / 2, canvas.height / 2 + 10);
+            
+            // Tagline
+            ctx.font = '20px Arial';
+            ctx.fillText('The Sample State', canvas.width / 2, canvas.height - 40);
+        }
+
+        // US Motorcycle Plate
+        function drawMotorcyclePlate() {
+            const canvas = document.getElementById('motorcycle-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // White background
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Blue border
+            ctx.strokeStyle = '#0055A4';
+            ctx.lineWidth = 10;
+            ctx.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
+            
+            // State name
+            ctx.fillStyle = '#0055A4';
+            ctx.font = 'bold 24px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('SAMPLE', canvas.width / 2, 35);
+            
+            // Plate number
+            ctx.font = 'bold 52px monospace';
+            ctx.fillText('MC-123', canvas.width / 2, canvas.height / 2 + 5);
+            
+            // Motorcycle indicator
+            ctx.font = '16px Arial';
+            ctx.fillText('MOTORCYCLE', canvas.width / 2, canvas.height - 30);
+        }
+
+        // Helper function to draw stars
+        function drawStar(ctx, cx, cy, outerRadius, points, innerRadius) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.translate(cx, cy);
+            ctx.moveTo(0, 0 - outerRadius);
+            for (let i = 0; i < points; i++) {
+                ctx.rotate(Math.PI / points);
+                ctx.lineTo(0, 0 - innerRadius);
+                ctx.rotate(Math.PI / points);
+                ctx.lineTo(0, 0 - outerRadius);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // Download function
+        function downloadImage(canvasId, filename) {
+            const canvas = document.getElementById(canvasId);
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            
+            // Show success message
+            const button = event.target;
+            const originalText = button.textContent;
+            button.textContent = '✓ Downloaded!';
+            button.style.background = '#28a745';
+            setTimeout(() => {
+                button.textContent = originalText;
+                button.style.background = '#0055A4';
+            }, 2000);
+        }
+
+        // Draw all plates on page load
+        window.onload = function() {
+            drawUKPlate();
+            drawUSPlate();
+            drawMotorcyclePlate();
+        };
+    </script>
+</body>
+</html>

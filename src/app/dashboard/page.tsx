@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
+import { getUserDesigns, deleteDesign as deleteDesignUtil } from '@/lib/designUtils';
 import { UserDesign } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { Plus, Edit, Trash2, Download, Share2 } from 'lucide-react';
 import ProtectedRoute from '@/components/Auth/ProtectedRoute';
+import LoadingSpinner from '@/components/UI/LoadingSpinner';
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -15,64 +17,22 @@ export default function DashboardPage() {
   const [designs, setDesigns] = useState<UserDesign[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'public' | 'private'>('all');
-
-  const fetchUserDesigns = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('user_designs')
-        .select(`
-          *,
-          template:plate_templates(*)
-        `)
-        .eq('user_id', user?.id)
-        .order('updated_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching designs:', error);
-        // Show sample data if Supabase is not configured
-        setDesigns([
-          {
-            id: '1',
-            user_id: user?.id || '',
-            template_id: '1',
-            design_json: {
-              elements: [],
-              template_id: '1',
-              width: 1200,
-              height: 600
-            },
-            name: 'My First Design',
-            is_public: false,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            template: {
-              id: '1',
-              name: 'US Standard',
-              image_url: 'https://via.placeholder.com/1200x600/2563eb/ffffff?text=US+Standard',
-              width_px: 1200,
-              height_px: 600,
-              country_id: '1',
-              is_active: true,
-              created_at: '',
-              updated_at: ''
-            }
-          }
-        ]);
-      } else {
-        setDesigns(data || []);
-      }
-    } catch (error) {
-      console.error('Error fetching designs:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id]);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
       fetchUserDesigns();
     }
-  }, [user, fetchUserDesigns]);
+  }, [user]);
+
+  const fetchUserDesigns = async () => {
+    setLoading(true);
+    const result = await getUserDesigns();
+    if (!result.error) {
+      setDesigns(result.designs || []);
+    }
+    setLoading(false);
+  };
 
   const filteredDesigns = designs.filter(design => {
     if (filter === 'all') return true;
@@ -81,21 +41,17 @@ export default function DashboardPage() {
     return true;
   });
 
-  const deleteDesign = async (designId: string) => {
+  const handleDeleteDesign = async (designId: string) => {
     if (!confirm('Are you sure you want to delete this design?')) return;
 
-    try {
-      const { error } = await supabase
-        .from('user_designs')
-        .delete()
-        .eq('id', designId);
-
-      if (!error) {
-        setDesigns(prev => prev.filter(d => d.id !== designId));
-      }
-    } catch (error) {
-      console.error('Error deleting design:', error);
+    setDeletingId(designId);
+    const result = await deleteDesignUtil(designId);
+    
+    if (!result.error) {
+      setDesigns(prev => prev.filter(d => d.id !== designId));
     }
+    
+    setDeletingId(null);
   };
 
   const togglePublic = async (designId: string, currentStatus: boolean) => {
@@ -130,14 +86,7 @@ export default function DashboardPage() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-lg font-medium text-gray-900">Loading your designs...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner message="Loading your designs..." />;
   }
 
   return (
@@ -315,8 +264,9 @@ export default function DashboardPage() {
                         </button>
                       </div>
                       <button
-                        onClick={() => deleteDesign(design.id)}
-                        className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        onClick={() => handleDeleteDesign(design.id)}
+                        disabled={deletingId === design.id}
+                        className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
                         title="Delete design"
                       >
                         <Trash2 className="w-4 h-4" />
