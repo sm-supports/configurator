@@ -74,9 +74,8 @@ class CanvasPerformanceWASM {
     if (this.module) return true;
     if (this.loadPromise) return this.loadPromise;
     
-    if (this.isLoading) {
-      // Wait for existing load to complete
-      return this.loadPromise || Promise.resolve(false);
+    if (this.isLoading && this.loadPromise) {
+      return this.loadPromise;
     }
 
     this.isLoading = true;

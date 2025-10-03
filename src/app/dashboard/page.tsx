@@ -49,6 +49,8 @@ export default function DashboardPage() {
     
     if (!result.error) {
       setDesigns(prev => prev.filter(d => d.id !== designId));
+    } else {
+      alert('Failed to delete design. Please try again.');
     }
     
     setDeletingId(null);
@@ -238,7 +240,13 @@ export default function DashboardPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1">
                         <button
-                          onClick={() => router.push(`/editor/${design.template_id}?design=${design.id}`)}
+                          onClick={() => {
+                            console.log('Navigating to editor:', { 
+                              templateId: design.template_id, 
+                              designId: design.id 
+                            });
+                            router.push(`/editor/${design.template_id}?design=${design.id}`);
+                          }}
                           className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                           title="Edit design"
                         >

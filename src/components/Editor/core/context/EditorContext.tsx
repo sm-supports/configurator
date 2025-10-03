@@ -109,12 +109,16 @@ export interface EditorProviderProps {
       elements?: Element[];
     };
   };
+  existingDesignId?: string;
+  existingDesignName?: string;
 }
 
 export const EditorProvider: React.FC<EditorProviderProps> = ({
   children,
   template,
   existingDesign,
+  existingDesignId,
+  existingDesignName,
 }) => {
   const { user, isAdmin } = useAuth();
 
@@ -256,8 +260,9 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
       }
 
       const result = await exportService.saveDesign(state, user.id || '', {
-        name: `${template.name} Design`,
+        name: existingDesignName || `${template.name} Design`,
         isPublic: false,
+        designId: existingDesignId,
       });
 
       if (!result.success) {
@@ -272,7 +277,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
     } finally {
       setIsSaving(false);
     }
-  }, [user, state, template, exportService]);
+  }, [user, state, template, exportService, existingDesignId, existingDesignName]);
 
   // Download function
   const handleDownload = useCallback(async (format: 'png' | 'jpeg' | 'pdf' | 'eps' | 'tiff') => {

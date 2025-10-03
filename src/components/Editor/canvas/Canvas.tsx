@@ -21,6 +21,7 @@ interface CanvasProps {
   selectElement: (id: string) => void;
   updateElement: (id: string, updates: Partial<Element>) => void;
   startTextEdit: (id: string) => void;
+  finishTextEdit: (save?: boolean, reselect?: boolean) => void;
   bumpOverlay: () => void;
   startPainting: (x: number, y: number) => void;
   addPaintPoint: (x: number, y: number) => void;
@@ -29,23 +30,10 @@ interface CanvasProps {
 }
 
 export const Canvas: React.FC<CanvasProps> = ({
-  template,
-  zoom,
-  view,
-  stageRef,
-  handleStageClick,
-  lastPointerRef,
-  bgImage,
-  licensePlateFrame,
-  state,
-  selectElement,
-  updateElement,
-  startTextEdit,
-  bumpOverlay,
-  startPainting,
-  addPaintPoint,
-  finishPainting,
-  eraseAtPoint,
+  template, zoom, view, stageRef, handleStageClick, lastPointerRef,
+  bgImage, licensePlateFrame, state, selectElement, updateElement,
+  startTextEdit, finishTextEdit, bumpOverlay,
+  startPainting, addPaintPoint, finishPainting, eraseAtPoint,
 }) => {
   const transformerRef = useRef<Konva.Transformer>(null);
   const selectedNodeRef = useRef<Konva.Node | null>(null);
@@ -254,7 +242,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           })()}
         </Layer>
 
-        {/* Black background for License Plate mode to simulate final print */}
+        {/* White background for License Plate mode to simulate final print */}
         {state.activeLayer === 'licenseplate' && (
           <Layer offsetX={-view.x} offsetY={-view.y}>
             <Rect
@@ -262,7 +250,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               y={0}
               width={template.width_px * zoom}
               height={template.height_px * zoom + (Math.min(template.width_px, template.height_px) * zoom * 0.2)}
-              fill="#000000"
+              fill="#FFFFFF"
               listening={false}
             />
           </Layer>
@@ -370,17 +358,31 @@ export const Canvas: React.FC<CanvasProps> = ({
             return filteredElements.filter(element => element.type === 'paint').map(element => {
               const elementLayer = element.layer || 'base';
               const isInteractive = state.activeLayer === elementLayer;
+              const isSelected = state.selectedId === element.id;
               // Show all elements with reduced opacity when not on active layer
               const elementOpacity = isInteractive ? 1 : 0.4;
               
               const paintEl = element as PaintElement;
               return (
-                <Group key={element.id} opacity={elementOpacity}>
+                <Group 
+                  key={element.id} 
+                  opacity={elementOpacity}
+                  draggable={isSelected && isInteractive}
+                  onDragEnd={(e) => {
+                    if (isSelected && isInteractive) {
+                      const newX = e.target.x() / zoom;
+                      const newY = e.target.y() / zoom;
+                      updateElement(element.id, { x: newX, y: newY });
+                      e.target.position({ x: 0, y: 0 });
+                    }
+                  }}
+                >
                   <PaintElementComponent
                     element={paintEl}
                     zoom={zoom}
                     plateOffsetY={plateOffsetY}
                     isInteractive={isInteractive}
+                    isSelected={isSelected}
                     onSelect={() => isInteractive ? selectElement(element.id) : undefined}
                     onUpdate={(updates) => {
                       if (isInteractive) {
@@ -450,6 +452,72 @@ export const Canvas: React.FC<CanvasProps> = ({
         </Layer>
 
       </Stage>
+
+      {/* Text Editing Overlay */}
+      {state.editingTextId && (() => {
+        const editingElement = state.elements.find(el => el.id === state.editingTextId);
+        if (!editingElement || editingElement.type !== 'text') return null;
+        
+        const textEl = editingElement as TextElement;
+        const stageNode = stageRef.current;
+        if (!stageNode) return null;
+
+        // Calculate position accounting for zoom, view offset, and plate offset
+        const textSpace = Math.min(template.width_px, template.height_px) * 0.15;
+        const plateOffsetY = textSpace * zoom;
+        
+        const x = (textEl.x * zoom) - view.x;
+        const y = (textEl.y * zoom + plateOffsetY) - view.y;
+        const width = (textEl.width || 100) * zoom;
+        const height = (textEl.height || 50) * zoom;
+
+        return (
+          <textarea
+            autoFocus
+            value={state.elements.find(el => el.id === state.editingTextId)?.type === 'text' 
+              ? (state.elements.find(el => el.id === state.editingTextId) as TextElement).text 
+              : ''}
+            onChange={(e) => {
+              if (state.editingTextId) {
+                updateElement(state.editingTextId, { text: e.target.value });
+              }
+            }}
+            onBlur={() => {
+              // Finish editing when clicking outside
+              finishTextEdit(true, true);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                finishTextEdit(false, true);
+              }
+              // Allow Enter for new lines in textarea
+            }}
+            style={{
+              position: 'absolute',
+              left: `${x}px`,
+              top: `${y}px`,
+              width: `${width}px`,
+              height: `${height}px`,
+              fontSize: `${textEl.fontSize * zoom}px`,
+              fontFamily: textEl.fontFamily,
+              fontWeight: textEl.fontWeight,
+              fontStyle: textEl.fontStyle || 'normal',
+              textDecoration: textEl.textDecoration || 'none',
+              color: textEl.color,
+              textAlign: textEl.textAlign,
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              border: '2px solid #4285f4',
+              borderRadius: '4px',
+              padding: '4px',
+              resize: 'none',
+              outline: 'none',
+              zIndex: 1000,
+              overflow: 'hidden',
+            }}
+          />
+        );
+      })()}
     </>
   );
 };

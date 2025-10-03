@@ -65,6 +65,7 @@ const EditorCore: React.FC = () => {
     flipVertical,
     toggleLayer,
     startTextEdit,
+    finishTextEdit,
     
     // Paint tool operations
     setActiveTool,
@@ -157,6 +158,7 @@ const EditorCore: React.FC = () => {
           selectElement={selectElement}
           updateElement={updateElement}
           startTextEdit={startTextEdit}
+          finishTextEdit={finishTextEdit}
           bumpOverlay={bumpOverlay}
           startPainting={startPainting}
           addPaintPoint={addPaintPoint}
@@ -186,6 +188,8 @@ const Editor: React.FC<EditorProps> = ({ template, existingDesign }) => {
             elements: existingDesign.design_json.elements as unknown as Element[]
           }
         } : undefined}
+        existingDesignId={existingDesign?.id}
+        existingDesignName={existingDesign?.name}
       >
         <EditorCore />
       </EditorProvider>

@@ -188,18 +188,22 @@ export const useElementManipulation = (
 
   const finishTextEdit = useCallback((save: boolean = true, reselect: boolean = true) => {
     if (!state.editingTextId) return;
-    if (save && editingValue.trim()) {
-      const element = state.elements.find(el => el.id === state.editingTextId);
-      if (element && element.type === 'text') {
-        const textEl = element as TextElement;
-        const measured = measureText(editingValue.trim(), textEl.fontSize, textEl.fontFamily, textEl.fontWeight, textEl.fontStyle);
+    
+    // Read the current text from the element (it may have been updated directly via textarea)
+    const element = state.elements.find(el => el.id === state.editingTextId);
+    
+    if (save && element && element.type === 'text') {
+      const textEl = element as TextElement;
+      const currentText = textEl.text || '';
+      
+      if (currentText.trim()) {
+        // Recalculate dimensions based on current text
+        const measured = measureText(currentText.trim(), textEl.fontSize, textEl.fontFamily, textEl.fontWeight, textEl.fontStyle);
         updateElement(state.editingTextId, { 
-          text: editingValue.trim(),
+          text: currentText.trim(),
           width: measured.width,
           height: measured.height
         });
-      } else {
-        updateElement(state.editingTextId, { text: editingValue.trim() });
       }
     }
 
@@ -209,7 +213,7 @@ export const useElementManipulation = (
       selectedId: save && reselect ? prev.editingTextId : null
     }));
     setEditingValue('');
-  }, [state.editingTextId, state.elements, editingValue, updateElement, setState, setEditingValue]);
+  }, [state.editingTextId, state.elements, updateElement, setState, setEditingValue]);
 
   // Paint functionality
   const setActiveTool = useCallback((tool: ToolType) => {
@@ -330,7 +334,7 @@ export const useElementManipulation = (
     }));
   }, [state, pushHistory, setState]);
 
-  // Eraser functionality (using WASM for intersection detection)
+  // Eraser functionality - deletes entire paint element when intersected
   const eraseAtPoint = useCallback((x: number, y: number, eraserSize: number) => {
     // Find and remove paint elements that intersect with the eraser circle
     const elementsToDelete: string[] = [];
@@ -339,28 +343,38 @@ export const useElementManipulation = (
       if (element.type === 'paint') {
         const paintEl = element as PaintElement;
         
-        // Transform paint points to absolute coordinates for WASM check
-        const absolutePoints = paintEl.points.map(point => ({
-          x: paintEl.x + point.x,
-          y: paintEl.y + point.y
-        }));
+        // Check if eraser intersects with paint element's bounding box first (fast)
+        const padding = eraserSize;
+        const inBounds = x >= (paintEl.x - padding) && 
+                        x <= (paintEl.x + (paintEl.width || 0) + padding) &&
+                        y >= (paintEl.y - padding) && 
+                        y <= (paintEl.y + (paintEl.height || 0) + padding);
         
-        // Use WASM for fast intersection detection
-        const hasIntersection = wasmOps.eraserIntersectsStroke(x, y, eraserSize / 2, absolutePoints);
-        
-        if (hasIntersection) {
-          elementsToDelete.push(paintEl.id);
+        if (inBounds) {
+          // Transform paint points to absolute coordinates for precise check
+          const absolutePoints = paintEl.points.map(point => ({
+            x: paintEl.x + point.x,
+            y: paintEl.y + point.y
+          }));
+          
+          // Use WASM for fast intersection detection
+          const hasIntersection = wasmOps.eraserIntersectsStroke(x, y, eraserSize / 2, absolutePoints);
+          
+          if (hasIntersection) {
+            elementsToDelete.push(paintEl.id);
+          }
         }
       }
     });
     
-    // Delete all intersecting elements
+    // Delete all intersecting elements at once (batch operation)
     if (elementsToDelete.length > 0) {
       setState(prev => {
         pushHistory(prev);
         return {
           ...prev,
-          elements: prev.elements.filter(el => !elementsToDelete.includes(el.id))
+          elements: prev.elements.filter(el => !elementsToDelete.includes(el.id)),
+          selectedId: elementsToDelete.includes(prev.selectedId || '') ? null : prev.selectedId
         };
       });
     }

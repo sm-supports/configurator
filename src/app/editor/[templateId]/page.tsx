@@ -71,17 +71,29 @@ export default function EditorPage() {
     if (!designId) return;
     
     try {
+      console.log('Fetching existing design:', designId);
       const result = await getDesign(designId);
+      console.log('Design fetch result:', result);
+      
       if (result.error) {
+        console.error('Error loading design:', result.error);
         setError(`Failed to load design: ${result.error}`);
       } else if (result.design) {
+        console.log('Design loaded successfully:', result.design);
         setExistingDesign(result.design);
         // Verify the design matches the template
         if (result.design.template_id !== templateId) {
+          console.error('Template mismatch:', { 
+            designTemplateId: result.design.template_id, 
+            currentTemplateId: templateId 
+          });
           setError('Design does not match the selected template');
         }
+      } else {
+        console.warn('No design returned but no error');
       }
-    } catch {
+    } catch (err) {
+      console.error('Exception fetching design:', err);
       setError('Failed to load existing design');
     }
   }, [designId, templateId]);

@@ -2,7 +2,7 @@ import type Konva from 'konva';
 import { PlateTemplate, DesignData, DesignElement } from '@/types';
 import { EditorState } from '../core/types';
 import { exportToDataURL, downloadFile } from '../canvas/utils/canvasUtils';
-import { saveDesign, SaveDesignParams } from '@/lib/designUtils';
+import { saveDesign, updateDesign, SaveDesignParams, UpdateDesignParams } from '@/lib/designUtils';
 
 export interface ExportOptions {
   format: 'png' | 'jpeg' | 'pdf' | 'eps' | 'tiff';
@@ -13,6 +13,7 @@ export interface ExportOptions {
 export interface SaveOptions {
   name?: string;
   isPublic?: boolean;
+  designId?: string;
 }
 
 export class EditorExportService {
@@ -78,20 +79,39 @@ export class EditorExportService {
         height: this.template.height_px,
       };
 
-      const saveParams: SaveDesignParams = {
-        designData,
-        templateId: this.template.id,
-        name: options.name || `${this.template.name} Design`,
-        isPublic: options.isPublic || false,
-      };
+      // If designId exists, update the existing design
+      if (options.designId) {
+        const updateParams: UpdateDesignParams = {
+          id: options.designId,
+          designData,
+          name: options.name,
+          isPublic: options.isPublic,
+        };
 
-      const result = await saveDesign(saveParams);
+        const result = await updateDesign(updateParams);
 
-      if (result.error) {
-        return { success: false, error: result.error };
+        if (result.error) {
+          return { success: false, error: result.error };
+        }
+
+        return { success: true, designId: result.design?.id };
+      } else {
+        // Otherwise, create a new design
+        const saveParams: SaveDesignParams = {
+          designData,
+          templateId: this.template.id,
+          name: options.name || `${this.template.name} Design`,
+          isPublic: options.isPublic || false,
+        };
+
+        const result = await saveDesign(saveParams);
+
+        if (result.error) {
+          return { success: false, error: result.error };
+        }
+
+        return { success: true, designId: result.design?.id };
       }
-
-      return { success: true, designId: result.design?.id };
     } catch (error) {
       console.error('Save design failed:', error);
       return { success: false, error: 'Failed to save design' };

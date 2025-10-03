@@ -16,6 +16,7 @@ export interface EditorContentProps {
   selectElement: (id: string) => void;
   updateElement: (id: string, updates: Partial<Element>) => void;
   startTextEdit: (id: string) => void;
+  finishTextEdit: (save?: boolean, reselect?: boolean) => void;
   bumpOverlay: () => void;
   startPainting: (x: number, y: number) => void;
   addPaintPoint: (x: number, y: number) => void;
@@ -35,6 +36,7 @@ export const EditorContent: React.FC<EditorContentProps> = ({
   selectElement,
   updateElement,
   startTextEdit,
+  finishTextEdit,
   bumpOverlay,
   startPainting,
   addPaintPoint,
@@ -43,13 +45,10 @@ export const EditorContent: React.FC<EditorContentProps> = ({
 }) => {
   return (
     <div className="relative">
-      {/* Empty state message */}
+      {/* Title above canvas */}
       {state.elements.length === 0 && (
-        <div className="absolute -top-16 left-1/2 transform -translate-x-1/2 text-center z-10">
-          <div className="bg-white/90 backdrop-blur-sm rounded-lg p-4 shadow-lg">
-            <h3 className="text-2xl text-gray-700 font-semibold mb-2">Create Your Design</h3>
-            <p className="text-gray-500">Add text or images to get started</p>
-          </div>
+        <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 text-center z-10">
+          <h3 className="text-xl text-gray-600 font-medium">Create Your Design</h3>
         </div>
       )}
 
@@ -68,6 +67,7 @@ export const EditorContent: React.FC<EditorContentProps> = ({
           selectElement={selectElement}
           updateElement={updateElement}
           startTextEdit={startTextEdit}
+          finishTextEdit={finishTextEdit}
           bumpOverlay={bumpOverlay}
           startPainting={startPainting}
           addPaintPoint={addPaintPoint}

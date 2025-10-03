@@ -70,6 +70,8 @@ export function batchScreenToCanvas(
   viewY: f64,
   zoom: f64
 ): void {
+  if (zoom === 0.0 || Math.abs(zoom) < 1e-10) return;
+  
   const points = changetype<Float64Array>(pointsPtr);
   for (let i = 0; i < count; i++) {
     const idx = i * 2;
@@ -202,6 +204,8 @@ export function calculateAirbrushLayers(
   baseOpacity: f64,
   outputPtr: usize
 ): void {
+  if (layerCount <= 0) return;
+  
   const output = changetype<Float64Array>(outputPtr);
   
   for (let i = 0; i < layerCount; i++) {
