@@ -164,14 +164,116 @@ export class EditorStateManager {
     }
   };
 
-  moveElementToFront = (id: string) => {
-    const maxZ = Math.max(...this.state.elements.map(el => el.zIndex));
-    this.updateElement(id, { zIndex: maxZ + 1 });
+  // Move element one step forward in z-order
+  moveElementUp = (id: string) => {
+    this.setState(prev => {
+      const element = prev.elements.find(el => el.id === id);
+      if (!element) return prev;
+
+      // Get all elements in the same layer, sorted by zIndex
+      const sameLayerElements = prev.elements
+        .filter(el => el.layer === element.layer)
+        .sort((a, b) => a.zIndex - b.zIndex);
+      
+      const currentIndex = sameLayerElements.findIndex(el => el.id === id);
+      
+      // Can't move up if already at top
+      if (currentIndex >= sameLayerElements.length - 1) return prev;
+      
+      this.pushHistory(prev);
+      
+      // Swap zIndex with element above
+      const elementAbove = sameLayerElements[currentIndex + 1];
+      const tempZ = element.zIndex;
+      
+      return {
+        ...prev,
+        elements: prev.elements.map(el => {
+          if (el.id === id) return { ...el, zIndex: elementAbove.zIndex };
+          if (el.id === elementAbove.id) return { ...el, zIndex: tempZ };
+          return el;
+        })
+      };
+    });
   };
 
+  // Move element one step backward in z-order
+  moveElementDown = (id: string) => {
+    this.setState(prev => {
+      const element = prev.elements.find(el => el.id === id);
+      if (!element) return prev;
+
+      // Get all elements in the same layer, sorted by zIndex
+      const sameLayerElements = prev.elements
+        .filter(el => el.layer === element.layer)
+        .sort((a, b) => a.zIndex - b.zIndex);
+      
+      const currentIndex = sameLayerElements.findIndex(el => el.id === id);
+      
+      // Can't move down if already at bottom
+      if (currentIndex <= 0) return prev;
+      
+      this.pushHistory(prev);
+      
+      // Swap zIndex with element below
+      const elementBelow = sameLayerElements[currentIndex - 1];
+      const tempZ = element.zIndex;
+      
+      return {
+        ...prev,
+        elements: prev.elements.map(el => {
+          if (el.id === id) return { ...el, zIndex: elementBelow.zIndex };
+          if (el.id === elementBelow.id) return { ...el, zIndex: tempZ };
+          return el;
+        })
+      };
+    });
+  };
+
+  // Move element to front (top of z-order)
+  moveElementToFront = (id: string) => {
+    this.setState(prev => {
+      const element = prev.elements.find(el => el.id === id);
+      if (!element) return prev;
+
+      // Get all elements in the same layer
+      const sameLayerElements = prev.elements.filter(el => el.layer === element.layer);
+      const maxZ = Math.max(...sameLayerElements.map(el => el.zIndex), 0);
+      
+      // Only move if not already at front
+      if (element.zIndex >= maxZ) return prev;
+      
+      this.pushHistory(prev);
+      return {
+        ...prev,
+        elements: prev.elements.map(el => 
+          el.id === id ? { ...el, zIndex: maxZ + 1 } : el
+        )
+      };
+    });
+  };
+
+  // Move element to back (bottom of z-order)
   moveElementToBack = (id: string) => {
-    const minZ = Math.min(...this.state.elements.map(el => el.zIndex));
-    this.updateElement(id, { zIndex: minZ - 1 });
+    this.setState(prev => {
+      const element = prev.elements.find(el => el.id === id);
+      if (!element) return prev;
+
+      // Get all elements in the same layer
+      const sameLayerElements = prev.elements.filter(el => el.layer === element.layer);
+      const minZ = Math.min(...sameLayerElements.map(el => el.zIndex), 0);
+      
+      // Only move if not already at back
+      if (element.zIndex <= minZ) return prev;
+      
+      this.pushHistory(prev);
+      return {
+        ...prev,
+        elements: prev.elements.map(el => 
+          el.id === id ? { ...el, zIndex: minZ - 1 } : el
+        )
+      };
+    });
   };
 }
 

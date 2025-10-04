@@ -133,6 +133,8 @@ const EditorCore: React.FC = () => {
       updateElement={updateElement}
       deleteElement={deleteElement}
       duplicateElement={stateManager?.duplicateElement}
+      moveElementUp={stateManager?.moveElementUp}
+      moveElementDown={stateManager?.moveElementDown}
       moveElementToFront={stateManager?.moveElementToFront}
       moveElementToBack={stateManager?.moveElementToBack}
       toggleLayer={toggleLayer}

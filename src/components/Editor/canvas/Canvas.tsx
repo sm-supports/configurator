@@ -211,9 +211,10 @@ export const Canvas: React.FC<CanvasProps> = ({
             const textSpace = Math.min(W, H) * 0.15;
             const plateOffsetY = textSpace;
             
-            const filteredElements = state.elements;
+            // Sort elements by zIndex (ascending) so they render in correct order
+            const sortedElements = [...state.elements].sort((a, b) => a.zIndex - b.zIndex);
             
-            return filteredElements
+            return sortedElements
               .filter(element => element.type === 'image' && (element.layer || 'base') === 'base')
               .map(element => {
                 const elementLayer = element.layer || 'base';
@@ -278,9 +279,10 @@ export const Canvas: React.FC<CanvasProps> = ({
             const textSpace = Math.min(W, H) * 0.15;
             const plateOffsetY = textSpace;
             
-            const filteredElements = state.elements;
+            // Sort elements by zIndex (ascending) so they render in correct order
+            const sortedElements = [...state.elements].sort((a, b) => a.zIndex - b.zIndex);
             
-            return filteredElements
+            return sortedElements
               .filter(element => element.type === 'image' && (element.layer || 'base') === 'licenseplate')
               .map(element => {
                 const elementLayer = element.layer || 'base';
@@ -316,9 +318,10 @@ export const Canvas: React.FC<CanvasProps> = ({
             const textSpace = Math.min(W, H) * 0.15;
             const plateOffsetY = textSpace;
             
-            const filteredElements = state.elements;
+            // Sort elements by zIndex (ascending) so they render in correct order
+            const sortedElements = [...state.elements].sort((a, b) => a.zIndex - b.zIndex);
             
-            return filteredElements.filter(element => element.type === 'text').map(element => {
+            return sortedElements.filter(element => element.type === 'text').map(element => {
               const elementLayer = element.layer || 'base';
               const isInteractive = state.activeLayer === elementLayer;
               // Show all elements with reduced opacity when not on active layer
@@ -353,9 +356,10 @@ export const Canvas: React.FC<CanvasProps> = ({
             const textSpace = Math.min(W, H) * 0.15;
             const plateOffsetY = textSpace;
             
-            const filteredElements = state.elements;
+            // Sort elements by zIndex (ascending) so they render in correct order
+            const sortedElements = [...state.elements].sort((a, b) => a.zIndex - b.zIndex);
             
-            return filteredElements.filter(element => element.type === 'paint').map(element => {
+            return sortedElements.filter(element => element.type === 'paint').map(element => {
               const elementLayer = element.layer || 'base';
               const isInteractive = state.activeLayer === elementLayer;
               const isSelected = state.selectedId === element.id;

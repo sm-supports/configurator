@@ -11,6 +11,8 @@ export interface LayersPanelProps {
   updateElement: (id: string, updates: Partial<TextElement>) => void;
   deleteElement: (id: string) => void;
   duplicateElement?: (id: string) => void;
+  moveElementUp?: (id: string) => void;
+  moveElementDown?: (id: string) => void;
   moveElementToFront?: (id: string) => void;
   moveElementToBack?: (id: string) => void;
   toggleLayer: (layer: 'base' | 'licenseplate') => void;
@@ -24,6 +26,8 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
   updateElement,
   deleteElement,
   duplicateElement,
+  moveElementUp,
+  moveElementDown,
   moveElementToFront,
   moveElementToBack,
   toggleLayer,
@@ -83,8 +87,8 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
         </span>
       </button>
       
-      {isActive && (
-        <div className="mt-2 space-y-1">
+      {/* Always show elements, regardless of active layer */}
+      <div className="mt-2 space-y-1">
           {elements.map((element) => (
             <div
               key={element.id}
@@ -133,29 +137,29 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
                   )}
                 </button>
 
-                {/* Move to front */}
-                {moveElementToFront && (
+                {/* Move up one step */}
+                {moveElementUp && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      moveElementToFront(element.id);
+                      moveElementUp(element.id);
                     }}
                     className="p-1 hover:bg-gray-200 rounded transition-colors"
-                    title="Move to front"
+                    title="Move up one step"
                   >
                     <MoveUp className="w-3 h-3 text-gray-600" />
                   </button>
                 )}
 
-                {/* Move to back */}
-                {moveElementToBack && (
+                {/* Move down one step */}
+                {moveElementDown && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      moveElementToBack(element.id);
+                      moveElementDown(element.id);
                     }}
                     className="p-1 hover:bg-gray-200 rounded transition-colors"
-                    title="Move to back"
+                    title="Move down one step"
                   >
                     <MoveDown className="w-3 h-3 text-gray-600" />
                   </button>
@@ -198,7 +202,6 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
             </p>
           )}
         </div>
-      )}
     </div>
   );
 
