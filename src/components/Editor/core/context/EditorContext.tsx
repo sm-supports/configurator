@@ -135,7 +135,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
     elements: createDefaultElements(),
     selectedId: null,
     editingTextId: null,
-    activeLayer: 'base',
+    activeLayer: 'licenseplate',
     activeTool: 'select',
     paintSettings: {
       color: '#000000',
