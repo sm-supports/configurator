@@ -274,21 +274,58 @@ export const useElementManipulation = (
     const strokePoints = state.currentPaintStroke;
     let processedPoints = strokePoints;
     
+    // Apply smoothing for brush strokes (uses JavaScript fallback to avoid WASM crashes)
     if (state.paintSettings.brushType === 'brush' && strokePoints.length > 2) {
-      // Apply Catmull-Rom spline smoothing via WASM for brush strokes
-      const smoothedPoints = wasmOps.smoothPaintStroke(
-        strokePoints.map(p => ({ x: p.x, y: p.y })),
-        0.5 // tension
-      );
-      
-      // Convert smoothed points back to PaintPoint format
-      if (smoothedPoints.length > 0) {
-        processedPoints = smoothedPoints.map((p, i) => ({
-          x: p.x,
-          y: p.y,
-          pressure: strokePoints[Math.min(i, strokePoints.length - 1)].pressure,
-          timestamp: Date.now() + i
-        }));
+      try {
+        // JavaScript-based Catmull-Rom spline smoothing (fallback implementation)
+        const smoothedPoints: Array<{ x: number; y: number }> = [];
+        
+        // Add first point
+        smoothedPoints.push({ x: strokePoints[0].x, y: strokePoints[0].y });
+        
+        // Interpolate between points
+        for (let i = 0; i < strokePoints.length - 1; i++) {
+          const p0 = strokePoints[Math.max(0, i - 1)];
+          const p1 = strokePoints[i];
+          const p2 = strokePoints[i + 1];
+          const p3 = strokePoints[Math.min(strokePoints.length - 1, i + 2)];
+          
+          // Create 10 interpolated points between each pair
+          for (let t = 1; t <= 10; t++) {
+            const tt = t / 10;
+            const tt2 = tt * tt;
+            const tt3 = tt2 * tt;
+            
+            const x = 0.5 * (
+              (2 * p1.x) +
+              (-p0.x + p2.x) * tt +
+              (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * tt2 +
+              (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * tt3
+            );
+            
+            const y = 0.5 * (
+              (2 * p1.y) +
+              (-p0.y + p2.y) * tt +
+              (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * tt2 +
+              (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * tt3
+            );
+            
+            smoothedPoints.push({ x, y });
+          }
+        }
+        
+        // Convert smoothed points back to PaintPoint format
+        if (smoothedPoints.length > 0) {
+          processedPoints = smoothedPoints.map((p, i) => ({
+            x: p.x,
+            y: p.y,
+            pressure: strokePoints[Math.min(i, strokePoints.length - 1)].pressure,
+            timestamp: Date.now() + i
+          }));
+        }
+      } catch (error) {
+        console.error('Error smoothing paint stroke:', error);
+        // Keep original points if smoothing fails
       }
     }
 
@@ -357,8 +394,22 @@ export const useElementManipulation = (
             y: paintEl.y + point.y
           }));
           
-          // Use WASM for fast intersection detection
-          const hasIntersection = wasmOps.eraserIntersectsStroke(x, y, eraserSize / 2, absolutePoints);
+          // JavaScript fallback for intersection detection (avoids WASM crashes)
+          const eraserRadius = eraserSize / 2;
+          const radiusSquared = eraserRadius * eraserRadius;
+          let hasIntersection = false;
+          
+          for (let i = 0; i < absolutePoints.length; i++) {
+            const point = absolutePoints[i];
+            const dx = x - point.x;
+            const dy = y - point.y;
+            const distSquared = dx * dx + dy * dy;
+            
+            if (distSquared <= radiusSquared) {
+              hasIntersection = true;
+              break;
+            }
+          }
           
           if (hasIntersection) {
             elementsToDelete.push(paintEl.id);

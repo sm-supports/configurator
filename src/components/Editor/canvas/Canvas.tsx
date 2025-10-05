@@ -104,10 +104,25 @@ export const Canvas: React.FC<CanvasProps> = ({
     );
   }
 
+  // Determine cursor class based on active tool
+  const getCursorClass = () => {
+    if (state.activeTool === 'brush' || state.activeTool === 'airbrush' || state.activeTool === 'spray') {
+      return 'cursor-brush';
+    }
+    if (state.activeTool === 'eraser') {
+      return 'cursor-eraser';
+    }
+    if (state.activeTool === 'text') {
+      return 'cursor-text';
+    }
+    return 'cursor-default';
+  };
+
   return (
     <>
       <Stage
         ref={stageRef}
+        className={getCursorClass()}
         width={template.width_px * zoom}
         height={template.height_px * zoom + (Math.min(template.width_px, template.height_px) * zoom * 0.2)}
         onClick={handleStageClick}

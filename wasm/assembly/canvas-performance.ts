@@ -98,10 +98,16 @@ export function smoothPaintStroke(
   const points = changetype<Float64Array>(pointsPtr);
   const output = changetype<Float64Array>(outputPtr);
   
-  if (count < 2) return count;
-  if (maxOutputPoints < count) return count; // Safety check
+  // Safety checks
+  if (count < 2) return 0;
+  if (count <= 0) return 0;
+  if (maxOutputPoints <= 0) return 0;
+  if (maxOutputPoints < count) return 0;
   
   let outputIdx = 0;
+  
+  // Verify we can read first point
+  if (points.length < 2) return 0;
   
   // Add first point
   output[outputIdx++] = points[0];
@@ -113,17 +119,33 @@ export function smoothPaintStroke(
     if (outputIdx / 2 >= maxOutputPoints - 10) {
       break; // Stop if we're running out of space
     }
-    const p0x = i > 0 ? points[(i - 1) * 2] : points[i * 2];
-    const p0y = i > 0 ? points[(i - 1) * 2 + 1] : points[i * 2 + 1];
     
-    const p1x = points[i * 2];
-    const p1y = points[i * 2 + 1];
+    // Ensure all array accesses are within bounds
+    const i0 = i > 0 ? (i - 1) * 2 : i * 2;
+    const i1 = i * 2;
+    const i2 = (i + 1) * 2;
+    const i3 = i < count - 2 ? (i + 2) * 2 : (i + 1) * 2;
     
-    const p2x = points[(i + 1) * 2];
-    const p2y = points[(i + 1) * 2 + 1];
+    // Bounds check before reading
+    if (i3 + 1 >= points.length) break;
     
-    const p3x = i < count - 2 ? points[(i + 2) * 2] : points[(i + 1) * 2];
-    const p3y = i < count - 2 ? points[(i + 2) * 2 + 1] : points[(i + 1) * 2 + 1];
+    const p0x = points[i0];
+    const p0y = points[i0 + 1];
+    
+    const p1x = points[i1];
+    const p1y = points[i1 + 1];
+    
+    const p2x = points[i2];
+    const p2y = points[i2 + 1];
+    
+    const p3x = points[i3];
+    const p3y = points[i3 + 1];
+    
+    // Skip invalid points
+    if (!isFinite(p0x) || !isFinite(p0y) || !isFinite(p1x) || !isFinite(p1y) ||
+        !isFinite(p2x) || !isFinite(p2y) || !isFinite(p3x) || !isFinite(p3y)) {
+      continue;
+    }
     
     // Catmull-Rom interpolation with 10 subdivisions
     const steps = 10;
@@ -147,9 +169,12 @@ export function smoothPaintStroke(
       );
       
       // Bounds check before writing
-      if (outputIdx / 2 < maxOutputPoints) {
-        output[outputIdx++] = x;
-        output[outputIdx++] = y;
+      if (outputIdx + 1 < output.length && outputIdx / 2 < maxOutputPoints) {
+        // Validate the computed values
+        if (isFinite(x) && isFinite(y)) {
+          output[outputIdx++] = x;
+          output[outputIdx++] = y;
+        }
       } else {
         // Buffer full, stop interpolating
         return outputIdx / 2;
@@ -622,14 +647,25 @@ export function eraserIntersectsStroke(
   eraserX: f64, eraserY: f64, eraserRadius: f64,
   strokePointsPtr: usize, numPoints: i32
 ): bool {
+  // Safety checks
+  if (numPoints <= 0) return false;
+  if (eraserRadius <= 0.0) return false;
+  
   const points = changetype<Float64Array>(strokePointsPtr);
   
   const radiusSquared = eraserRadius * eraserRadius;
   
-  // Check if any point is within eraser radius
+  // Check if any point is within eraser radius with bounds checking
   for (let i = 0; i < numPoints; i++) {
-    const px = points[i * 2];
-    const py = points[i * 2 + 1];
+    // Ensure we don't read beyond the array bounds
+    const index = i * 2;
+    if (index + 1 >= points.length) break;
+    
+    const px = points[index];
+    const py = points[index + 1];
+    
+    // Skip invalid points
+    if (!isFinite(px) || !isFinite(py)) continue;
     
     const dx = eraserX - px;
     const dy = eraserY - py;

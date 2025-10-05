@@ -48,8 +48,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   showLayersPanel,
   setShowLayersPanel,
   state,
-  setState,
-  pushHistory,
   toggleLayer,
   addText,
   addImage,
@@ -565,100 +563,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           </div>
         )}
       </div>
-
-      {/* Layers Panel (same as before but styled to match) */}
-      {showLayersPanel && (
-        <div className="fixed top-16 right-4 w-80 max-h-[70vh] bg-slate-800 border border-slate-700 rounded-lg shadow-2xl z-[120] overflow-hidden">
-          <div className="p-3 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border-b border-slate-700 flex items-center justify-between">
-            <div>
-              <div className="font-semibold text-white">Layers</div>
-              <div className="text-xs text-slate-400">Drag to reorder</div>
-            </div>
-            <button
-              onClick={() => setShowLayersPanel(false)}
-              className="text-slate-400 hover:text-white"
-            >
-              ✕
-            </button>
-          </div>
-          
-          <div className="p-2 overflow-auto max-h-[calc(70vh-60px)]">
-            {state.elements.length === 0 ? (
-              <div className="text-center py-8 text-slate-400 text-sm">No elements yet</div>
-            ) : (
-              [...state.elements].reverse().map((el, visualIndex, arr) => {
-                const isSelected = el.id === state.selectedId;
-                const frontMost = visualIndex === 0;
-                const backMost = visualIndex === arr.length - 1;
-                const label = el.type === 'text'
-                  ? `"${(el as TextElement).text.slice(0, 30)}${(el as TextElement).text.length > 30 ? '...' : ''}"`
-                  : 'Image';
-                  
-                return (
-                  <div
-                    key={el.id}
-                    className={`group mb-1 p-2 rounded-lg border transition-all ${
-                      isSelected
-                        ? 'border-indigo-500 bg-indigo-500/10'
-                        : 'border-slate-700 bg-slate-900/50 hover:bg-slate-700/50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setState(p => ({ ...p, selectedId: el.id }))}
-                        className="flex-1 text-left"
-                      >
-                        <div className={`text-sm font-medium ${isSelected ? 'text-white' : 'text-slate-300'}`}>
-                          {el.type === 'text' ? <Type className="w-3 h-3 inline mr-1" /> : <ImagePlus className="w-3 h-3 inline mr-1" />}
-                          {label}
-                        </div>
-                      </button>
-                      
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => {
-                            setState(prev => {
-                              const idx = prev.elements.findIndex(e => e.id === el.id);
-                              if (idx === -1 || idx === prev.elements.length - 1) return prev;
-                              pushHistory(prev);
-                              const elems = [...prev.elements];
-                              [elems[idx], elems[idx + 1]] = [elems[idx + 1], elems[idx]];
-                              return { ...prev, elements: elems };
-                            });
-                          }}
-                          disabled={frontMost}
-                          className="p-1 text-xs text-slate-400 hover:text-white disabled:opacity-30 hover:bg-slate-600 rounded"
-                          title="Bring Forward"
-                        >
-                          ↑
-                        </button>
-                        
-                        <button
-                          onClick={() => {
-                            setState(prev => {
-                              const idx = prev.elements.findIndex(e => e.id === el.id);
-                              if (idx <= 0) return prev;
-                              pushHistory(prev);
-                              const elems = [...prev.elements];
-                              [elems[idx], elems[idx - 1]] = [elems[idx - 1], elems[idx]];
-                              return { ...prev, elements: elems };
-                            });
-                          }}
-                          disabled={backMost}
-                          className="p-1 text-xs text-slate-400 hover:text-white disabled:opacity-30 hover:bg-slate-600 rounded"
-                          title="Send Backward"
-                        >
-                          ↓
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      )}
     </>
   );
 };
