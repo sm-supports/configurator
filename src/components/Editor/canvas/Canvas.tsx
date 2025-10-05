@@ -74,6 +74,21 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
   }, [eraseAtPoint]);
 
+  // Determine cursor class based on active tool (memoized for performance)
+  // Must be called before any conditional returns to follow Rules of Hooks
+  const cursorClass = useMemo(() => {
+    if (state.activeTool === 'brush' || state.activeTool === 'airbrush' || state.activeTool === 'spray') {
+      return 'cursor-brush';
+    }
+    if (state.activeTool === 'eraser') {
+      return 'cursor-eraser';
+    }
+    if (state.activeTool === 'text') {
+      return 'cursor-text';
+    }
+    return 'cursor-default';
+  }, [state.activeTool]);
+
   useEffect(() => {
     if (!transformerRef.current) return;
     
@@ -103,20 +118,6 @@ export const Canvas: React.FC<CanvasProps> = ({
       </div>
     );
   }
-
-  // Determine cursor class based on active tool (memoized for performance)
-  const cursorClass = useMemo(() => {
-    if (state.activeTool === 'brush' || state.activeTool === 'airbrush' || state.activeTool === 'spray') {
-      return 'cursor-brush';
-    }
-    if (state.activeTool === 'eraser') {
-      return 'cursor-eraser';
-    }
-    if (state.activeTool === 'text') {
-      return 'cursor-text';
-    }
-    return 'cursor-default';
-  }, [state.activeTool]);
 
   return (
     <>
