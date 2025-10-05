@@ -100,14 +100,12 @@ export function smoothPaintStroke(
   
   // Safety checks
   if (count < 2) return 0;
-  if (count <= 0) return 0;
   if (maxOutputPoints <= 0) return 0;
-  if (maxOutputPoints < count) return 0;
   
   let outputIdx = 0;
   
-  // Verify we can read first point
-  if (points.length < 2) return 0;
+  // Verify we have enough data for all points
+  if (points.length < count * 2) return 0;
   
   // Add first point
   output[outputIdx++] = points[0];
@@ -126,9 +124,6 @@ export function smoothPaintStroke(
     const i2 = (i + 1) * 2;
     const i3 = i < count - 2 ? (i + 2) * 2 : (i + 1) * 2;
     
-    // Bounds check before reading
-    if (i3 + 1 >= points.length) break;
-    
     const p0x = points[i0];
     const p0y = points[i0 + 1];
     
@@ -141,10 +136,10 @@ export function smoothPaintStroke(
     const p3x = points[i3];
     const p3y = points[i3 + 1];
     
-    // Skip invalid points
+    // Terminate early on invalid data
     if (!isFinite(p0x) || !isFinite(p0y) || !isFinite(p1x) || !isFinite(p1y) ||
         !isFinite(p2x) || !isFinite(p2y) || !isFinite(p3x) || !isFinite(p3y)) {
-      continue;
+      break;
     }
     
     // Catmull-Rom interpolation with 10 subdivisions
@@ -653,14 +648,14 @@ export function eraserIntersectsStroke(
   
   const points = changetype<Float64Array>(strokePointsPtr);
   
+  // Validate array has enough data for all points
+  if (points.length < numPoints * 2) return false;
+  
   const radiusSquared = eraserRadius * eraserRadius;
   
-  // Check if any point is within eraser radius with bounds checking
+  // Check if any point is within eraser radius
   for (let i = 0; i < numPoints; i++) {
-    // Ensure we don't read beyond the array bounds
     const index = i * 2;
-    if (index + 1 >= points.length) break;
-    
     const px = points[index];
     const py = points[index + 1];
     

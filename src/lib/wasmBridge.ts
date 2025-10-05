@@ -234,8 +234,8 @@ class CanvasPerformanceWASM {
     );
 
     if (validPoints.length < 2) {
-      console.warn('[WASM] Invalid points detected, returning original points');
-      return points;
+      console.warn('[WASM] Insufficient valid points for smoothing, returning valid points');
+      return validPoints;
     }
 
     // Prepare input
@@ -250,33 +250,33 @@ class CanvasPerformanceWASM {
       const maxOutputPoints = Math.max(validPoints.length * 10, 100);
       const outputPtr = this.module.exports.allocateFloat64Array(maxOutputPoints * 2);
 
-      const inputMemory = new Float64Array(this.module.exports.memory.buffer, inputPtr, inputArray.length);
-      inputMemory.set(inputArray);
+      try {
+        const inputMemory = new Float64Array(this.module.exports.memory.buffer, inputPtr, inputArray.length);
+        inputMemory.set(inputArray);
 
-      const outputCount = this.module.exports.smoothPaintStroke(inputPtr, validPoints.length, tension, outputPtr, maxOutputPoints);
-      
-      // Validate output count
-      if (outputCount < 0 || outputCount > maxOutputPoints) {
-        console.error('[WASM] Invalid output count:', outputCount);
+        const outputCount = this.module.exports.smoothPaintStroke(inputPtr, validPoints.length, tension, outputPtr, maxOutputPoints);
+        
+        // Validate output count
+        if (outputCount < 0 || outputCount > maxOutputPoints) {
+          console.error('[WASM] Invalid output count:', outputCount);
+          return validPoints;
+        }
+        
+        const outputMemory = new Float64Array(this.module.exports.memory.buffer, outputPtr, outputCount * 2);
+        const result: Array<{ x: number; y: number }> = [];
+        
+        for (let i = 0; i < outputCount; i++) {
+          result.push({
+            x: outputMemory[i * 2],
+            y: outputMemory[i * 2 + 1]
+          });
+        }
+
+        return result;
+      } finally {
         this.module.exports.freeMemory(inputPtr);
         this.module.exports.freeMemory(outputPtr);
-        return validPoints;
       }
-      
-      const outputMemory = new Float64Array(this.module.exports.memory.buffer, outputPtr, outputCount * 2);
-      const result: Array<{ x: number; y: number }> = [];
-      
-      for (let i = 0; i < outputCount; i++) {
-        result.push({
-          x: outputMemory[i * 2],
-          y: outputMemory[i * 2 + 1]
-        });
-      }
-
-      this.module.exports.freeMemory(inputPtr);
-      this.module.exports.freeMemory(outputPtr);
-
-      return result;
     } catch (error) {
       console.error('[WASM] Error in smoothPaintStroke:', error);
       console.error('[WASM] Input points:', validPoints.length);
@@ -529,14 +529,16 @@ class CanvasPerformanceWASM {
       }
 
       const pointsPtr = this.module.exports.allocateFloat64Array(pointsArray.length);
-      const memory = new Float64Array(this.module.exports.memory.buffer, pointsPtr, pointsArray.length);
-      memory.set(pointsArray);
+      try {
+        const memory = new Float64Array(this.module.exports.memory.buffer, pointsPtr, pointsArray.length);
+        memory.set(pointsArray);
 
-      const result = this.module.exports.eraserIntersectsStroke(eraserX, eraserY, eraserRadius, pointsPtr, validPoints.length);
+        const result = this.module.exports.eraserIntersectsStroke(eraserX, eraserY, eraserRadius, pointsPtr, validPoints.length);
 
-      this.module.exports.freeMemory(pointsPtr);
-
-      return result;
+        return result;
+      } finally {
+        this.module.exports.freeMemory(pointsPtr);
+      }
     } catch (error) {
       console.error('[WASM] Error in eraserIntersectsStroke:', error);
       console.error('[WASM] Eraser:', { eraserX, eraserY, eraserRadius });

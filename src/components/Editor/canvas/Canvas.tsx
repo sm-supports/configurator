@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback, useState } from 'react';
+import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import { Stage, Layer, Image as KonvaImage, Group, Transformer, Line, Rect } from 'react-konva';
 import type Konva from 'konva';
 import { PlateTemplate, ImageElement, TextElement } from '@/types';
@@ -104,8 +104,8 @@ export const Canvas: React.FC<CanvasProps> = ({
     );
   }
 
-  // Determine cursor class based on active tool
-  const getCursorClass = () => {
+  // Determine cursor class based on active tool (memoized for performance)
+  const cursorClass = useMemo(() => {
     if (state.activeTool === 'brush' || state.activeTool === 'airbrush' || state.activeTool === 'spray') {
       return 'cursor-brush';
     }
@@ -116,13 +116,13 @@ export const Canvas: React.FC<CanvasProps> = ({
       return 'cursor-text';
     }
     return 'cursor-default';
-  };
+  }, [state.activeTool]);
 
   return (
     <>
       <Stage
         ref={stageRef}
-        className={getCursorClass()}
+        className={cursorClass}
         width={template.width_px * zoom}
         height={template.height_px * zoom + (Math.min(template.width_px, template.height_px) * zoom * 0.2)}
         onClick={handleStageClick}

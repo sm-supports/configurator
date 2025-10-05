@@ -316,12 +316,23 @@ export const useElementManipulation = (
         
         // Convert smoothed points back to PaintPoint format
         if (smoothedPoints.length > 0) {
-          processedPoints = smoothedPoints.map((p, i) => ({
-            x: p.x,
-            y: p.y,
-            pressure: strokePoints[Math.min(i, strokePoints.length - 1)].pressure,
-            timestamp: Date.now() + i
-          }));
+          processedPoints = smoothedPoints.map((p, i) => {
+            // Map smoothed point index to original stroke segment
+            const segmentIndex = Math.floor(i / 10);
+            const t = (i % 10) / 10;
+            const p1 = strokePoints[Math.min(segmentIndex, strokePoints.length - 2)];
+            const p2 = strokePoints[Math.min(segmentIndex + 1, strokePoints.length - 1)];
+            const pressure1 = p1.pressure || 1.0;
+            const pressure2 = p2.pressure || 1.0;
+            const interpolatedPressure = pressure1 * (1 - t) + pressure2 * t;
+            
+            return {
+              x: p.x,
+              y: p.y,
+              pressure: interpolatedPressure,
+              timestamp: Date.now() + i
+            };
+          });
         }
       } catch (error) {
         console.error('Error smoothing paint stroke:', error);
