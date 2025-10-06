@@ -195,7 +195,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   <div className="grid grid-cols-4 gap-1 mb-3">
                     <button
                       onClick={() => {
-                        setActiveTool('brush');
+                        setActiveTool(state.activeTool === 'brush' ? 'select' : 'brush');
                         setShowPaintSettings(false);
                       }}
                       className={`p-2 rounded ${
@@ -210,7 +210,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                     
                     <button
                       onClick={() => {
-                        setActiveTool('airbrush');
+                        setActiveTool(state.activeTool === 'airbrush' ? 'select' : 'airbrush');
                         setShowPaintSettings(false);
                       }}
                       className={`p-2 rounded ${
@@ -228,7 +228,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                     
                     <button
                       onClick={() => {
-                        setActiveTool('spray');
+                        setActiveTool(state.activeTool === 'spray' ? 'select' : 'spray');
                         setShowPaintSettings(false);
                       }}
                       className={`p-2 rounded ${
@@ -248,7 +248,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                     
                     <button
                       onClick={() => {
-                        setActiveTool('eraser');
+                        setActiveTool(state.activeTool === 'eraser' ? 'select' : 'eraser');
                         setShowPaintSettings(false);
                       }}
                       className={`p-2 rounded ${
