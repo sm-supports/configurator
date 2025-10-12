@@ -414,6 +414,25 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         {textElement && (
           <div className="px-4 py-2 bg-slate-800/50 backdrop-blur-sm border-t border-slate-700">
             <div className="flex items-center gap-3 flex-wrap">
+              {/* Text Content Input */}
+              <div className="flex items-center gap-2 flex-1 min-w-[300px]">
+                <label className="text-xs font-medium text-slate-400">Text:</label>
+                <input
+                  type="text"
+                  value={textElement.text}
+                  onChange={(e) => {
+                    const newText = e.target.value;
+                    const measured = measureText(newText, textElement.fontSize, textElement.fontFamily, textElement.fontWeight, textElement.fontStyle);
+                    updateElement(state.selectedId!, { text: newText, width: measured.width, height: measured.height });
+                  }}
+                  className="flex-1 px-3 py-1.5 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter text here..."
+                  autoFocus
+                />
+              </div>
+
+              <div className="w-px h-6 bg-slate-700" />
+
               <div className="flex items-center gap-2">
                 <label className="text-xs font-medium text-slate-400">Size:</label>
                 <input

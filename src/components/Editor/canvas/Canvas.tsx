@@ -20,8 +20,6 @@ interface CanvasProps {
   state: EditorState;
   selectElement: (id: string) => void;
   updateElement: (id: string, updates: Partial<Element>) => void;
-  startTextEdit: (id: string) => void;
-  finishTextEdit: (save?: boolean, reselect?: boolean) => void;
   bumpOverlay: () => void;
   startPainting: (x: number, y: number) => void;
   addPaintPoint: (x: number, y: number) => void;
@@ -32,7 +30,7 @@ interface CanvasProps {
 export const Canvas: React.FC<CanvasProps> = ({
   template, zoom, view, stageRef, handleStageClick, lastPointerRef,
   bgImage, licensePlateFrame, state, selectElement, updateElement,
-  startTextEdit, finishTextEdit, bumpOverlay,
+  bumpOverlay,
   startPainting, addPaintPoint, finishPainting, eraseAtPoint,
 }) => {
   const transformerRef = useRef<Konva.Transformer>(null);
@@ -219,7 +217,7 @@ export const Canvas: React.FC<CanvasProps> = ({
 
         <Layer offsetX={-view.x} offsetY={-view.y}>{/* background visuals are provided by the image above */}</Layer>
 
-        {/* Base layer images (behind license plate) */}
+        {/* Base layer - ALL elements (images, text, paint) sorted by zIndex */}
         <Layer offsetX={-view.x} offsetY={-view.y}>
           {(() => {
             const W = template.width_px * zoom;
@@ -231,30 +229,81 @@ export const Canvas: React.FC<CanvasProps> = ({
             const sortedElements = [...state.elements].sort((a, b) => a.zIndex - b.zIndex);
             
             return sortedElements
-              .filter(element => element.type === 'image' && (element.layer || 'base') === 'base')
+              .filter(element => (element.layer || 'base') === 'base')
               .map(element => {
                 const elementLayer = element.layer || 'base';
                 const isInteractive = state.activeLayer === elementLayer;
+                const isSelected = state.selectedId === element.id;
                 // Show all elements with reduced opacity when not on active layer
                 const elementOpacity = isInteractive ? 1 : 0.4;
                 
-                const imageEl = element as ImageElement;
-                return (
-                  <Group key={element.id} opacity={elementOpacity}>
-                    <ImageElementComponent
-                      element={imageEl}
-                      zoom={zoom}
-                      plateOffsetY={plateOffsetY}
-                      isInteractive={isInteractive}
-                      onSelect={() => isInteractive ? selectElement(element.id) : undefined}
-                      onUpdate={(updates) => {
-                        if (isInteractive) {
-                          updateElement(element.id, updates);
+                if (element.type === 'image') {
+                  const imageEl = element as ImageElement;
+                  return (
+                    <Group key={element.id} opacity={elementOpacity}>
+                      <ImageElementComponent
+                        element={imageEl}
+                        zoom={zoom}
+                        plateOffsetY={plateOffsetY}
+                        isInteractive={isInteractive}
+                        onSelect={() => isInteractive ? selectElement(element.id) : undefined}
+                        onUpdate={(updates) => {
+                          if (isInteractive) {
+                            updateElement(element.id, updates);
+                          }
+                        }}
+                      />
+                    </Group>
+                  );
+                } else if (element.type === 'text') {
+                  const textEl = element as TextElement;
+                  return (
+                    <Group key={element.id} opacity={elementOpacity}>
+                      <TextElementComponent
+                        element={textEl}
+                        zoom={zoom}
+                        plateOffsetY={plateOffsetY}
+                        isInteractive={isInteractive}
+                        onSelect={selectElement}
+                        onUpdate={updateElement}
+                        bumpOverlay={bumpOverlay}
+                        template={template}
+                      />
+                    </Group>
+                  );
+                } else if (element.type === 'paint') {
+                  const paintEl = element as PaintElement;
+                  return (
+                    <Group 
+                      key={element.id} 
+                      opacity={elementOpacity}
+                      draggable={isSelected && isInteractive}
+                      onDragEnd={(e) => {
+                        if (isSelected && isInteractive) {
+                          const newX = e.target.x() / zoom;
+                          const newY = e.target.y() / zoom;
+                          updateElement(element.id, { x: newX, y: newY });
+                          e.target.position({ x: 0, y: 0 });
                         }
                       }}
-                    />
-                  </Group>
-                );
+                    >
+                      <PaintElementComponent
+                        element={paintEl}
+                        zoom={zoom}
+                        plateOffsetY={plateOffsetY}
+                        isInteractive={isInteractive}
+                        isSelected={isSelected}
+                        onSelect={() => isInteractive ? selectElement(element.id) : undefined}
+                        onUpdate={(updates) => {
+                          if (isInteractive) {
+                            updateElement(element.id, updates);
+                          }
+                        }}
+                      />
+                    </Group>
+                  );
+                }
+                return null;
               });
           })()}
         </Layer>
@@ -287,8 +336,11 @@ export const Canvas: React.FC<CanvasProps> = ({
           </Layer>
         )}
 
-        {/* License plate layer images (over license plate) */}
-        <Layer offsetX={-view.x} offsetY={-view.y}>
+        {/* License plate layer with masking - All elements clipped to frame's opaque areas */}
+        <Layer 
+          offsetX={-view.x} 
+          offsetY={-view.y}
+        >
           {(() => {
             const W = template.width_px * zoom;
             const H = template.height_px * zoom;
@@ -298,147 +350,127 @@ export const Canvas: React.FC<CanvasProps> = ({
             // Sort elements by zIndex (ascending) so they render in correct order
             const sortedElements = [...state.elements].sort((a, b) => a.zIndex - b.zIndex);
             
-            return sortedElements
-              .filter(element => element.type === 'image' && (element.layer || 'base') === 'licenseplate')
-              .map(element => {
-                const elementLayer = element.layer || 'base';
-                const isInteractive = state.activeLayer === elementLayer;
-                // Show all elements with reduced opacity when not on active layer
-                const elementOpacity = isInteractive ? 1 : 0.4;
-                
-                const imageEl = element as ImageElement;
-                return (
-                  <Group key={element.id} opacity={elementOpacity}>
-                    <ImageElementComponent
-                      element={imageEl}
-                      zoom={zoom}
-                      plateOffsetY={plateOffsetY}
-                      isInteractive={isInteractive}
-                      onSelect={() => isInteractive ? selectElement(element.id) : undefined}
-                      onUpdate={(updates) => {
-                        if (isInteractive) {
-                          updateElement(element.id, updates);
-                        }
-                      }}
-                    />
-                  </Group>
-                );
-              });
-          })()}
-        </Layer>
-
-        <Layer offsetX={-view.x} offsetY={-view.y}>
-          {(() => {
-            const W = template.width_px * zoom;
-            const H = template.height_px * zoom;
-            const textSpace = Math.min(W, H) * 0.15;
-            const plateOffsetY = textSpace;
-            
-            // Sort elements by zIndex (ascending) so they render in correct order
-            const sortedElements = [...state.elements].sort((a, b) => a.zIndex - b.zIndex);
-            
-            return sortedElements.filter(element => element.type === 'text').map(element => {
-              const elementLayer = element.layer || 'base';
-              const isInteractive = state.activeLayer === elementLayer;
-              // Show all elements with reduced opacity when not on active layer
-              const elementOpacity = isInteractive ? 1 : 0.4;
-              
-              const textEl = element as TextElement;
-              return (
-                <Group key={element.id} opacity={elementOpacity}>
-                  <TextElementComponent
-                    element={textEl}
-                    zoom={zoom}
-                    plateOffsetY={plateOffsetY}
-                    isInteractive={isInteractive}
-                    onSelect={selectElement}
-                    onUpdate={updateElement}
-                    onDblClick={startTextEdit}
-                    editingTextId={state.editingTextId}
-                    bumpOverlay={bumpOverlay}
-                    template={template}
-                  />
-                  </Group>
-                );
-            });
-          })()}
-        </Layer>
-
-        {/* Paint elements layer */}
-        <Layer offsetX={-view.x} offsetY={-view.y}>
-          {(() => {
-            const W = template.width_px * zoom;
-            const H = template.height_px * zoom;
-            const textSpace = Math.min(W, H) * 0.15;
-            const plateOffsetY = textSpace;
-            
-            // Sort elements by zIndex (ascending) so they render in correct order
-            const sortedElements = [...state.elements].sort((a, b) => a.zIndex - b.zIndex);
-            
-            return sortedElements.filter(element => element.type === 'paint').map(element => {
-              const elementLayer = element.layer || 'base';
-              const isInteractive = state.activeLayer === elementLayer;
-              const isSelected = state.selectedId === element.id;
-              // Show all elements with reduced opacity when not on active layer
-              const elementOpacity = isInteractive ? 1 : 0.4;
-              
-              const paintEl = element as PaintElement;
-              return (
-                <Group 
-                  key={element.id} 
-                  opacity={elementOpacity}
-                  draggable={isSelected && isInteractive}
-                  onDragEnd={(e) => {
-                    if (isSelected && isInteractive) {
-                      const newX = e.target.x() / zoom;
-                      const newY = e.target.y() / zoom;
-                      updateElement(element.id, { x: newX, y: newY });
-                      e.target.position({ x: 0, y: 0 });
-                    }
-                  }}
-                >
-                  <PaintElementComponent
-                    element={paintEl}
-                    zoom={zoom}
-                    plateOffsetY={plateOffsetY}
-                    isInteractive={isInteractive}
-                    isSelected={isSelected}
-                    onSelect={() => isInteractive ? selectElement(element.id) : undefined}
-                    onUpdate={(updates) => {
-                      if (isInteractive) {
-                        updateElement(element.id, updates);
-                      }
-                    }}
-                  />
-                </Group>
-              );
-            });
-          })()}
-          
-          {/* Live paint stroke preview */}
-          {state.isPainting && state.currentPaintStroke && state.currentPaintStroke.length > 1 && (() => {
-            const points: number[] = [];
-            state.currentPaintStroke.forEach(point => {
-              points.push(point.x * zoom);
-              points.push(point.y * zoom);
-            });
-            
+            // Group that will contain all masked content
             return (
-              <Line
-                points={points}
-                stroke={state.paintSettings.color}
-                strokeWidth={state.paintSettings.brushSize * zoom}
-                opacity={state.paintSettings.opacity}
-                lineCap="round"
-                lineJoin="round"
-                tension={0.5}
-                listening={false}
-              />
+              <Group>
+                {/* Render ALL license plate layer elements (images, text, paint) sorted by zIndex */}
+                {sortedElements
+                  .filter(element => (element.layer || 'base') === 'licenseplate')
+                  .map(element => {
+                    const elementLayer = element.layer || 'base';
+                    const isInteractive = state.activeLayer === elementLayer;
+                    const isSelected = state.selectedId === element.id;
+                    const elementOpacity = isInteractive ? 1 : 0.4;
+                    
+                    if (element.type === 'image') {
+                      const imageEl = element as ImageElement;
+                      return (
+                        <Group key={element.id} opacity={elementOpacity}>
+                          <ImageElementComponent
+                            element={imageEl}
+                            zoom={zoom}
+                            plateOffsetY={plateOffsetY}
+                            isInteractive={isInteractive}
+                            onSelect={() => isInteractive ? selectElement(element.id) : undefined}
+                            onUpdate={(updates) => {
+                              if (isInteractive) {
+                                updateElement(element.id, updates);
+                              }
+                            }}
+                          />
+                        </Group>
+                      );
+                    } else if (element.type === 'text') {
+                      const textEl = element as TextElement;
+                      return (
+                        <Group key={element.id} opacity={elementOpacity}>
+                          <TextElementComponent
+                            element={textEl}
+                            zoom={zoom}
+                            plateOffsetY={plateOffsetY}
+                            isInteractive={isInteractive}
+                            onSelect={selectElement}
+                            onUpdate={updateElement}
+                            bumpOverlay={bumpOverlay}
+                            template={template}
+                          />
+                        </Group>
+                      );
+                    } else if (element.type === 'paint') {
+                      const paintEl = element as PaintElement;
+                      return (
+                        <Group 
+                          key={element.id} 
+                          opacity={elementOpacity}
+                          draggable={isSelected && isInteractive}
+                          onDragEnd={(e) => {
+                            if (isSelected && isInteractive) {
+                              const newX = e.target.x() / zoom;
+                              const newY = e.target.y() / zoom;
+                              updateElement(element.id, { x: newX, y: newY });
+                              e.target.position({ x: 0, y: 0 });
+                            }
+                          }}
+                        >
+                          <PaintElementComponent
+                            element={paintEl}
+                            zoom={zoom}
+                            plateOffsetY={plateOffsetY}
+                            isInteractive={isInteractive}
+                            isSelected={isSelected}
+                            onSelect={() => isInteractive ? selectElement(element.id) : undefined}
+                            onUpdate={(updates) => {
+                              if (isInteractive) {
+                                updateElement(element.id, updates);
+                              }
+                            }}
+                          />
+                        </Group>
+                      );
+                    }
+                    return null;
+                  })}
+                
+                {/* Live paint stroke preview */}
+                {state.isPainting && state.currentPaintStroke && state.currentPaintStroke.length > 1 && (() => {
+                  const points: number[] = [];
+                  state.currentPaintStroke.forEach(point => {
+                    points.push(point.x * zoom);
+                    points.push(point.y * zoom);
+                  });
+                  
+                  return (
+                    <Line
+                      points={points}
+                      stroke={state.paintSettings.color}
+                      strokeWidth={state.paintSettings.brushSize * zoom}
+                      opacity={state.paintSettings.opacity}
+                      lineCap="round"
+                      lineJoin="round"
+                      tension={0.5}
+                      listening={false}
+                    />
+                  );
+                })()}
+                
+                {/* Step 4: Apply mask using destination-in composite operation */}
+                {licensePlateFrame && state.activeLayer === 'licenseplate' && (
+                  <KonvaImage
+                    image={licensePlateFrame}
+                    x={0}
+                    y={0}
+                    width={template.width_px * zoom}
+                    height={template.height_px * zoom + (Math.min(template.width_px, template.height_px) * zoom * 0.2)}
+                    globalCompositeOperation="destination-in"
+                    listening={false}
+                  />
+                )}
+              </Group>
             );
           })()}
         </Layer>
 
-        {/* Selection Transformer */}
+        {/* Selection Transformer - Separate layer so it's not clipped by the mask */}
         <Layer offsetX={-view.x} offsetY={-view.y}>
           <Transformer
             ref={transformerRef}
@@ -472,72 +504,6 @@ export const Canvas: React.FC<CanvasProps> = ({
         </Layer>
 
       </Stage>
-
-      {/* Text Editing Overlay */}
-      {state.editingTextId && (() => {
-        const editingElement = state.elements.find(el => el.id === state.editingTextId);
-        if (!editingElement || editingElement.type !== 'text') return null;
-        
-        const textEl = editingElement as TextElement;
-        const stageNode = stageRef.current;
-        if (!stageNode) return null;
-
-        // Calculate position accounting for zoom, view offset, and plate offset
-        const textSpace = Math.min(template.width_px, template.height_px) * 0.15;
-        const plateOffsetY = textSpace * zoom;
-        
-        const x = (textEl.x * zoom) - view.x;
-        const y = (textEl.y * zoom + plateOffsetY) - view.y;
-        const width = (textEl.width || 100) * zoom;
-        const height = (textEl.height || 50) * zoom;
-
-        return (
-          <textarea
-            autoFocus
-            value={state.elements.find(el => el.id === state.editingTextId)?.type === 'text' 
-              ? (state.elements.find(el => el.id === state.editingTextId) as TextElement).text 
-              : ''}
-            onChange={(e) => {
-              if (state.editingTextId) {
-                updateElement(state.editingTextId, { text: e.target.value });
-              }
-            }}
-            onBlur={() => {
-              // Finish editing when clicking outside
-              finishTextEdit(true, true);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') {
-                e.preventDefault();
-                finishTextEdit(false, true);
-              }
-              // Allow Enter for new lines in textarea
-            }}
-            style={{
-              position: 'absolute',
-              left: `${x}px`,
-              top: `${y}px`,
-              width: `${width}px`,
-              height: `${height}px`,
-              fontSize: `${textEl.fontSize * zoom}px`,
-              fontFamily: textEl.fontFamily,
-              fontWeight: textEl.fontWeight,
-              fontStyle: textEl.fontStyle || 'normal',
-              textDecoration: textEl.textDecoration || 'none',
-              color: textEl.color,
-              textAlign: textEl.textAlign,
-              backgroundColor: 'rgba(255, 255, 255, 0.9)',
-              border: '2px solid #4285f4',
-              borderRadius: '4px',
-              padding: '4px',
-              resize: 'none',
-              outline: 'none',
-              zIndex: 1000,
-              overflow: 'hidden',
-            }}
-          />
-        );
-      })()}
     </>
   );
 };

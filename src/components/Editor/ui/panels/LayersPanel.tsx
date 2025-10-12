@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layers, Eye, EyeOff, Lock, Unlock, Trash2, Copy, MoveUp, MoveDown } from 'lucide-react';
+import { Layers, Eye, Trash2, Copy, MoveUp, MoveDown } from 'lucide-react';
 import { EditorState, Element } from '../../core/types';
 import { TextElement } from '@/types';
 
@@ -8,7 +8,6 @@ export interface LayersPanelProps {
   onClose: () => void;
   state: EditorState;
   selectElement: (id: string) => void;
-  updateElement: (id: string, updates: Partial<TextElement>) => void;
   deleteElement: (id: string) => void;
   duplicateElement?: (id: string) => void;
   moveElementUp?: (id: string) => void;
@@ -23,7 +22,6 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
   onClose,
   state,
   selectElement,
-  updateElement,
   deleteElement,
   duplicateElement,
   moveElementUp,
@@ -56,14 +54,6 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
       return '🖼️';
     }
     return '📄';
-  };
-
-  const handleToggleVisibility = (id: string, visible: boolean) => {
-    updateElement(id, { visible: !visible });
-  };
-
-  const handleToggleLock = (id: string, locked: boolean) => {
-    updateElement(id, { locked: !locked });
   };
 
   const LayerSection: React.FC<{ 
@@ -105,38 +95,6 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
               </div>
               
               <div className="flex items-center space-x-1 ml-2">
-                {/* Visibility toggle */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleToggleVisibility(element.id, element.visible !== false);
-                  }}
-                  className="p-1 hover:bg-gray-200 rounded transition-colors"
-                  title={element.visible !== false ? 'Hide element' : 'Show element'}
-                >
-                  {element.visible !== false ? (
-                    <Eye className="w-3 h-3 text-gray-600" />
-                  ) : (
-                    <EyeOff className="w-3 h-3 text-gray-400" />
-                  )}
-                </button>
-
-                {/* Lock toggle */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleToggleLock(element.id, element.locked || false);
-                  }}
-                  className="p-1 hover:bg-gray-200 rounded transition-colors"
-                  title={element.locked ? 'Unlock element' : 'Lock element'}
-                >
-                  {element.locked ? (
-                    <Lock className="w-3 h-3 text-gray-600" />
-                  ) : (
-                    <Unlock className="w-3 h-3 text-gray-400" />
-                  )}
-                </button>
-
                 {/* Move up one step */}
                 {moveElementUp && (
                   <button

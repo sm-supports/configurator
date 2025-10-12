@@ -130,7 +130,6 @@ const EditorCore: React.FC = () => {
       onClose={() => setShowLayersPanel(false)}
       state={state}
       selectElement={selectElement}
-      updateElement={updateElement}
       deleteElement={deleteElement}
       duplicateElement={stateManager?.duplicateElement}
       moveElementUp={stateManager?.moveElementUp}
@@ -159,8 +158,6 @@ const EditorCore: React.FC = () => {
           state={state}
           selectElement={selectElement}
           updateElement={updateElement}
-          startTextEdit={startTextEdit}
-          finishTextEdit={finishTextEdit}
           bumpOverlay={bumpOverlay}
           startPainting={startPainting}
           addPaintPoint={addPaintPoint}

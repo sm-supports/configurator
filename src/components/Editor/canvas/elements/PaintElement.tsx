@@ -89,7 +89,7 @@ export const PaintElementComponent: React.FC<PaintElementProps> = React.memo(fun
         // Use WASM for faster spray dot generation
         return (
           <Group {...baseProps}>
-            {element.points.map((point, index) => {
+            {element.points.flatMap((point, index) => {
               const pressure = point.pressure || 1.0;
               const sprayRadius = (element.brushSize * pressure) * zoom;
               
@@ -107,7 +107,7 @@ export const PaintElementComponent: React.FC<PaintElementProps> = React.memo(fun
                 dotsCount
               );
               
-              const sprayDots = sprayDotPositions.map((dot, i) => (
+              return sprayDotPositions.map((dot, i) => (
                 <Circle
                   key={`${index}-${i}`}
                   x={dot.x}
@@ -117,8 +117,6 @@ export const PaintElementComponent: React.FC<PaintElementProps> = React.memo(fun
                   opacity={element.opacity * pressure * (0.3 + Math.random() * 0.7)}
                 />
               ));
-              
-              return sprayDots;
             })}
           </Group>
         );

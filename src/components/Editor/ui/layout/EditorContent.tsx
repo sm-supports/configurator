@@ -15,8 +15,6 @@ export interface EditorContentProps {
   state: EditorState;
   selectElement: (id: string) => void;
   updateElement: (id: string, updates: Partial<Element>) => void;
-  startTextEdit: (id: string) => void;
-  finishTextEdit: (save?: boolean, reselect?: boolean) => void;
   bumpOverlay: () => void;
   startPainting: (x: number, y: number) => void;
   addPaintPoint: (x: number, y: number) => void;
@@ -35,8 +33,6 @@ export const EditorContent: React.FC<EditorContentProps> = ({
   state,
   selectElement,
   updateElement,
-  startTextEdit,
-  finishTextEdit,
   bumpOverlay,
   startPainting,
   addPaintPoint,
@@ -66,8 +62,6 @@ export const EditorContent: React.FC<EditorContentProps> = ({
           state={state}
           selectElement={selectElement}
           updateElement={updateElement}
-          startTextEdit={startTextEdit}
-          finishTextEdit={finishTextEdit}
           bumpOverlay={bumpOverlay}
           startPainting={startPainting}
           addPaintPoint={addPaintPoint}
