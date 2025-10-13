@@ -26,12 +26,12 @@ export const PaintElementComponent: React.FC<PaintElementProps> = React.memo(fun
   const linePoints = useMemo(() => {
     const points: number[] = [];
     element.points.forEach(point => {
-      // Points are already in canvas coordinates, just scale by zoom
+      // Points are already in canvas coordinates, scale by zoom and add back plateOffsetY
       points.push((element.x + point.x) * zoom);
-      points.push((element.y + point.y) * zoom);
+      points.push((element.y + point.y) * zoom + plateOffsetY);
     });
     return points;
-  }, [element.points, element.x, element.y, zoom]);
+  }, [element.points, element.x, element.y, zoom, plateOffsetY]);
 
   // Render different brush types
   const renderBrushStroke = () => {
@@ -95,9 +95,9 @@ export const PaintElementComponent: React.FC<PaintElementProps> = React.memo(fun
               
               // Use WASM to calculate spray dot positions (much faster for many dots)
               const dotsCount = Math.max(3, Math.floor(sprayRadius / 2));
-              // Points are already in canvas coordinates, just scale by zoom
+              // Points are already in canvas coordinates, scale by zoom and add back plateOffsetY
               const centerX = (element.x + point.x) * zoom;
-              const centerY = (element.y + point.y) * zoom;
+              const centerY = (element.y + point.y) * zoom + plateOffsetY;
               
               // Calculate spray dots with WASM (falls back to JS if unavailable)
               const sprayDotPositions = wasmOps.calculateSprayDots(
@@ -135,7 +135,7 @@ export const PaintElementComponent: React.FC<PaintElementProps> = React.memo(fun
           {/* Semi-transparent background for clickability */}
           <Circle
             x={(element.x + (element.width / 2)) * zoom}
-            y={(element.y + (element.height / 2)) * zoom}
+            y={(element.y + (element.height / 2)) * zoom + plateOffsetY}
             radius={Math.max(element.width, element.height) * zoom * 0.6}
             fill="rgba(59, 130, 246, 0.1)"
             listening={false}
@@ -150,7 +150,7 @@ export const PaintElementComponent: React.FC<PaintElementProps> = React.memo(fun
             <Circle
               key={i}
               x={corner.x * zoom}
-              y={corner.y * zoom}
+              y={corner.y * zoom + plateOffsetY}
               radius={4}
               fill="#3b82f6"
               stroke="#ffffff"

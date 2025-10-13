@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
-import { Stage, Layer, Image as KonvaImage, Group, Transformer, Line, Rect } from 'react-konva';
+import { Stage, Layer, Image as KonvaImage, Group, Transformer, Line, Rect, Circle } from 'react-konva';
 import type Konva from 'konva';
 import { PlateTemplate, ImageElement, TextElement } from '@/types';
 import { EditorState, Element, PaintElement } from '../core/types';
@@ -36,6 +36,7 @@ export const Canvas: React.FC<CanvasProps> = ({
   const transformerRef = useRef<Konva.Transformer>(null);
   const selectedNodeRef = useRef<Konva.Node | null>(null);
   const [wasmReady, setWasmReady] = useState(false);
+  const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
 
   // Check WASM status on mount
   useEffect(() => {
@@ -163,10 +164,17 @@ export const Canvas: React.FC<CanvasProps> = ({
             lastPointerRef.current = { x: evt.clientX, y: evt.clientY };
           }
           
-          // Handle paint point addition during painting (throttled for smoothness)
-          if (state.isPainting && (state.activeTool === 'brush' || state.activeTool === 'airbrush' || state.activeTool === 'spray')) {
-            const pos = e.target.getStage()?.getPointerPosition();
-            if (pos) {
+          const pos = e.target.getStage()?.getPointerPosition();
+          if (pos) {
+            // Update cursor position for brush preview
+            if (state.activeTool === 'brush' || state.activeTool === 'airbrush' || state.activeTool === 'spray' || state.activeTool === 'eraser') {
+              setCursorPos({ x: pos.x, y: pos.y });
+            } else {
+              setCursorPos(null);
+            }
+            
+            // Handle paint point addition during painting (throttled for smoothness)
+            if (state.isPainting && (state.activeTool === 'brush' || state.activeTool === 'airbrush' || state.activeTool === 'spray')) {
               // Layer already has offsetX/offsetY applied, so we just need to divide by zoom
               // and subtract plateOffsetY to get correct canvas coordinates
               const textSpace = Math.min(template.width_px, template.height_px) * 0.15;
@@ -175,12 +183,9 @@ export const Canvas: React.FC<CanvasProps> = ({
               const y = (pos.y - plateOffsetY) / zoom;
               throttledAddPaintPoint(x, y);
             }
-          }
-          
-          // Handle eraser during mouse move (when left mouse button is pressed)
-          if (state.activeTool === 'eraser' && evt.buttons === 1) {
-            const pos = e.target.getStage()?.getPointerPosition();
-            if (pos) {
+            
+            // Handle eraser during mouse move (when left mouse button is pressed)
+            if (state.activeTool === 'eraser' && evt.buttons === 1) {
               const textSpace = Math.min(template.width_px, template.height_px) * 0.15;
               const plateOffsetY = textSpace * zoom;
               const x = pos.x / zoom;
@@ -188,6 +193,10 @@ export const Canvas: React.FC<CanvasProps> = ({
               throttledEraseAtPoint(x, y, state.paintSettings.brushSize);
             }
           }
+        }}
+        onMouseLeave={() => {
+          // Hide brush preview when mouse leaves canvas
+          setCursorPos(null);
         }}
         onMouseUp={() => {
           // Handle paint stroke completion
@@ -217,25 +226,40 @@ export const Canvas: React.FC<CanvasProps> = ({
 
         <Layer offsetX={-view.x} offsetY={-view.y}>{/* background visuals are provided by the image above */}</Layer>
 
-        {/* Base layer - ALL elements (images, text, paint) sorted by zIndex */}
-        <Layer offsetX={-view.x} offsetY={-view.y}>
-          {(() => {
-            const W = template.width_px * zoom;
-            const H = template.height_px * zoom;
-            const textSpace = Math.min(W, H) * 0.15;
-            const plateOffsetY = textSpace;
-            
-            // Sort elements by zIndex (ascending) so they render in correct order
-            const sortedElements = [...state.elements].sort((a, b) => a.zIndex - b.zIndex);
-            
-            return sortedElements
-              .filter(element => (element.layer || 'base') === 'base')
-              .map(element => {
+        {/* White background for License Plate mode to simulate final print - render BEFORE base elements */}
+        {state.activeLayer === 'licenseplate' && (
+          <Layer offsetX={-view.x} offsetY={-view.y}>
+            <Rect
+              x={0}
+              y={0}
+              width={template.width_px * zoom}
+              height={template.height_px * zoom + (Math.min(template.width_px, template.height_px) * zoom * 0.2)}
+              fill="#FFFFFF"
+              listening={false}
+            />
+          </Layer>
+        )}
+
+        {/* Base layer - ONLY rendered in BASE MODE (no masking), hidden in LICENSE PLATE MODE */}
+        {state.activeLayer === 'base' && (
+          <Layer offsetX={-view.x} offsetY={-view.y}>
+            {(() => {
+              const W = template.width_px * zoom;
+              const H = template.height_px * zoom;
+              const textSpace = Math.min(W, H) * 0.15;
+              const plateOffsetY = textSpace;
+              
+              // Sort elements by zIndex (ascending) so they render in correct order
+              const sortedElements = [...state.elements].sort((a, b) => a.zIndex - b.zIndex);
+              
+              return sortedElements
+                .filter(element => (element.layer || 'base') === 'base')
+                .map(element => {
                 const elementLayer = element.layer || 'base';
-                const isInteractive = state.activeLayer === elementLayer;
+                const isInteractive = true; // All elements are now editable in both layers
                 const isSelected = state.selectedId === element.id;
-                // Show all elements with reduced opacity when not on active layer
-                const elementOpacity = isInteractive ? 1 : 0.4;
+                // All elements remain at full opacity
+                const elementOpacity = 1;
                 
                 if (element.type === 'image') {
                   const imageEl = element as ImageElement;
@@ -246,12 +270,8 @@ export const Canvas: React.FC<CanvasProps> = ({
                         zoom={zoom}
                         plateOffsetY={plateOffsetY}
                         isInteractive={isInteractive}
-                        onSelect={() => isInteractive ? selectElement(element.id) : undefined}
-                        onUpdate={(updates) => {
-                          if (isInteractive) {
-                            updateElement(element.id, updates);
-                          }
-                        }}
+                        onSelect={() => selectElement(element.id)}
+                        onUpdate={(updates) => updateElement(element.id, updates)}
                       />
                     </Group>
                   );
@@ -277,9 +297,9 @@ export const Canvas: React.FC<CanvasProps> = ({
                     <Group 
                       key={element.id} 
                       opacity={elementOpacity}
-                      draggable={isSelected && isInteractive}
+                      draggable={isSelected}
                       onDragEnd={(e) => {
-                        if (isSelected && isInteractive) {
+                        if (isSelected) {
                           const newX = e.target.x() / zoom;
                           const newY = e.target.y() / zoom;
                           updateElement(element.id, { x: newX, y: newY });
@@ -304,21 +324,8 @@ export const Canvas: React.FC<CanvasProps> = ({
                   );
                 }
                 return null;
-              });
-          })()}
-        </Layer>
-
-        {/* White background for License Plate mode to simulate final print */}
-        {state.activeLayer === 'licenseplate' && (
-          <Layer offsetX={-view.x} offsetY={-view.y}>
-            <Rect
-              x={0}
-              y={0}
-              width={template.width_px * zoom}
-              height={template.height_px * zoom + (Math.min(template.width_px, template.height_px) * zoom * 0.2)}
-              fill="#FFFFFF"
-              listening={false}
-            />
+                });
+            })()}
           </Layer>
         )}
 
@@ -336,7 +343,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           </Layer>
         )}
 
-        {/* License plate layer with masking - All elements clipped to frame's opaque areas */}
+        {/* License plate layer - In LICENSE PLATE MODE: all elements masked to frame, in BASE MODE: no masking */}
         <Layer 
           offsetX={-view.x} 
           offsetY={-view.y}
@@ -350,17 +357,17 @@ export const Canvas: React.FC<CanvasProps> = ({
             // Sort elements by zIndex (ascending) so they render in correct order
             const sortedElements = [...state.elements].sort((a, b) => a.zIndex - b.zIndex);
             
-            // Group that will contain all masked content
+            // Group that will contain all masked content (only in License Plate Mode)
             return (
               <Group>
-                {/* Render ALL license plate layer elements (images, text, paint) sorted by zIndex */}
-                {sortedElements
-                  .filter(element => (element.layer || 'base') === 'licenseplate')
+                {/* IN LICENSE PLATE MODE: Render base layer elements here too for masking */}
+                {state.activeLayer === 'licenseplate' && sortedElements
+                  .filter(element => (element.layer || 'base') === 'base')
                   .map(element => {
                     const elementLayer = element.layer || 'base';
-                    const isInteractive = state.activeLayer === elementLayer;
+                    const isInteractive = true;
                     const isSelected = state.selectedId === element.id;
-                    const elementOpacity = isInteractive ? 1 : 0.4;
+                    const elementOpacity = 1;
                     
                     if (element.type === 'image') {
                       const imageEl = element as ImageElement;
@@ -371,12 +378,8 @@ export const Canvas: React.FC<CanvasProps> = ({
                             zoom={zoom}
                             plateOffsetY={plateOffsetY}
                             isInteractive={isInteractive}
-                            onSelect={() => isInteractive ? selectElement(element.id) : undefined}
-                            onUpdate={(updates) => {
-                              if (isInteractive) {
-                                updateElement(element.id, updates);
-                              }
-                            }}
+                            onSelect={() => selectElement(element.id)}
+                            onUpdate={(updates) => updateElement(element.id, updates)}
                           />
                         </Group>
                       );
@@ -402,9 +405,9 @@ export const Canvas: React.FC<CanvasProps> = ({
                         <Group 
                           key={element.id} 
                           opacity={elementOpacity}
-                          draggable={isSelected && isInteractive}
+                          draggable={isSelected}
                           onDragEnd={(e) => {
-                            if (isSelected && isInteractive) {
+                            if (isSelected) {
                               const newX = e.target.x() / zoom;
                               const newY = e.target.y() / zoom;
                               updateElement(element.id, { x: newX, y: newY });
@@ -418,12 +421,78 @@ export const Canvas: React.FC<CanvasProps> = ({
                             plateOffsetY={plateOffsetY}
                             isInteractive={isInteractive}
                             isSelected={isSelected}
-                            onSelect={() => isInteractive ? selectElement(element.id) : undefined}
-                            onUpdate={(updates) => {
-                              if (isInteractive) {
-                                updateElement(element.id, updates);
-                              }
-                            }}
+                            onSelect={() => selectElement(element.id)}
+                            onUpdate={(updates) => updateElement(element.id, updates)}
+                          />
+                        </Group>
+                      );
+                    }
+                    return null;
+                  })}
+                
+                {/* Render ALL license plate layer elements (images, text, paint) sorted by zIndex */}
+                {sortedElements
+                  .filter(element => (element.layer || 'base') === 'licenseplate')
+                  .map(element => {
+                    const elementLayer = element.layer || 'base';
+                    const isInteractive = true; // All elements are now editable in both layers
+                    const isSelected = state.selectedId === element.id;
+                    const elementOpacity = 1;
+                    
+                    if (element.type === 'image') {
+                      const imageEl = element as ImageElement;
+                      return (
+                        <Group key={element.id} opacity={elementOpacity}>
+                          <ImageElementComponent
+                            element={imageEl}
+                            zoom={zoom}
+                            plateOffsetY={plateOffsetY}
+                            isInteractive={isInteractive}
+                            onSelect={() => selectElement(element.id)}
+                            onUpdate={(updates) => updateElement(element.id, updates)}
+                          />
+                        </Group>
+                      );
+                    } else if (element.type === 'text') {
+                      const textEl = element as TextElement;
+                      return (
+                        <Group key={element.id} opacity={elementOpacity}>
+                          <TextElementComponent
+                            element={textEl}
+                            zoom={zoom}
+                            plateOffsetY={plateOffsetY}
+                            isInteractive={isInteractive}
+                            onSelect={selectElement}
+                            onUpdate={updateElement}
+                            bumpOverlay={bumpOverlay}
+                            template={template}
+                          />
+                        </Group>
+                      );
+                    } else if (element.type === 'paint') {
+                      const paintEl = element as PaintElement;
+                      return (
+                        <Group 
+                          key={element.id} 
+                          opacity={elementOpacity}
+                          draggable={isSelected}
+                          onDragEnd={(e) => {
+                            if (isSelected) {
+                              const newX = e.target.x() / zoom;
+                              const newY = e.target.y() / zoom;
+                              updateElement(element.id, { x: newX, y: newY });
+                              e.target.position({ x: 0, y: 0 });
+                            }
+                          }}
+                        >
+                          <PaintElementComponent
+                            element={paintEl}
+                            zoom={zoom}
+                            plateOffsetY={plateOffsetY}
+                            isInteractive={isInteractive}
+                            isSelected={isSelected}
+                            onSelect={() => selectElement(element.id)}
+                            onUpdate={(updates) => updateElement(element.id, updates)}
                           />
                         </Group>
                       );
@@ -435,8 +504,9 @@ export const Canvas: React.FC<CanvasProps> = ({
                 {state.isPainting && state.currentPaintStroke && state.currentPaintStroke.length > 1 && (() => {
                   const points: number[] = [];
                   state.currentPaintStroke.forEach(point => {
+                    // Apply same coordinate transformation as finished strokes
                     points.push(point.x * zoom);
-                    points.push(point.y * zoom);
+                    points.push(point.y * zoom + plateOffsetY);
                   });
                   
                   return (
@@ -453,7 +523,8 @@ export const Canvas: React.FC<CanvasProps> = ({
                   );
                 })()}
                 
-                {/* Step 4: Apply mask using destination-in composite operation */}
+                {/* Apply mask using destination-in composite operation ONLY in License Plate Mode */}
+                {/* This clips ALL elements (base + license plate) to the opaque areas of the frame */}
                 {licensePlateFrame && state.activeLayer === 'licenseplate' && (
                   <KonvaImage
                     image={licensePlateFrame}
@@ -502,6 +573,31 @@ export const Canvas: React.FC<CanvasProps> = ({
             rotateAnchorStroke="#ffffff"
           />
         </Layer>
+
+        {/* Brush Preview - Shows exact area that will be painted */}
+        {cursorPos && (state.activeTool === 'brush' || state.activeTool === 'airbrush' || state.activeTool === 'spray' || state.activeTool === 'eraser') && (
+          <Layer offsetX={-view.x} offsetY={-view.y}>
+            <Circle
+              x={cursorPos.x}
+              y={cursorPos.y}
+              radius={(state.paintSettings.brushSize / 2) * zoom}
+              stroke={state.activeTool === 'eraser' ? '#ef4444' : state.paintSettings.color}
+              strokeWidth={2}
+              opacity={0.6}
+              listening={false}
+              dash={[4, 4]}
+            />
+            {/* Center dot to show exact paint origin */}
+            <Circle
+              x={cursorPos.x}
+              y={cursorPos.y}
+              radius={2}
+              fill={state.activeTool === 'eraser' ? '#ef4444' : state.paintSettings.color}
+              opacity={0.8}
+              listening={false}
+            />
+          </Layer>
+        )}
 
       </Stage>
     </>
