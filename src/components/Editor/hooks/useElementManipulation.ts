@@ -38,14 +38,13 @@ export const useElementManipulation = (
       fontWeight: defaultFontWeight,
       fontStyle: 'normal',
       textDecoration: 'none',
-      color: '#000000',
+      color: '#ffffff',
       textAlign: 'left',
       zIndex: state.elements.length,
       visible: true,
       locked: false,
       flippedH: false,
-      flippedV: false,
-      layer: state.activeLayer
+      flippedV: false
     };
 
     setState(prev => {
@@ -102,8 +101,7 @@ export const useElementManipulation = (
           visible: true,
           locked: false,
           flippedH: false,
-          flippedV: false,
-          layer: state.activeLayer
+          flippedV: false
         };
 
         setState(prev => {
@@ -370,8 +368,7 @@ export const useElementManipulation = (
       rotation: 0,
       zIndex: state.elements.length,
       locked: false,
-      visible: true,
-      layer: state.activeLayer
+      visible: true
     };
 
     setState(prev => ({

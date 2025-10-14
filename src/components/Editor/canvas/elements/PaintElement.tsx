@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
 import { Line, Circle, Group } from 'react-konva';
 import { PaintElement } from '../../core/types';
-import { wasmOps } from '@/lib/wasmBridge';
 
 interface PaintElementProps {
   element: PaintElement;
@@ -43,6 +42,12 @@ export const PaintElementComponent: React.FC<PaintElementProps> = React.memo(fun
 
     switch (element.brushType) {
       case 'brush':
+        // ============================================================
+        // PAINT BRUSH: Solid, clean, continuous stroke
+        // - Single solid line with sharp, defined edges
+        // - Most efficient rendering (1 Line element)
+        // - Mimics: Paintbrush, marker, pen
+        // ============================================================
         return (
           <Line
             {...baseProps}
@@ -53,73 +58,103 @@ export const PaintElementComponent: React.FC<PaintElementProps> = React.memo(fun
             lineCap="round"
             lineJoin="round"
             tension={0.5}
+            perfectDrawEnabled={false}
+            shadowForStrokeEnabled={false}
           />
         );
 
       case 'airbrush':
-        // Airbrush effect using multiple lines with decreasing opacity
-        return (
-          <Group {...baseProps}>
-            {[0.3, 0.5, 0.7, 1.0].map((opacityMultiplier, index) => (
-              <Line
-                key={index}
-                points={linePoints}
-                stroke={element.color}
-                strokeWidth={(element.brushSize + index * 2) * zoom}
-                opacity={element.opacity * opacityMultiplier * 0.3}
-                lineCap="round"
-                lineJoin="round"
-                tension={0.5}
-              />
-            ))}
-            <Line
-              points={linePoints}
-              stroke={element.color}
-              strokeWidth={element.brushSize * zoom}
-              opacity={element.opacity}
-              lineCap="round"
-              lineJoin="round"
-              tension={0.5}
-            />
-          </Group>
-        );
+        // ============================================================
+        // AIRBRUSH: Soft, fuzzy, gradient effect with buildable opacity
+        // - Wide outer glow + denser center = soft circular gradient
+        // - Strokes blend smoothly when overlapping
+        // - 2 layers for clear visual distinction (still performant)
+        // - Mimics: Real airbrush tool, spray paint with distance
+        // - Returns array of elements (not Fragment) for Konva compatibility
+        // ============================================================
+        return [
+          // Wide, soft outer glow - creates the "fuzzy" airbrush halo
+          <Line
+            key="airbrush-outer"
+            {...baseProps}
+            points={linePoints}
+            stroke={element.color}
+            strokeWidth={(element.brushSize * 2.5) * zoom}
+            opacity={element.opacity * 0.15}
+            lineCap="round"
+            lineJoin="round"
+            tension={0.5}
+            perfectDrawEnabled={false}
+            shadowForStrokeEnabled={false}
+          />,
+          // Dense center stroke - provides color buildup and definition
+          <Line
+            key="airbrush-center"
+            {...baseProps}
+            points={linePoints}
+            stroke={element.color}
+            strokeWidth={element.brushSize * zoom}
+            opacity={element.opacity * 0.5}
+            lineCap="round"
+            lineJoin="round"
+            tension={0.5}
+            perfectDrawEnabled={false}
+            shadowForStrokeEnabled={false}
+          />
+        ];
 
       case 'spray':
-        // Spray effect using circles for each point with pressure variation
-        // Use WASM for faster spray dot generation
-        return (
-          <Group {...baseProps}>
-            {element.points.flatMap((point, index) => {
-              const pressure = point.pressure || 1.0;
-              const sprayRadius = (element.brushSize * pressure) * zoom;
-              
-              // Use WASM to calculate spray dot positions (much faster for many dots)
-              const dotsCount = Math.max(3, Math.floor(sprayRadius / 2));
-              // Points are already in canvas coordinates, scale by zoom and add back plateOffsetY
-              const centerX = (element.x + point.x) * zoom;
-              const centerY = (element.y + point.y) * zoom + plateOffsetY;
-              
-              // Calculate spray dots with WASM (falls back to JS if unavailable)
-              const sprayDotPositions = wasmOps.calculateSprayDots(
-                centerX,
-                centerY,
-                sprayRadius * 0.7,
-                dotsCount
-              );
-              
-              return sprayDotPositions.map((dot, i) => (
-                <Circle
-                  key={`${index}-${i}`}
-                  x={dot.x}
-                  y={dot.y}
-                  radius={Math.random() * 2 + 0.5}
-                  fill={element.color}
-                  opacity={element.opacity * pressure * (0.3 + Math.random() * 0.7)}
-                />
-              ));
-            })}
-          </Group>
-        );
+        // ============================================================
+        // SPRAY: Speckled, random dots scattered in circular pattern
+        // - Each point generates multiple random dots within radius
+        // - Dots have varying sizes and opacity for natural spray look
+        // - Uses fast seeded random for stable rendering (no jitter)
+        // - Optimized: 5-8 dots per point (not hundreds)
+        // - Mimics: Spray can, splatter effect
+        // - Returns flat array of elements for Konva compatibility
+        // ============================================================
+        
+        // Fast seeded random generator (deterministic, no Math.random jitter)
+        const fastRandom = (seed: number) => {
+          const x = Math.sin(seed) * 10000;
+          return x - Math.floor(x);
+        };
+        
+        // Flatten all spray dots into a single array
+        const sprayDots: React.ReactElement[] = [];
+        element.points.forEach((point, pointIndex) => {
+          const centerX = (element.x + point.x) * zoom;
+          const centerY = (element.y + point.y) * zoom + plateOffsetY;
+          const sprayRadius = (element.brushSize * 0.8) * zoom;
+          
+          // Optimized dot count: 5-8 dots per point (visible spray pattern)
+          const dotCount = 6;
+          const baseSeed = point.x * 1000 + point.y * 100 + pointIndex;
+          
+          // Generate spray dots
+          for (let i = 0; i < dotCount; i++) {
+            const seed = baseSeed + i;
+            const angle = fastRandom(seed * 2) * Math.PI * 2;
+            const distance = fastRandom(seed * 3 + 100) * sprayRadius;
+            const dotSize = (fastRandom(seed * 5 + 500) * 1.5 + 0.8) * zoom;
+            const dotOpacity = element.opacity * (fastRandom(seed * 7 + 1000) * 0.4 + 0.6);
+            
+            sprayDots.push(
+              <Circle
+                {...baseProps}
+                key={`${pointIndex}-${i}`}
+                x={centerX + Math.cos(angle) * distance}
+                y={centerY + Math.sin(angle) * distance}
+                radius={dotSize}
+                fill={element.color}
+                opacity={dotOpacity}
+                perfectDrawEnabled={false}
+              />
+            );
+          }
+        });
+        
+        return sprayDots;
 
       default:
         return null;

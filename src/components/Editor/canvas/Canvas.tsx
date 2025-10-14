@@ -435,9 +435,12 @@ export const Canvas: React.FC<CanvasProps> = ({
                   .filter(element => (element.layer || 'base') === 'licenseplate')
                   .map(element => {
                     const elementLayer = element.layer || 'base';
-                    const isInteractive = true; // All elements are now editable in both layers
+                    // Disable interaction when paint tools are active to allow uninterrupted painting
+                    const isPaintToolActive = state.activeTool === 'brush' || state.activeTool === 'airbrush' || 
+                                             state.activeTool === 'spray' || state.activeTool === 'eraser';
+                    const isInteractive = !isPaintToolActive;
                     const isSelected = state.selectedId === element.id;
-                    const elementOpacity = 1;
+                    const elementOpacity = state.activeLayer === elementLayer ? 1 : 0.4;
                     
                     if (element.type === 'image') {
                       const imageEl = element as ImageElement;
@@ -500,7 +503,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                     return null;
                   })}
                 
-                {/* Live paint stroke preview */}
+                {/* Live paint stroke preview - clearly distinct for each brush type */}
                 {state.isPainting && state.currentPaintStroke && state.currentPaintStroke.length > 1 && (() => {
                   const points: number[] = [];
                   state.currentPaintStroke.forEach(point => {
@@ -509,23 +512,114 @@ export const Canvas: React.FC<CanvasProps> = ({
                     points.push(point.y * zoom + plateOffsetY);
                   });
                   
-                  return (
-                    <Line
-                      points={points}
-                      stroke={state.paintSettings.color}
-                      strokeWidth={state.paintSettings.brushSize * zoom}
-                      opacity={state.paintSettings.opacity}
-                      lineCap="round"
-                      lineJoin="round"
-                      tension={0.5}
-                      listening={false}
-                    />
-                  );
+                  const brushSize = state.paintSettings.brushSize * zoom;
+                  const color = state.paintSettings.color;
+                  const opacity = state.paintSettings.opacity;
+                  
+                  switch (state.paintSettings.brushType) {
+                    case 'brush':
+                      // ========================================
+                      // BRUSH PREVIEW: Clean solid line
+                      // ========================================
+                      return (
+                        <Line
+                          points={points}
+                          stroke={color}
+                          strokeWidth={brushSize}
+                          opacity={opacity}
+                          lineCap="round"
+                          lineJoin="round"
+                          tension={0.5}
+                          listening={false}
+                          perfectDrawEnabled={false}
+                        />
+                      );
+                    
+                    case 'airbrush':
+                      // ========================================
+                      // AIRBRUSH PREVIEW: Soft fuzzy glow
+                      // 2 layers for visible soft effect
+                      // Returns array for Konva compatibility
+                      // ========================================
+                      return [
+                        <Line
+                          key="preview-airbrush-outer"
+                          points={points}
+                          stroke={color}
+                          strokeWidth={brushSize * 2.5}
+                          opacity={opacity * 0.15}
+                          lineCap="round"
+                          lineJoin="round"
+                          tension={0.5}
+                          listening={false}
+                          perfectDrawEnabled={false}
+                        />,
+                        <Line
+                          key="preview-airbrush-center"
+                          points={points}
+                          stroke={color}
+                          strokeWidth={brushSize}
+                          opacity={opacity * 0.5}
+                          lineCap="round"
+                          lineJoin="round"
+                          tension={0.5}
+                          listening={false}
+                          perfectDrawEnabled={false}
+                        />
+                      ];
+                    
+                    case 'spray':
+                      // ========================================
+                      // SPRAY PREVIEW: Random scattered dots
+                      // Simplified for performance (3 dots per point)
+                      // Returns flat array for Konva compatibility
+                      // ========================================
+                      const fastRandom = (seed: number) => {
+                        const x = Math.sin(seed) * 10000;
+                        return x - Math.floor(x);
+                      };
+                      
+                      // Flatten all preview spray dots into a single array
+                      const previewDots: React.ReactElement[] = [];
+                      state.currentPaintStroke.forEach((point, idx) => {
+                        const centerX = point.x * zoom;
+                        const centerY = point.y * zoom + plateOffsetY;
+                        const sprayRadius = brushSize * 0.8;
+                        const baseSeed = point.x * 1000 + point.y * 100 + idx;
+                        
+                        // 3 dots per point for live preview (lighter load)
+                        for (let i = 0; i < 3; i++) {
+                          const seed = baseSeed + i;
+                          const angle = fastRandom(seed * 2) * Math.PI * 2;
+                          const distance = fastRandom(seed * 3 + 100) * sprayRadius;
+                          const dotSize = (fastRandom(seed * 5 + 500) * 1.5 + 0.8) * zoom;
+                          const dotOpacity = opacity * (fastRandom(seed * 7 + 1000) * 0.4 + 0.6);
+                          
+                          previewDots.push(
+                            <Circle
+                              key={`preview-${idx}-${i}`}
+                              x={centerX + Math.cos(angle) * distance}
+                              y={centerY + Math.sin(angle) * distance}
+                              radius={dotSize}
+                              fill={color}
+                              opacity={dotOpacity}
+                              listening={false}
+                              perfectDrawEnabled={false}
+                            />
+                          );
+                        }
+                      });
+                      
+                      return previewDots;
+                    
+                    default:
+                      return null;
+                  }
                 })()}
                 
-                {/* Apply mask using destination-in composite operation ONLY in License Plate Mode */}
-                {/* This clips ALL elements (base + license plate) to the opaque areas of the frame */}
-                {licensePlateFrame && state.activeLayer === 'licenseplate' && (
+                {/* Apply mask using destination-in composite operation */}
+                {/* ALWAYS clip content to license plate frame's opaque areas */}
+                {licensePlateFrame && (
                   <KonvaImage
                     image={licensePlateFrame}
                     x={0}

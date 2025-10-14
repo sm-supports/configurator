@@ -196,6 +196,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                     <button
                       onClick={() => {
                         setActiveTool(state.activeTool === 'brush' ? 'select' : 'brush');
+                        setPaintSettings({ brushType: 'brush' });
                         setShowPaintSettings(false);
                       }}
                       className={`p-2 rounded ${
@@ -211,6 +212,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                     <button
                       onClick={() => {
                         setActiveTool(state.activeTool === 'airbrush' ? 'select' : 'airbrush');
+                        setPaintSettings({ brushType: 'airbrush' });
                         setShowPaintSettings(false);
                       }}
                       className={`p-2 rounded ${
@@ -229,6 +231,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                     <button
                       onClick={() => {
                         setActiveTool(state.activeTool === 'spray' ? 'select' : 'spray');
+                        setPaintSettings({ brushType: 'spray' });
                         setShowPaintSettings(false);
                       }}
                       className={`p-2 rounded ${

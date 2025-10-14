@@ -138,7 +138,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
     activeLayer: 'licenseplate',
     activeTool: 'select',
     paintSettings: {
-      color: '#000000',
+      color: '#ffffff',
       brushSize: 10,
       opacity: 1.0,
       brushType: 'brush'
