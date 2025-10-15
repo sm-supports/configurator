@@ -256,7 +256,10 @@ export const Canvas: React.FC<CanvasProps> = ({
                 .filter(element => (element.layer || 'base') === 'base')
                 .map(element => {
                 const elementLayer = element.layer || 'base';
-                const isInteractive = true; // All elements are now editable in both layers
+                // Disable interaction when paint tools are active to allow uninterrupted painting
+                const isPaintToolActive = state.activeTool === 'brush' || state.activeTool === 'airbrush' || 
+                                         state.activeTool === 'spray' || state.activeTool === 'eraser';
+                const isInteractive = !isPaintToolActive;
                 const isSelected = state.selectedId === element.id;
                 // All elements remain at full opacity
                 const elementOpacity = 1;
@@ -365,7 +368,10 @@ export const Canvas: React.FC<CanvasProps> = ({
                   .filter(element => (element.layer || 'base') === 'base')
                   .map(element => {
                     const elementLayer = element.layer || 'base';
-                    const isInteractive = true;
+                    // Disable interaction when paint tools are active to allow uninterrupted painting
+                    const isPaintToolActive = state.activeTool === 'brush' || state.activeTool === 'airbrush' || 
+                                             state.activeTool === 'spray' || state.activeTool === 'eraser';
+                    const isInteractive = !isPaintToolActive;
                     const isSelected = state.selectedId === element.id;
                     const elementOpacity = 1;
                     
