@@ -46,7 +46,7 @@ export const TextElementComponent: React.FC<TextElementProps> = React.memo(funct
         scaleY={element.flippedV ? -1 : 1}
         offsetX={element.flippedH ? (element.width || 100) * zoom : 0}
         offsetY={element.flippedV ? (element.height || 50) * zoom : 0}
-        opacity={1}
+        opacity={element.opacity ?? 1}
         draggable={isInteractive}
         listening={isInteractive}
         onClick={() => onSelect(element.id)}

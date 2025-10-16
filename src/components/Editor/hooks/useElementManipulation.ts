@@ -44,7 +44,8 @@ export const useElementManipulation = (
       visible: true,
       locked: false,
       flippedH: false,
-      flippedV: false
+      flippedV: false,
+      opacity: 1
     };
 
     setState(prev => {
@@ -103,7 +104,8 @@ export const useElementManipulation = (
           visible: true,
           locked: false,
           flippedH: false,
-          flippedV: false
+          flippedV: false,
+          opacity: 1
         };
 
         setState(prev => {
