@@ -52,7 +52,9 @@ export const useElementManipulation = (
       return {
         ...prev,
         elements: [...prev.elements, newText],
-        selectedId: newText.id
+        selectedId: newText.id,
+        // Deselect paint brush when adding text
+        activeTool: ['brush', 'airbrush', 'spray', 'eraser'].includes(prev.activeTool) ? 'select' : prev.activeTool
       };
     });
   }, [state.elements, state.activeLayer, pushHistory, template, nextRand, vehiclePlateFonts, setState]);
@@ -119,7 +121,20 @@ export const useElementManipulation = (
   }, [state.elements.length, state.activeLayer, pushHistory, template.width_px, template.height_px, setState]);
 
   const selectElement = useCallback((id: string) => {
-    setState(prev => ({ ...prev, selectedId: id }));
+    setState(prev => {
+      // Find the element being selected
+      const element = prev.elements.find(el => el.id === id);
+      const isTextElement = element?.type === 'text';
+      
+      // If selecting text element and paint brush is active, deselect paint brush
+      const shouldDeactivatePaint = isTextElement && ['brush', 'airbrush', 'spray', 'eraser'].includes(prev.activeTool);
+      
+      return {
+        ...prev,
+        selectedId: id,
+        activeTool: shouldDeactivatePaint ? 'select' : prev.activeTool
+      };
+    });
   }, [setState]);
 
   const updateElement = useCallback((id: string, updates: Partial<Element>) => {
