@@ -298,22 +298,23 @@ export const Canvas: React.FC<CanvasProps> = ({
                   const paintEl = element as PaintElement;
                   return (
                     <Group 
-                      key={element.id} 
+                      key={element.id}
+                      x={element.x * zoom}
+                      y={element.y * zoom + plateOffsetY}
                       opacity={elementOpacity}
                       draggable={isSelected}
                       onDragEnd={(e) => {
                         if (isSelected) {
                           const newX = e.target.x() / zoom;
-                          const newY = e.target.y() / zoom;
+                          const newY = (e.target.y() - plateOffsetY) / zoom;
                           updateElement(element.id, { x: newX, y: newY });
-                          e.target.position({ x: 0, y: 0 });
                         }
                       }}
                     >
                       <PaintElementComponent
                         element={paintEl}
                         zoom={zoom}
-                        plateOffsetY={plateOffsetY}
+                        plateOffsetY={0}
                         isInteractive={isInteractive}
                         isSelected={isSelected}
                         onSelect={() => isInteractive ? selectElement(element.id) : undefined}
@@ -409,22 +410,23 @@ export const Canvas: React.FC<CanvasProps> = ({
                       const paintEl = element as PaintElement;
                       return (
                         <Group 
-                          key={element.id} 
+                          key={element.id}
+                          x={element.x * zoom}
+                          y={element.y * zoom + plateOffsetY}
                           opacity={elementOpacity}
                           draggable={isSelected}
                           onDragEnd={(e) => {
                             if (isSelected) {
                               const newX = e.target.x() / zoom;
-                              const newY = e.target.y() / zoom;
+                              const newY = (e.target.y() - plateOffsetY) / zoom;
                               updateElement(element.id, { x: newX, y: newY });
-                              e.target.position({ x: 0, y: 0 });
                             }
                           }}
                         >
                           <PaintElementComponent
                             element={paintEl}
                             zoom={zoom}
-                            plateOffsetY={plateOffsetY}
+                            plateOffsetY={0}
                             isInteractive={isInteractive}
                             isSelected={isSelected}
                             onSelect={() => selectElement(element.id)}
@@ -482,22 +484,23 @@ export const Canvas: React.FC<CanvasProps> = ({
                       const paintEl = element as PaintElement;
                       return (
                         <Group 
-                          key={element.id} 
+                          key={element.id}
+                          x={element.x * zoom}
+                          y={element.y * zoom + plateOffsetY}
                           opacity={elementOpacity}
                           draggable={isSelected}
                           onDragEnd={(e) => {
                             if (isSelected) {
                               const newX = e.target.x() / zoom;
-                              const newY = e.target.y() / zoom;
+                              const newY = (e.target.y() - plateOffsetY) / zoom;
                               updateElement(element.id, { x: newX, y: newY });
-                              e.target.position({ x: 0, y: 0 });
                             }
                           }}
                         >
                           <PaintElementComponent
                             element={paintEl}
                             zoom={zoom}
-                            plateOffsetY={plateOffsetY}
+                            plateOffsetY={0}
                             isInteractive={isInteractive}
                             isSelected={isSelected}
                             onSelect={() => selectElement(element.id)}

@@ -22,15 +22,16 @@ export const PaintElementComponent: React.FC<PaintElementProps> = React.memo(fun
   onUpdate
 }) {
   // Convert paint points to Konva line points format
+  // Points are relative to element position, not absolute
   const linePoints = useMemo(() => {
     const points: number[] = [];
     element.points.forEach(point => {
-      // Points are already in canvas coordinates, scale by zoom and add back plateOffsetY
-      points.push((element.x + point.x) * zoom);
-      points.push((element.y + point.y) * zoom + plateOffsetY);
+      // Render points relative to parent Group (which will be positioned at element.x, element.y)
+      points.push(point.x * zoom);
+      points.push(point.y * zoom);
     });
     return points;
-  }, [element.points, element.x, element.y, zoom, plateOffsetY]);
+  }, [element.points, zoom]);
 
   // Render different brush types
   const renderBrushStroke = () => {
@@ -123,8 +124,9 @@ export const PaintElementComponent: React.FC<PaintElementProps> = React.memo(fun
         // Flatten all spray dots into a single array
         const sprayDots: React.ReactElement[] = [];
         element.points.forEach((point, pointIndex) => {
-          const centerX = (element.x + point.x) * zoom;
-          const centerY = (element.y + point.y) * zoom + plateOffsetY;
+          // Render dots relative to parent Group (no element.x/y or plateOffsetY)
+          const centerX = point.x * zoom;
+          const centerY = point.y * zoom;
           const sprayRadius = (element.brushSize * 0.8) * zoom;
           
           // Optimized dot count: 5-8 dots per point (visible spray pattern)
@@ -164,28 +166,28 @@ export const PaintElementComponent: React.FC<PaintElementProps> = React.memo(fun
   return (
     <Group>
       {renderBrushStroke()}
-      {/* Selection rectangle */}
+      {/* Selection rectangle - relative to parent Group position */}
       {isSelected && element.width && element.height && (
         <React.Fragment>
           {/* Semi-transparent background for clickability */}
           <Circle
-            x={(element.x + (element.width / 2)) * zoom}
-            y={(element.y + (element.height / 2)) * zoom + plateOffsetY}
+            x={(element.width / 2) * zoom}
+            y={(element.height / 2) * zoom}
             radius={Math.max(element.width, element.height) * zoom * 0.6}
             fill="rgba(59, 130, 246, 0.1)"
             listening={false}
           />
           {/* Selection corners */}
           {[
-            { x: element.x, y: element.y },
-            { x: element.x + element.width, y: element.y },
-            { x: element.x + element.width, y: element.y + element.height },
-            { x: element.x, y: element.y + element.height },
+            { x: 0, y: 0 },
+            { x: element.width, y: 0 },
+            { x: element.width, y: element.height },
+            { x: 0, y: element.height },
           ].map((corner, i) => (
             <Circle
               key={i}
               x={corner.x * zoom}
-              y={corner.y * zoom + plateOffsetY}
+              y={corner.y * zoom}
               radius={4}
               fill="#3b82f6"
               stroke="#ffffff"

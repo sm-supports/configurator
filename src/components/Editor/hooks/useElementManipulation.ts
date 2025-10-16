@@ -126,10 +126,10 @@ export const useElementManipulation = (
     setState(prev => {
       // Find the element being selected
       const element = prev.elements.find(el => el.id === id);
-      const isTextElement = element?.type === 'text';
+      const isPaintToolActive = ['brush', 'airbrush', 'spray', 'eraser'].includes(prev.activeTool);
       
-      // If selecting text element and paint brush is active, deselect paint brush
-      const shouldDeactivatePaint = isTextElement && ['brush', 'airbrush', 'spray', 'eraser'].includes(prev.activeTool);
+      // Deactivate paint brush when selecting any element (text, image, or paint) from layers
+      const shouldDeactivatePaint = element && isPaintToolActive;
       
       return {
         ...prev,
