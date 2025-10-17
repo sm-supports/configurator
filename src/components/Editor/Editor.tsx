@@ -53,6 +53,9 @@ const EditorCore: React.FC = () => {
     // Zoom operations
     zoom,
     view,
+    zoomIn,
+    zoomOut,
+    resetZoom,
     bumpOverlay,
     
     // Element operations
@@ -64,8 +67,6 @@ const EditorCore: React.FC = () => {
     flipHorizontal,
     flipVertical,
     toggleLayer,
-    startTextEdit,
-    finishTextEdit,
     
     // Paint tool operations
     setActiveTool,
@@ -121,6 +122,10 @@ const EditorCore: React.FC = () => {
       flipVertical={flipVertical}
       setActiveTool={setActiveTool}
       setPaintSettings={setPaintSettings}
+      zoom={zoom}
+      zoomIn={zoomIn}
+      zoomOut={zoomOut}
+      resetZoom={resetZoom}
     />
   );
 

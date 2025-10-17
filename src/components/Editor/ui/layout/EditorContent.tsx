@@ -1,6 +1,5 @@
 import React from 'react';
 import { Canvas } from '../../canvas/Canvas';
-import { ZoomControls } from '../ZoomControls';
 import type Konva from 'konva';
 import { PlateTemplate } from '@/types';
 import { EditorState, Element } from '../../core/types';
@@ -69,9 +68,6 @@ export const EditorContent: React.FC<EditorContentProps> = ({
           finishPainting={finishPainting}
           eraseAtPoint={eraseAtPoint}
         />
-        
-        {/* Zoom Controls */}
-        <ZoomControls />
       </div>
     </div>
   );

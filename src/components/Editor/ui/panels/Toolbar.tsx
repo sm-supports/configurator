@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   Undo2, Redo2, Type, ImagePlus, Trash2, Save, Download, ChevronDown, FlipHorizontal, FlipVertical, 
-  Bold, Italic, Underline, Brush, Eraser, Layers, Home, Sparkles
+  Bold, Italic, Underline, Brush, Eraser, Layers, Home, Sparkles, ZoomIn, ZoomOut
 } from 'lucide-react';
 import { PlateTemplate, TextElement } from '@/types';
 import { EditorState, Element, ToolType, PaintSettings } from '../../core/types';
@@ -37,6 +37,10 @@ interface ToolbarProps {
   flipVertical: (id: string) => void;
   setActiveTool: (tool: ToolType) => void;
   setPaintSettings: (settings: Partial<PaintSettings>) => void;
+  zoom: number;
+  zoomIn: () => void;
+  zoomOut: () => void;
+  resetZoom: () => void;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({
@@ -67,13 +71,25 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   flipVertical,
   setActiveTool,
   setPaintSettings,
+  zoom,
+  zoomIn,
+  zoomOut,
+  resetZoom,
 }) => {
   const selectedElement = state.elements.find(el => el.id === state.selectedId);
   const isTextElement = selectedElement?.type === 'text';
   const textElement = isTextElement ? selectedElement as TextElement : null;
   const [showPaintSettings, setShowPaintSettings] = useState(false);
+  const [showTextColorPicker, setShowTextColorPicker] = useState(false);
 
   const isPaintToolActive = ['brush', 'airbrush', 'spray', 'eraser'].includes(state.activeTool);
+
+  const zoomPercentage = Math.round(zoom * 100);
+  const isMinZoom = zoom <= 0.1;
+  const isMaxZoom = zoom >= 3;
+
+  const isMac = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform);
+  const modKey = isMac ? '⌘' : 'Ctrl';
 
   return (
     <>
@@ -107,6 +123,35 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               title="Redo (Cmd/Ctrl+Shift+Z)"
             >
               <Redo2 className="w-5 h-5" />
+            </button>
+
+            <div className="w-px h-6 bg-slate-700" />
+
+            {/* Zoom Controls */}
+            <button
+              onClick={zoomOut}
+              disabled={isMinZoom}
+              className="p-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              title={`Zoom Out (${modKey} -)`}
+            >
+              <ZoomOut className="w-5 h-5" />
+            </button>
+            
+            <button
+              onClick={resetZoom}
+              className="px-3 py-1.5 text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-all min-w-[52px]"
+              title={`Reset Zoom (${modKey} 0)`}
+            >
+              {zoomPercentage}%
+            </button>
+            
+            <button
+              onClick={zoomIn}
+              disabled={isMaxZoom}
+              className="p-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              title={`Zoom In (${modKey} +)`}
+            >
+              <ZoomIn className="w-5 h-5" />
             </button>
           </div>
 
@@ -268,16 +313,80 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   {isPaintToolActive && (
                     <>
                       {state.activeTool !== 'eraser' && (
-                        <div className="mb-2">
-                          <label className="text-xs text-slate-400 block mb-1">Color</label>
-                          <div className="flex items-center gap-2">
+                        <div className="mb-3">
+                          <label className="text-xs text-slate-400 block mb-2">Color</label>
+                          
+                          {/* Color Preview */}
+                          <div 
+                            className="w-full h-12 rounded border-2 border-slate-600 mb-2"
+                            style={{ backgroundColor: state.paintSettings.color }}
+                          />
+                          
+                          {/* Preset Colors Grid */}
+                          <div className="grid grid-cols-8 gap-1 mb-3">
+                            {['#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF',
+                              '#FFA500', '#800080', '#008000', '#FFC0CB', '#A52A2A', '#808080', '#FFD700', '#4B0082'].map((color) => (
+                              <button
+                                key={color}
+                                onClick={() => setPaintSettings({ color })}
+                                className={`w-6 h-6 rounded border-2 transition-all hover:scale-110 ${
+                                  state.paintSettings.color === color
+                                    ? 'border-blue-400 ring-1 ring-blue-400'
+                                    : 'border-slate-600 hover:border-slate-400'
+                                }`}
+                                style={{ backgroundColor: color }}
+                                title={color}
+                              />
+                            ))}
+                          </div>
+                          
+                          {/* Hex Input and Eyedropper */}
+                          <div className="flex items-center gap-2 mb-2">
+                            <label className="text-xs text-slate-400">Hex:</label>
                             <input
-                              type="color"
+                              type="text"
                               value={state.paintSettings.color}
-                              onChange={(e) => setPaintSettings({ color: e.target.value })}
-                              className="w-10 h-10 rounded cursor-pointer border-2 border-slate-600"
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                // Validate hex color format
+                                if (/^#[0-9A-Fa-f]{0,6}$/.test(value)) {
+                                  if (value.length === 7) {
+                                    setPaintSettings({ color: value.toUpperCase() });
+                                  }
+                                }
+                              }}
+                              onBlur={(e) => {
+                                const value = e.target.value;
+                                // Ensure valid hex on blur
+                                if (!/^#[0-9A-Fa-f]{6}$/.test(value)) {
+                                  e.target.value = state.paintSettings.color;
+                                }
+                              }}
+                              className="flex-1 px-2 py-1 bg-slate-700 border border-slate-600 rounded text-slate-200 text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              placeholder="#000000"
+                              maxLength={7}
                             />
-                            <span className="text-xs text-slate-400 font-mono">{state.paintSettings.color}</span>
+                            <button
+                              onClick={async () => {
+                                if ('EyeDropper' in window) {
+                                  try {
+                                    const eyeDropper = new (window as any).EyeDropper();
+                                    const result = await eyeDropper.open();
+                                    setPaintSettings({ color: result.sRGBHex.toUpperCase() });
+                                  } catch (e) {
+                                    // User cancelled or error
+                                  }
+                                } else {
+                                  alert('Eyedropper not supported in this browser. Try Chrome, Edge, or Opera.');
+                                }
+                              }}
+                              className="p-2 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded transition-colors"
+                              title="Pick color from screen"
+                            >
+                              <svg className="w-4 h-4 text-slate-300" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M19.35 11.72l-3.07-3.07 1.41-1.41a1 1 0 000-1.42L15.12 3.3a1 1 0 00-1.42 0l-1.41 1.41-1.42-1.41a1 1 0 00-1.41 0L6.39 6.37a1 1 0 000 1.42l1.42 1.41L4.73 12.3a3 3 0 00-.88 2.12v3.17a1 1 0 001 1h3.17a3 3 0 002.12-.88l3.17-3.17 1.41 1.42a1 1 0 001.42 0l3.07-3.07a1 1 0 00.14-1.17zM9 17a1 1 0 01-.29.71l-2.83 2.83-.71-.71 2.83-2.83A1 1 0 019 17z"/>
+                              </svg>
+                            </button>
                           </div>
                         </div>
                       )}
@@ -488,18 +597,105 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
               <div className="w-px h-6 bg-slate-700" />
 
-              <div className="flex items-center gap-2">
-                <label className="text-xs font-medium text-slate-400">Color:</label>
-                <input
-                  type="color"
-                  value={textElement.color}
-                  onChange={(e) => updateElement(state.selectedId!, { color: e.target.value })}
-                  className="w-10 h-8 border-2 border-slate-600 rounded cursor-pointer"
-                />
-                <span className="text-xs text-slate-400 font-mono">{textElement.color}</span>
+              <div className="relative">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium text-slate-400">Color:</label>
+                  <button
+                    onClick={() => setShowTextColorPicker(!showTextColorPicker)}
+                    className="w-12 h-8 border-2 border-slate-600 rounded cursor-pointer"
+                    style={{ backgroundColor: textElement.color }}
+                  />
+                  <span className="text-xs text-slate-400 font-mono">{textElement.color}</span>
+                </div>
+                
+                {/* Color Picker Dropdown */}
+                {showTextColorPicker && (
+                  <div className="absolute top-full left-0 mt-2 bg-slate-800 border-2 border-slate-600 rounded-lg shadow-2xl p-4 z-50 w-72">
+                    {/* Color Preview */}
+                    <div 
+                      className="w-full h-12 rounded border-2 border-slate-600 mb-3"
+                      style={{ backgroundColor: textElement.color }}
+                    />
+                    
+                    {/* Preset Colors Grid */}
+                    <div className="grid grid-cols-8 gap-1.5 mb-3">
+                      {['#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF',
+                        '#FFA500', '#800080', '#008000', '#FFC0CB', '#A52A2A', '#808080', '#FFD700', '#4B0082'].map((color) => (
+                        <button
+                          key={color}
+                          onClick={() => updateElement(state.selectedId!, { color })}
+                          className={`w-7 h-7 rounded border-2 transition-all hover:scale-110 ${
+                            textElement.color === color
+                              ? 'border-blue-400 ring-1 ring-blue-400'
+                              : 'border-slate-600 hover:border-slate-400'
+                          }`}
+                          style={{ backgroundColor: color }}
+                          title={color}
+                        />
+                      ))}
+                    </div>
+                    
+                    {/* Hex Input and Eyedropper */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <label className="text-xs text-slate-400">Hex:</label>
+                      <input
+                        type="text"
+                        value={textElement.color}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          // Validate hex color format
+                          if (/^#[0-9A-Fa-f]{0,6}$/.test(value)) {
+                            if (value.length === 7) {
+                              updateElement(state.selectedId!, { color: value.toUpperCase() });
+                            }
+                          }
+                        }}
+                        onBlur={(e) => {
+                          const value = e.target.value;
+                          // Ensure valid hex on blur
+                          if (!/^#[0-9A-Fa-f]{6}$/.test(value)) {
+                            e.target.value = textElement.color;
+                          }
+                        }}
+                        className="flex-1 px-2 py-1 bg-slate-700 border border-slate-600 rounded text-slate-200 text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="#000000"
+                        maxLength={7}
+                      />
+                      <button
+                        onClick={async () => {
+                          if ('EyeDropper' in window) {
+                            try {
+                              const eyeDropper = new (window as any).EyeDropper();
+                              const result = await eyeDropper.open();
+                              updateElement(state.selectedId!, { color: result.sRGBHex.toUpperCase() });
+                            } catch (e) {
+                              // User cancelled or error
+                            }
+                          } else {
+                            alert('Eyedropper not supported in this browser. Try Chrome, Edge, or Opera.');
+                          }
+                        }}
+                        className="p-2 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded transition-colors"
+                        title="Pick color from screen"
+                      >
+                        <svg className="w-4 h-4 text-slate-300" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M19.35 11.72l-3.07-3.07 1.41-1.41a1 1 0 000-1.42L15.12 3.3a1 1 0 00-1.42 0l-1.41 1.41-1.42-1.41a1 1 0 00-1.41 0L6.39 6.37a1 1 0 000 1.42l1.42 1.41L4.73 12.3a3 3 0 00-.88 2.12v3.17a1 1 0 001 1h3.17a3 3 0 002.12-.88l3.17-3.17 1.41 1.42a1 1 0 001.42 0l3.07-3.07a1 1 0 00.14-1.17zM9 17a1 1 0 01-.29.71l-2.83 2.83-.71-.71 2.83-2.83A1 1 0 019 17z"/>
+                        </svg>
+                      </button>
+                    </div>
+                    
+                    {/* Close Button */}
+                    <button
+                      onClick={() => setShowTextColorPicker(false)}
+                      className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors"
+                    >
+                      Done
+                    </button>
+                  </div>
+                )}
               </div>
 
-              <div className="w-px h-6 bg-slate-700" />              <div className="w-px h-6 bg-slate-700" />
+              <div className="w-px h-6 bg-slate-700" />
 
               <div className="flex items-center gap-1">
                 <button

@@ -545,6 +545,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         </Layer>
 
         {/* Selection Transformer - Separate layer so it's not clipped by the mask */}
+        {/* Rendered LAST to ensure it's always visible above all other layers including the license plate frame */}
         <Layer offsetX={-view.x} offsetY={-view.y}>
           <Transformer
             ref={transformerRef}
@@ -566,14 +567,16 @@ export const Canvas: React.FC<CanvasProps> = ({
               'middle-right'
             ]}
             rotateAnchorOffset={30}
-            anchorSize={8 * zoom}
+            anchorSize={10 * zoom}
             anchorStroke="#4285f4"
             anchorFill="#ffffff"
-            anchorStrokeWidth={2}
+            anchorStrokeWidth={2.5}
             borderStroke="#4285f4"
-            borderStrokeWidth={1.5}
+            borderStrokeWidth={2}
+            borderDash={[4, 2]}
             rotateAnchorFill="#4285f4"
             rotateAnchorStroke="#ffffff"
+            keepRatio={false}
           />
         </Layer>
 
