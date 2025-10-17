@@ -70,15 +70,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 }) => {
   const selectedElement = state.elements.find(el => el.id === state.selectedId);
   const isTextElement = selectedElement?.type === 'text';
-  const isImageElement = selectedElement?.type === 'image';
-  const isPaintElement = selectedElement?.type === 'paint';
   const textElement = isTextElement ? selectedElement as TextElement : null;
   const [showPaintSettings, setShowPaintSettings] = useState(false);
 
   const isPaintToolActive = ['brush', 'airbrush', 'spray', 'eraser'].includes(state.activeTool);
-  
-  // Any element can have flip and opacity controls
-  const hasElementControls = selectedElement && (isTextElement || isImageElement || isPaintElement);
 
   return (
     <>
@@ -272,15 +267,20 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
                   {isPaintToolActive && (
                     <>
-                      <div className="mb-2">
-                        <label className="text-xs text-slate-400 block mb-1">Color</label>
-                        <input
-                          type="color"
-                          value={state.paintSettings.color}
-                          onChange={(e) => setPaintSettings({ color: e.target.value })}
-                          className="w-full h-8 rounded cursor-pointer"
-                        />
-                      </div>
+                      {state.activeTool !== 'eraser' && (
+                        <div className="mb-2">
+                          <label className="text-xs text-slate-400 block mb-1">Color</label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="color"
+                              value={state.paintSettings.color}
+                              onChange={(e) => setPaintSettings({ color: e.target.value })}
+                              className="w-10 h-10 rounded cursor-pointer border-2 border-slate-600"
+                            />
+                            <span className="text-xs text-slate-400 font-mono">{state.paintSettings.color}</span>
+                          </div>
+                        </div>
+                      )}
                       
                       <div>
                         <label className="text-xs text-slate-400 block mb-1">
@@ -496,9 +496,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   onChange={(e) => updateElement(state.selectedId!, { color: e.target.value })}
                   className="w-10 h-8 border-2 border-slate-600 rounded cursor-pointer"
                 />
+                <span className="text-xs text-slate-400 font-mono">{textElement.color}</span>
               </div>
 
-              <div className="w-px h-6 bg-slate-700" />
+              <div className="w-px h-6 bg-slate-700" />              <div className="w-px h-6 bg-slate-700" />
 
               <div className="flex items-center gap-1">
                 <button
@@ -573,100 +574,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 >
                   <FlipVertical className="w-4 h-4" />
                 </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Element Controls Bar (appears for Image and Paint elements) */}
-        {hasElementControls && !isTextElement && (
-          <div className="px-4 py-2 bg-slate-800/50 backdrop-blur-sm border-t border-slate-700">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <span className="text-sm font-medium text-slate-400">
-                  {isImageElement ? '🖼️ Image' : isPaintElement ? '🎨 Paint' : 'Element'} Controls
-                </span>
-
-                {/* Flip Controls */}
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => flipHorizontal(state.selectedId!)}
-                    className={`p-2 rounded ${
-                      selectedElement?.flippedH
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                    }`}
-                    title="Flip Horizontal"
-                  >
-                    <FlipHorizontal className="w-4 h-4" />
-                  </button>
-
-                  <button
-                    onClick={() => flipVertical(state.selectedId!)}
-                    className={`p-2 rounded ${
-                      selectedElement?.flippedV
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                    }`}
-                    title="Flip Vertical"
-                  >
-                    <FlipVertical className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="w-px h-6 bg-slate-700" />
-
-                {/* Opacity Control */}
-                <div className="flex items-center gap-3">
-                  <label className="text-xs font-medium text-slate-400">
-                    Opacity: {Math.round((selectedElement?.opacity ?? 1) * 100)}%
-                  </label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={Math.round((selectedElement?.opacity ?? 1) * 100)}
-                    onChange={(e) => updateElement(state.selectedId!, { opacity: parseInt(e.target.value) / 100 })}
-                    className="w-32"
-                  />
-                </div>
-              </div>
-
-              {/* Delete Button */}
-              <button
-                onClick={() => {
-                  if (confirm('Delete this element?')) {
-                    deleteElement(state.selectedId!);
-                  }
-                }}
-                className="p-2 bg-red-500 hover:bg-red-600 text-white rounded transition-all"
-                title="Delete Element"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Enhanced Element Controls for Text (includes all text formatting + flip & opacity) */}
-        {hasElementControls && isTextElement && (
-          <div className="px-4 py-2 bg-slate-800/50 backdrop-blur-sm border-t border-slate-700">
-            <div className="flex items-center gap-4">
-              <span className="text-sm font-medium text-slate-400">Additional Controls</span>
-              
-              {/* Opacity Control */}
-              <div className="flex items-center gap-3">
-                <label className="text-xs font-medium text-slate-400">
-                  Opacity: {Math.round((selectedElement?.opacity ?? 1) * 100)}%
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={Math.round((selectedElement?.opacity ?? 1) * 100)}
-                  onChange={(e) => updateElement(state.selectedId!, { opacity: parseInt(e.target.value) / 100 })}
-                  className="w-32"
-                />
               </div>
             </div>
           </div>

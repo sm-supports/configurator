@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layers, Eye, Trash2, Copy, MoveUp, MoveDown } from 'lucide-react';
+import { Layers, Eye, Trash2, Copy, MoveUp, MoveDown, ChevronsUp, ChevronsDown } from 'lucide-react';
 import { EditorState, Element } from '../../core/types';
 import { TextElement } from '@/types';
 
@@ -116,7 +116,7 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
           </div>
           
           <div className="space-y-1">
-            {sortedElements.map((element) => (
+            {sortedElements.map((element, index) => (
               <div
                 key={element.id}
                 className={`flex items-center justify-between p-2 rounded-md text-sm transition-colors cursor-pointer ${
@@ -132,6 +132,21 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
                 </div>
                 
                 <div className="flex items-center space-x-1 ml-2">
+                  {/* Move to top */}
+                  {moveElementToFront && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        moveElementToFront(element.id);
+                      }}
+                      className="p-1 hover:bg-blue-50 rounded transition-colors group"
+                      title="Move to Top"
+                      disabled={index === 0}
+                    >
+                      <ChevronsUp className="w-4 h-4 text-gray-500 group-hover:text-blue-600 group-disabled:opacity-30" />
+                    </button>
+                  )}
+
                   {/* Move up one step */}
                   {moveElementUp && (
                     <button
@@ -139,10 +154,11 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
                         e.stopPropagation();
                         moveElementUp(element.id);
                       }}
-                      className="p-1 hover:bg-gray-200 rounded transition-colors"
-                      title="Move up one step"
+                      className="p-1 hover:bg-gray-100 rounded transition-colors group"
+                      title="Move Up"
+                      disabled={index === 0}
                     >
-                      <MoveUp className="w-3 h-3 text-gray-600" />
+                      <MoveUp className="w-3.5 h-3.5 text-gray-500 group-hover:text-gray-700 group-disabled:opacity-30" />
                     </button>
                   )}
 
@@ -153,12 +169,31 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
                         e.stopPropagation();
                         moveElementDown(element.id);
                       }}
-                      className="p-1 hover:bg-gray-200 rounded transition-colors"
-                      title="Move down one step"
+                      className="p-1 hover:bg-gray-100 rounded transition-colors group"
+                      title="Move Down"
+                      disabled={index === sortedElements.length - 1}
                     >
-                      <MoveDown className="w-3 h-3 text-gray-600" />
+                      <MoveDown className="w-3.5 h-3.5 text-gray-500 group-hover:text-gray-700 group-disabled:opacity-30" />
                     </button>
                   )}
+
+                  {/* Move to bottom */}
+                  {moveElementToBack && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        moveElementToBack(element.id);
+                      }}
+                      className="p-1 hover:bg-blue-50 rounded transition-colors group"
+                      title="Move to Bottom"
+                      disabled={index === sortedElements.length - 1}
+                    >
+                      <ChevronsDown className="w-4 h-4 text-gray-500 group-hover:text-blue-600 group-disabled:opacity-30" />
+                    </button>
+                  )}
+
+                  {/* Divider */}
+                  <div className="w-px h-4 bg-gray-300 mx-1" />
 
                   {/* Duplicate */}
                   {duplicateElement && (
@@ -167,10 +202,10 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
                         e.stopPropagation();
                         duplicateElement(element.id);
                       }}
-                      className="p-1 hover:bg-gray-200 rounded transition-colors"
-                      title="Duplicate element"
+                      className="p-1 hover:bg-green-50 rounded transition-colors group"
+                      title="Duplicate"
                     >
-                      <Copy className="w-3 h-3 text-gray-600" />
+                      <Copy className="w-3.5 h-3.5 text-gray-500 group-hover:text-green-600" />
                     </button>
                   )}
 
@@ -182,10 +217,10 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
                         deleteElement(element.id);
                       }
                     }}
-                    className="p-1 hover:bg-red-100 rounded transition-colors"
-                    title="Delete element"
+                    className="p-1 hover:bg-red-50 rounded transition-colors group"
+                    title="Delete"
                   >
-                    <Trash2 className="w-3 h-3 text-red-600" />
+                    <Trash2 className="w-3.5 h-3.5 text-gray-500 group-hover:text-red-600" />
                   </button>
                 </div>
               </div>

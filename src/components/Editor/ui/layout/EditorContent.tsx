@@ -1,5 +1,6 @@
 import React from 'react';
 import { Canvas } from '../../canvas/Canvas';
+import { ZoomControls } from '../ZoomControls';
 import type Konva from 'konva';
 import { PlateTemplate } from '@/types';
 import { EditorState, Element } from '../../core/types';
@@ -68,12 +69,9 @@ export const EditorContent: React.FC<EditorContentProps> = ({
           finishPainting={finishPainting}
           eraseAtPoint={eraseAtPoint}
         />
-      </div>
-
-      {/* Design info */}
-      <div className="mt-4 text-center text-sm text-gray-500">
-        <p>{template.name} • {template.width_px} × {template.height_px} px</p>
-        <p>{state.elements.length} element{state.elements.length !== 1 ? 's' : ''}</p>
+        
+        {/* Zoom Controls */}
+        <ZoomControls />
       </div>
     </div>
   );

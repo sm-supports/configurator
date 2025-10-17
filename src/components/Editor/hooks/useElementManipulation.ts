@@ -24,13 +24,20 @@ export const useElementManipulation = (
     const defaultFontFamily = vehiclePlateFonts[0].value;
     const defaultFontWeight = 'normal';
     const measured = measureText(defaultText, defaultFontSize, defaultFontFamily, defaultFontWeight, 'normal');
-    const { x: randX, y: randY } = computeSpawnPosition({ width: measured.width, height: measured.height }, template, state.elements, nextRand);
+    
+    // Position text at the very top edge of the canvas with random horizontal position
+    const margin = 10;
+    const minX = margin;
+    const maxX = template.width_px - measured.width - margin;
+    const randomX = minX + (nextRand() * (maxX - minX));
+    const topY = -50; // Above the origin to position higher
+    
     const newText: TextElement = {
       id: uuidv4(),
       type: 'text',
       text: defaultText,
-      x: randX,
-      y: randY,
+      x: randomX,
+      y: topY,
       width: Math.max(50, measured.width),
       height: Math.max(24, measured.height),
       fontSize: defaultFontSize,
@@ -38,14 +45,13 @@ export const useElementManipulation = (
       fontWeight: defaultFontWeight,
       fontStyle: 'normal',
       textDecoration: 'none',
-      color: '#ffffff',
+      color: '#FF0000',
       textAlign: 'left',
       zIndex: state.elements.length,
       visible: true,
       locked: false,
       flippedH: false,
-      flippedV: false,
-      opacity: 1
+      flippedV: false
     };
 
     setState(prev => {
@@ -53,9 +59,7 @@ export const useElementManipulation = (
       return {
         ...prev,
         elements: [...prev.elements, newText],
-        selectedId: newText.id,
-        // Deselect paint brush when adding text
-        activeTool: ['brush', 'airbrush', 'spray', 'eraser'].includes(prev.activeTool) ? 'select' : prev.activeTool
+        selectedId: newText.id
       };
     });
   }, [state.elements, state.activeLayer, pushHistory, template, nextRand, vehiclePlateFonts, setState]);
@@ -104,8 +108,7 @@ export const useElementManipulation = (
           visible: true,
           locked: false,
           flippedH: false,
-          flippedV: false,
-          opacity: 1
+          flippedV: false
         };
 
         setState(prev => {
@@ -123,20 +126,7 @@ export const useElementManipulation = (
   }, [state.elements.length, state.activeLayer, pushHistory, template.width_px, template.height_px, setState]);
 
   const selectElement = useCallback((id: string) => {
-    setState(prev => {
-      // Find the element being selected
-      const element = prev.elements.find(el => el.id === id);
-      const isPaintToolActive = ['brush', 'airbrush', 'spray', 'eraser'].includes(prev.activeTool);
-      
-      // Deactivate paint brush when selecting any element (text, image, or paint) from layers
-      const shouldDeactivatePaint = element && isPaintToolActive;
-      
-      return {
-        ...prev,
-        selectedId: id,
-        activeTool: shouldDeactivatePaint ? 'select' : prev.activeTool
-      };
-    });
+    setState(prev => ({ ...prev, selectedId: id }));
   }, [setState]);
 
   const updateElement = useCallback((id: string, updates: Partial<Element>) => {
@@ -244,6 +234,7 @@ export const useElementManipulation = (
 
   const startPainting = useCallback((x: number, y: number, pressure?: number) => {
     // Coordinates are already in canvas space (divided by zoom in Canvas.tsx)
+    console.log('[startPainting] Starting at canvas coords:', x, y);
     const point: PaintPoint = {
       x: x,
       y: y,
@@ -281,6 +272,10 @@ export const useElementManipulation = (
       setState(prev => ({ ...prev, isPainting: false, currentPaintStroke: null }));
       return;
     }
+
+    console.log('[finishPainting] Starting with', state.currentPaintStroke.length, 'points');
+    console.log('[finishPainting] First point:', state.currentPaintStroke[0]);
+    console.log('[finishPainting] Last point:', state.currentPaintStroke[state.currentPaintStroke.length - 1]);
 
     pushHistory(state);
 
@@ -363,12 +358,17 @@ export const useElementManipulation = (
     const maxX = Math.max(...xs);
     const maxY = Math.max(...ys);
 
+    console.log('[finishPainting] Bounding box:', { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY });
+
     // Normalize points relative to the element's position
     const normalizedPoints = processedPoints.map(point => ({
       ...point,
       x: point.x - minX,
       y: point.y - minY
     }));
+
+    console.log('[finishPainting] First normalized point:', normalizedPoints[0]);
+    console.log('[finishPainting] Element position:', { x: minX, y: minY });
 
     const newPaintElement: PaintElement = {
       id: uuidv4(),
@@ -387,6 +387,8 @@ export const useElementManipulation = (
       locked: false,
       visible: true
     };
+
+    console.log('[finishPainting] Created paint element:', newPaintElement.id, 'at', newPaintElement.x, newPaintElement.y);
 
     setState(prev => ({
       ...prev,

@@ -280,8 +280,7 @@ export class EditorImageService {
         visible: true,
         locked: false,
         flippedH: false,
-        flippedV: false,
-        opacity: 1
+        flippedV: false
       };
 
       return element;
