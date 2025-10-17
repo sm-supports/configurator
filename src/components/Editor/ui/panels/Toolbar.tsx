@@ -88,7 +88,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const isMinZoom = zoom <= 0.1;
   const isMaxZoom = zoom >= 3;
 
-  const isMac = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform);
+  const isMac = typeof navigator !== 'undefined' && /mac/i.test(navigator.userAgent);
   const modKey = isMac ? '⌘' : 'Ctrl';
 
   return (
@@ -347,22 +347,23 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                               type="text"
                               value={state.paintSettings.color}
                               onChange={(e) => {
-                                const value = e.target.value;
-                                // Validate hex color format
-                                if (/^#[0-9A-Fa-f]{0,6}$/.test(value)) {
-                                  if (value.length === 7) {
-                                    setPaintSettings({ color: value.toUpperCase() });
-                                  }
+                                const value = e.target.value.toUpperCase();
+                                // Only allow valid hex characters
+                                if (/^#[0-9A-F]{0,6}$/.test(value)) {
+                                  setPaintSettings({ color: value });
                                 }
                               }}
                               onBlur={(e) => {
                                 const value = e.target.value;
-                                // Ensure valid hex on blur
-                                if (!/^#[0-9A-Fa-f]{6}$/.test(value)) {
-                                  e.target.value = state.paintSettings.color;
+                                // Pad incomplete hex codes with zeros on blur
+                                if (value.length > 1 && value.length < 7) {
+                                  const padded = value.padEnd(7, '0');
+                                  setPaintSettings({ color: padded });
+                                } else if (!/^#[0-9A-F]{6}$/.test(value)) {
+                                  setPaintSettings({ color: '#000000' });
                                 }
                               }}
-                              className="flex-1 px-2 py-1 bg-slate-700 border border-slate-600 rounded text-slate-200 text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="flex-1 px-2 py-1 bg-slate-700 border border-slate-600 rounded text-slate-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
                               placeholder="#000000"
                               maxLength={7}
                             />
@@ -370,10 +371,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                               onClick={async () => {
                                 if ('EyeDropper' in window) {
                                   try {
+                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                     const eyeDropper = new (window as any).EyeDropper();
                                     const result = await eyeDropper.open();
                                     setPaintSettings({ color: result.sRGBHex.toUpperCase() });
-                                  } catch (e) {
+                                  } catch {
                                     // User cancelled or error
                                   }
                                 } else {
@@ -665,10 +667,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                         onClick={async () => {
                           if ('EyeDropper' in window) {
                             try {
+                              // eslint-disable-next-line @typescript-eslint/no-explicit-any
                               const eyeDropper = new (window as any).EyeDropper();
                               const result = await eyeDropper.open();
                               updateElement(state.selectedId!, { color: result.sRGBHex.toUpperCase() });
-                            } catch (e) {
+                            } catch {
                               // User cancelled or error
                             }
                           } else {
