@@ -70,6 +70,7 @@ export interface EditorContextValue {
   toggleLayer: (layer: 'base' | 'licenseplate') => void;
   finishTextEdit: (save?: boolean, reselect?: boolean) => void;
   startTextEdit: (id: string) => void;
+  changeFrameSize: (size: 'small' | 'std' | 'xl') => Promise<void>;
   
   // Paint tool operations
   setActiveTool: (tool: ToolType) => void;
@@ -156,7 +157,8 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
       opacity: 1.0
     },
     isPainting: false,
-    currentPaintStroke: null
+    currentPaintStroke: null,
+    frameSize: 'small'
   });
 
   // UI state
@@ -232,7 +234,8 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
   const { 
     imageService, 
     getBackgroundImage, 
-    getFrameImage 
+    getFrameImage,
+    changeFrameSize: changeFrameSizeService
   } = useEditorImageService(template, onImageLoad);
 
   // Update images when service loads them
@@ -255,6 +258,12 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
     // This function can be used to set editing position if needed
     // Currently just a placeholder to satisfy the Toolbar component
   }, []);
+
+  // Frame size change function
+  const changeFrameSize = useCallback(async (size: 'small' | 'std' | 'xl') => {
+    setState(prev => ({ ...prev, frameSize: size }));
+    await changeFrameSizeService(size);
+  }, [changeFrameSizeService]);
 
   // Save design function
   const handleSaveDesign = useCallback(async () => {
@@ -363,6 +372,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
     toggleLayer,
     finishTextEdit,
     startTextEdit,
+    changeFrameSize,
     
     // Paint tool operations
     setActiveTool,
@@ -394,7 +404,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
     undo, redo, canUndo, canRedo, pushHistory,
     zoom, view, zoomIn, zoomOut, resetZoom, bumpOverlay,
     addText, addImage, selectElement, updateElement, deleteElement,
-    flipHorizontal, flipVertical, toggleLayer, finishTextEdit, startTextEdit,
+    flipHorizontal, flipVertical, toggleLayer, finishTextEdit, startTextEdit, changeFrameSize,
     setActiveTool, setPaintSettings, startPainting, addPaintPoint, finishPainting, eraseAtPoint,
     setShapeSettings, addShape,
     handleSaveDesign, handleDownload, setEditingPos,

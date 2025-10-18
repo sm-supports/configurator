@@ -14,6 +14,7 @@ export class EditorImageService {
   private bgImage: HTMLImageElement | null = null;
   private frameImage: HTMLImageElement | null = null;
   private onImageLoad?: (type: 'background' | 'frame', image: HTMLImageElement) => void;
+  private currentFrameSize: 'small' | 'std' | 'xl' = 'small';
 
   constructor(template: PlateTemplate, onImageLoad?: (type: 'background' | 'frame', image: HTMLImageElement) => void) {
     this.template = template;
@@ -61,7 +62,7 @@ export class EditorImageService {
 
     // Load the license plate frame image
     try {
-      const frameUrl = '/license-plate-frame.png';
+      const frameUrl = this.getFrameUrl(this.currentFrameSize);
       const frameImg = await this.loadImage(frameUrl);
       if (!frameImg) {
         throw new Error('Frame image failed to load');
@@ -70,7 +71,7 @@ export class EditorImageService {
       this.frameImage = frameImg;
       this.onImageLoad?.('frame', frameImg);
     } catch (error) {
-      const errorMessage = `Failed to load frame image from /license-plate-frame.png: ${
+      const errorMessage = `Failed to load frame image: ${
         error instanceof Error ? error.message : 'Image failed to load'
       }`;
       console.warn(errorMessage); // Changed from console.error to console.warn
@@ -444,6 +445,39 @@ export class EditorImageService {
     return this.frameImage;
   }
 
+  private getFrameUrl(size: 'small' | 'std' | 'xl'): string {
+    switch (size) {
+      case 'small':
+        return '/license-plate-frame.png';
+      case 'std':
+        return '/license-plate-frame2.svg';
+      case 'xl':
+        return '/license-plate-frame3.svg';
+      default:
+        return '/license-plate-frame.png';
+    }
+  }
+
+  async changeFrameSize(size: 'small' | 'std' | 'xl'): Promise<void> {
+    this.currentFrameSize = size;
+    try {
+      const frameUrl = this.getFrameUrl(size);
+      const frameImg = await this.loadImage(frameUrl);
+      if (!frameImg) {
+        throw new Error('Frame image failed to load');
+      }
+
+      this.frameImage = frameImg;
+      this.onImageLoad?.('frame', frameImg);
+    } catch (error) {
+      const errorMessage = `Failed to load frame image: ${
+        error instanceof Error ? error.message : 'Image failed to load'
+      }`;
+      console.warn(errorMessage);
+      this.frameImage = null;
+    }
+  }
+
   async updateTemplate(newTemplate: PlateTemplate): Promise<void> {
     try {
       // Validate new template
@@ -779,11 +813,19 @@ export const useEditorImageService = (
     [imageService]
   );
 
+  const changeFrameSize = useCallback(
+    async (size: 'small' | 'std' | 'xl') => {
+      await imageService?.changeFrameSize(size);
+    },
+    [imageService]
+  );
+
   return {
     imageService,
     processUserImage,
     validateImageFile,
     getBackgroundImage: () => imageService?.getBackgroundImage() || null,
-    getFrameImage: () => imageService?.getFrameImage() || null
+    getFrameImage: () => imageService?.getFrameImage() || null,
+    changeFrameSize
   };
 };

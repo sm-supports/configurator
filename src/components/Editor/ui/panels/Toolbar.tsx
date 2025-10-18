@@ -43,6 +43,7 @@ interface ToolbarProps {
   zoomIn: () => void;
   zoomOut: () => void;
   resetZoom: () => void;
+  changeFrameSize: (size: 'small' | 'std' | 'xl') => Promise<void>;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({
@@ -79,6 +80,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   zoomIn,
   zoomOut,
   resetZoom,
+  changeFrameSize,
 }) => {
   const selectedElement = state.elements.find(el => el.id === state.selectedId);
   const isTextElement = selectedElement?.type === 'text';
@@ -87,7 +89,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const shapeElement = isShapeElement ? selectedElement as ShapeElement : null;
   const [showTextColorPicker, setShowTextColorPicker] = useState(false);
   const [showFontDropdown, setShowFontDropdown] = useState(false);
+  const [showFrameSizeDropdown, setShowFrameSizeDropdown] = useState(false);
   const fontDropdownRef = useRef<HTMLDivElement>(null);
+  const frameSizeDropdownRef = useRef<HTMLDivElement>(null);
 
   const isPaintToolActive = ['brush', 'airbrush', 'spray', 'eraser'].includes(state.activeTool);
   const isShapeToolActive = state.activeTool === 'shape';
@@ -112,6 +116,20 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [showFontDropdown]);
+
+  // Close frame size dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (frameSizeDropdownRef.current && !frameSizeDropdownRef.current.contains(event.target as Node)) {
+        setShowFrameSizeDropdown(false);
+      }
+    }
+
+    if (showFrameSizeDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showFrameSizeDropdown]);
 
   return (
     <>
@@ -210,6 +228,60 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               }`}>
                 Plate
               </span>
+
+              <div className="w-px h-6 bg-slate-700 ml-1" />
+
+              {/* Frame Size Dropdown */}
+              <div className="relative" ref={frameSizeDropdownRef}>
+                <button
+                  onClick={() => setShowFrameSizeDropdown(!showFrameSizeDropdown)}
+                  className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-700 rounded transition-all"
+                  title="Change License Plate Frame Size"
+                >
+                  <span>
+                    {state.frameSize === 'small' ? 'Small' : state.frameSize === 'std' ? 'Std' : 'XL'}
+                  </span>
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+
+                {showFrameSizeDropdown && (
+                  <div className="absolute top-full left-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden z-50 min-w-[120px]">
+                    <button
+                      onClick={async () => {
+                        await changeFrameSize('small');
+                        setShowFrameSizeDropdown(false);
+                      }}
+                      className={`w-full px-3 py-2 text-left text-xs hover:bg-slate-700 transition-colors ${
+                        state.frameSize === 'small' ? 'bg-blue-500/20 text-blue-400' : 'text-slate-300'
+                      }`}
+                    >
+                      Small
+                    </button>
+                    <button
+                      onClick={async () => {
+                        await changeFrameSize('std');
+                        setShowFrameSizeDropdown(false);
+                      }}
+                      className={`w-full px-3 py-2 text-left text-xs hover:bg-slate-700 transition-colors ${
+                        state.frameSize === 'std' ? 'bg-blue-500/20 text-blue-400' : 'text-slate-300'
+                      }`}
+                    >
+                      Std
+                    </button>
+                    <button
+                      onClick={async () => {
+                        await changeFrameSize('xl');
+                        setShowFrameSizeDropdown(false);
+                      }}
+                      className={`w-full px-3 py-2 text-left text-xs hover:bg-slate-700 transition-colors ${
+                        state.frameSize === 'xl' ? 'bg-blue-500/20 text-blue-400' : 'text-slate-300'
+                      }`}
+                    >
+                      XL
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -274,7 +346,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 className={`p-2 rounded-md transition-all shadow-sm ${
                   isShapeToolActive
                     ? 'bg-purple-500 hover:bg-purple-600 text-white'
-                    : 'bg-purple-500 hover:bg-purple-600 text-white'
+                    : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
                 }`}
                 title={isShapeToolActive ? "Close Shape Tools" : "Shape Tools"}
               >

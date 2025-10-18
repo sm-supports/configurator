@@ -67,6 +67,7 @@ const EditorCore: React.FC = () => {
     flipHorizontal,
     flipVertical,
     toggleLayer,
+    changeFrameSize,
     
     // Paint tool operations
     setActiveTool,
@@ -132,6 +133,7 @@ const EditorCore: React.FC = () => {
       zoomIn={zoomIn}
       zoomOut={zoomOut}
       resetZoom={resetZoom}
+      changeFrameSize={changeFrameSize}
     />
   );
 

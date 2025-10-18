@@ -80,6 +80,8 @@ export interface PaintSettings {
   brushType: 'brush' | 'airbrush' | 'spray';
 }
 
+export type FrameSize = 'small' | 'std' | 'xl';
+
 export interface EditorState {
   elements: Element[];
   selectedId: string | null;
@@ -90,4 +92,5 @@ export interface EditorState {
   shapeSettings: ShapeSettings;
   isPainting: boolean;
   currentPaintStroke: PaintPoint[] | null;
+  frameSize: FrameSize;
 }
