@@ -104,6 +104,7 @@ export const useElementManipulation = (
           height: targetH,
           originalWidth: img.width,
           originalHeight: img.height,
+          filename: file.name,
           zIndex: state.elements.length,
           visible: true,
           locked: false,

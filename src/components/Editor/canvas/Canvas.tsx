@@ -52,6 +52,31 @@ export const Canvas: React.FC<CanvasProps> = ({
     };
     checkWasm();
   }, []);
+
+  // Global mouseup/touchend listener to stop painting even when released outside canvas
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (state.isPainting) {
+        finishPainting();
+      }
+    };
+
+    const handleGlobalTouchEnd = () => {
+      if (state.isPainting) {
+        finishPainting();
+      }
+    };
+
+    // Add listeners to window to catch events outside canvas
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    window.addEventListener('touchend', handleGlobalTouchEnd);
+
+    return () => {
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+      window.removeEventListener('touchend', handleGlobalTouchEnd);
+    };
+  }, [state.isPainting, finishPainting]);
+
   const lastPaintTimeRef = useRef<number>(0);
   const paintThrottleMs = 16; // ~60 FPS for smooth painting
 
@@ -92,12 +117,42 @@ export const Canvas: React.FC<CanvasProps> = ({
     if (!transformerRef.current) return;
     
     if (state.selectedId) {
-      const node = stageRef.current?.findOne(`#${state.selectedId}`);
-      if (node && node !== selectedNodeRef.current) {
-        selectedNodeRef.current = node;
-        transformerRef.current.nodes([node]);
-        transformerRef.current.getLayer()?.batchDraw();
-      }
+      // Use requestAnimationFrame to ensure the stage is fully rendered
+      // This fixes issues on Windows browsers where elements aren't immediately available
+      requestAnimationFrame(() => {
+        if (!stageRef.current || !transformerRef.current) return;
+        
+        const node = stageRef.current.findOne(`#${state.selectedId}`);
+        
+        if (node && node !== selectedNodeRef.current) {
+          selectedNodeRef.current = node;
+          transformerRef.current.nodes([node]);
+          
+          // Force immediate layer update - critical for Windows browsers
+          const layer = transformerRef.current.getLayer();
+          if (layer) {
+            layer.batchDraw();
+          }
+          
+          // Also force the node's layer to update
+          const nodeLayer = node.getLayer();
+          if (nodeLayer && nodeLayer !== layer) {
+            nodeLayer.batchDraw();
+          }
+        } else if (!node) {
+          // Node not found - try again after a short delay (Windows browser fix)
+          setTimeout(() => {
+            if (!stageRef.current || !transformerRef.current) return;
+            const retryNode = stageRef.current.findOne(`#${state.selectedId}`);
+            if (retryNode) {
+              selectedNodeRef.current = retryNode;
+              transformerRef.current.nodes([retryNode]);
+              transformerRef.current.getLayer()?.batchDraw();
+              retryNode.getLayer()?.batchDraw();
+            }
+          }, 50);
+        }
+      });
     } else {
       selectedNodeRef.current = null;
       transformerRef.current.nodes([]);
@@ -256,7 +311,9 @@ export const Canvas: React.FC<CanvasProps> = ({
                 .filter(element => (element.layer || 'base') === 'base')
                 .map(element => {
                 const elementLayer = element.layer || 'base';
-                const isInteractive = true; // All elements are now editable in both layers
+                // Disable interaction when paint tools are active to allow painting over elements
+                const isPaintToolActive = ['brush', 'airbrush', 'spray', 'eraser'].includes(state.activeTool);
+                const isInteractive = !isPaintToolActive;
                 const isSelected = state.selectedId === element.id;
                 // All elements remain at full opacity
                 const elementOpacity = 1;
@@ -366,7 +423,9 @@ export const Canvas: React.FC<CanvasProps> = ({
                   .filter(element => (element.layer || 'base') === 'base')
                   .map(element => {
                     const elementLayer = element.layer || 'base';
-                    const isInteractive = true;
+                    // Disable interaction when paint tools are active to allow painting over elements
+                    const isPaintToolActive = ['brush', 'airbrush', 'spray', 'eraser'].includes(state.activeTool);
+                    const isInteractive = !isPaintToolActive;
                     const isSelected = state.selectedId === element.id;
                     const elementOpacity = 1;
                     
@@ -437,7 +496,9 @@ export const Canvas: React.FC<CanvasProps> = ({
                   .filter(element => (element.layer || 'base') === 'licenseplate')
                   .map(element => {
                     const elementLayer = element.layer || 'base';
-                    const isInteractive = true; // All elements are now editable in both layers
+                    // Disable interaction when paint tools are active to allow painting over elements
+                    const isPaintToolActive = ['brush', 'airbrush', 'spray', 'eraser'].includes(state.activeTool);
+                    const isInteractive = !isPaintToolActive;
                     const isSelected = state.selectedId === element.id;
                     const elementOpacity = 1;
                     
@@ -577,6 +638,9 @@ export const Canvas: React.FC<CanvasProps> = ({
             rotateAnchorFill="#4285f4"
             rotateAnchorStroke="#ffffff"
             keepRatio={false}
+            ignoreStroke={true}
+            shouldOverdrawWholeArea={true}
+            useSingleNodeRotation={false}
           />
         </Layer>
 

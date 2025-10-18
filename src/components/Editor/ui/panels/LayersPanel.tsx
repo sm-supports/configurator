@@ -1,7 +1,7 @@
 import React from 'react';
 import { Layers, Eye, Trash2, Copy, MoveUp, MoveDown, ChevronsUp, ChevronsDown } from 'lucide-react';
 import { EditorState, Element } from '../../core/types';
-import { TextElement } from '@/types';
+import { TextElement, ImageElement } from '@/types';
 
 export interface LayersPanelProps {
   isOpen: boolean;
@@ -40,7 +40,8 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
       const textEl = element as TextElement;
       return textEl.text?.substring(0, 20) || 'Text';
     } else if (element.type === 'image') {
-      return 'Image';
+      const imageEl = element as ImageElement;
+      return imageEl.filename || 'Image';
     } else if (element.type === 'paint') {
       return 'Paint Stroke';
     }

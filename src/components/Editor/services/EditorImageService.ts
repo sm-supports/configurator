@@ -194,21 +194,6 @@ export class EditorImageService {
         ctx.stroke();
       }
 
-      // Text
-      ctx.fillStyle = '#666666';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      
-      // Main text
-      const fontSize = Math.min(width, height) * 0.08;
-      ctx.font = `bold ${fontSize}px Arial, sans-serif`;
-      ctx.fillText(text, width / 2, height / 2 - fontSize * 0.5);
-      
-      // Sub text
-      ctx.font = `${fontSize * 0.6}px Arial, sans-serif`;
-      ctx.fillStyle = '#999999';
-      ctx.fillText('Placeholder Template', width / 2, height / 2 + fontSize * 0.8);
-
       // Convert canvas to image
       const img = new Image();
       img.src = canvas.toDataURL('image/png');
@@ -276,6 +261,7 @@ export class EditorImageService {
         height: targetH,
         originalWidth: img.width,
         originalHeight: img.height,
+        filename: file.name,
         zIndex: 0, // Will be set by the state manager
         visible: true,
         locked: false,

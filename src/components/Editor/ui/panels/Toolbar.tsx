@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Undo2, Redo2, Type, ImagePlus, Trash2, Save, Download, ChevronDown, FlipHorizontal, FlipVertical, 
   Bold, Italic, Underline, Brush, Eraser, Layers, Home, Sparkles, ZoomIn, ZoomOut
@@ -81,6 +81,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const textElement = isTextElement ? selectedElement as TextElement : null;
   const [showPaintSettings, setShowPaintSettings] = useState(false);
   const [showTextColorPicker, setShowTextColorPicker] = useState(false);
+  const [showFontDropdown, setShowFontDropdown] = useState(false);
+  const fontDropdownRef = useRef<HTMLDivElement>(null);
 
   const isPaintToolActive = ['brush', 'airbrush', 'spray', 'eraser'].includes(state.activeTool);
 
@@ -90,6 +92,25 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
   const isMac = typeof navigator !== 'undefined' && /mac/i.test(navigator.userAgent);
   const modKey = isMac ? '⌘' : 'Ctrl';
+
+  // Sync paint settings visibility with active tool
+  useEffect(() => {
+    setShowPaintSettings(isPaintToolActive);
+  }, [isPaintToolActive]);
+
+  // Close font dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (fontDropdownRef.current && !fontDropdownRef.current.contains(event.target as Node)) {
+        setShowFontDropdown(false);
+      }
+    }
+
+    if (showFontDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showFontDropdown]);
 
   return (
     <>
@@ -196,7 +217,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             {/* Add Tools */}
             <div className="flex items-center gap-1 bg-slate-800/50 backdrop-blur-sm rounded-lg p-1 border border-slate-700">
               <button
-                onClick={addText}
+                onClick={() => {
+                  setActiveTool('select');
+                  addText();
+                }}
                 className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md transition-all shadow-sm"
                 title="Add Text"
               >
@@ -210,207 +234,36 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   accept="image/*"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) addImage(file);
+                    if (file) {
+                      setActiveTool('select');
+                      addImage(file);
+                    }
                   }}
                   className="hidden"
                 />
               </label>
+
+              <button
+                onClick={() => {
+                  if (isPaintToolActive) {
+                    setActiveTool('select');
+                  } else {
+                    setActiveTool('brush');
+                    setPaintSettings({ brushType: 'brush' });
+                  }
+                }}
+                className={`p-2 rounded-md transition-all shadow-sm ${
+                  isPaintToolActive
+                    ? 'bg-pink-500 hover:bg-pink-600 text-white'
+                    : 'bg-pink-500 hover:bg-pink-600 text-white'
+                }`}
+                title={isPaintToolActive ? "Close Paint Tools" : "Paint Tools"}
+              >
+                <Brush className="w-4 h-4" />
+              </button>
             </div>
 
             <div className="w-px h-6 bg-slate-700" />
-
-            {/* Paint Tools */}
-            <div className="relative">
-              <button
-                onClick={() => setShowPaintSettings(!showPaintSettings)}
-                className={`p-2 rounded-lg transition-all ${
-                  isPaintToolActive
-                    ? 'bg-purple-500 text-white'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-700'
-                }`}
-                title="Paint Tools"
-              >
-                <Brush className="w-5 h-5" />
-              </button>
-
-              {showPaintSettings && (
-                <div className="absolute top-full right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-2xl z-[100] p-3">
-                  <div className="text-xs font-semibold text-slate-300 mb-2">Paint Tools</div>
-                  
-                  <div className="grid grid-cols-4 gap-1 mb-3">
-                    <button
-                      onClick={() => {
-                        setActiveTool(state.activeTool === 'brush' ? 'select' : 'brush');
-                        setPaintSettings({ brushType: 'brush' });
-                        setShowPaintSettings(false);
-                      }}
-                      className={`p-2 rounded ${
-                        state.activeTool === 'brush'
-                          ? 'bg-purple-500 text-white'
-                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      }`}
-                      title="Brush"
-                    >
-                      <Brush className="w-4 h-4" />
-                    </button>
-                    
-                    <button
-                      onClick={() => {
-                        setActiveTool(state.activeTool === 'airbrush' ? 'select' : 'airbrush');
-                        setPaintSettings({ brushType: 'airbrush' });
-                        setShowPaintSettings(false);
-                      }}
-                      className={`p-2 rounded ${
-                        state.activeTool === 'airbrush'
-                          ? 'bg-purple-500 text-white'
-                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      }`}
-                      title="Airbrush"
-                    >
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                        <circle cx="12" cy="12" r="4" opacity="0.8"/>
-                        <circle cx="12" cy="12" r="7" opacity="0.3"/>
-                      </svg>
-                    </button>
-                    
-                    <button
-                      onClick={() => {
-                        setActiveTool(state.activeTool === 'spray' ? 'select' : 'spray');
-                        setPaintSettings({ brushType: 'spray' });
-                        setShowPaintSettings(false);
-                      }}
-                      className={`p-2 rounded ${
-                        state.activeTool === 'spray'
-                          ? 'bg-purple-500 text-white'
-                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      }`}
-                      title="Spray"
-                    >
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                        <circle cx="8" cy="8" r="1"/><circle cx="16" cy="8" r="1"/>
-                        <circle cx="12" cy="12" r="1"/><circle cx="6" cy="16" r="1"/>
-                        <circle cx="18" cy="16" r="1"/><circle cx="10" cy="18" r="1"/>
-                        <circle cx="14" cy="6" r="1"/>
-                      </svg>
-                    </button>
-                    
-                    <button
-                      onClick={() => {
-                        setActiveTool(state.activeTool === 'eraser' ? 'select' : 'eraser');
-                        setShowPaintSettings(false);
-                      }}
-                      className={`p-2 rounded ${
-                        state.activeTool === 'eraser'
-                          ? 'bg-red-500 text-white'
-                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      }`}
-                      title="Eraser"
-                    >
-                      <Eraser className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  {isPaintToolActive && (
-                    <>
-                      {state.activeTool !== 'eraser' && (
-                        <div className="mb-3">
-                          <label className="text-xs text-slate-400 block mb-2">Color</label>
-                          
-                          {/* Color Preview */}
-                          <div 
-                            className="w-full h-12 rounded border-2 border-slate-600 mb-2"
-                            style={{ backgroundColor: state.paintSettings.color }}
-                          />
-                          
-                          {/* Preset Colors Grid */}
-                          <div className="grid grid-cols-8 gap-1 mb-3">
-                            {['#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF',
-                              '#FFA500', '#800080', '#008000', '#FFC0CB', '#A52A2A', '#808080', '#FFD700', '#4B0082'].map((color) => (
-                              <button
-                                key={color}
-                                onClick={() => setPaintSettings({ color })}
-                                className={`w-6 h-6 rounded border-2 transition-all hover:scale-110 ${
-                                  state.paintSettings.color === color
-                                    ? 'border-blue-400 ring-1 ring-blue-400'
-                                    : 'border-slate-600 hover:border-slate-400'
-                                }`}
-                                style={{ backgroundColor: color }}
-                                title={color}
-                              />
-                            ))}
-                          </div>
-                          
-                          {/* Hex Input and Eyedropper */}
-                          <div className="flex items-center gap-2 mb-2">
-                            <label className="text-xs text-slate-400">Hex:</label>
-                            <input
-                              type="text"
-                              value={state.paintSettings.color}
-                              onChange={(e) => {
-                                const value = e.target.value.toUpperCase();
-                                // Only allow valid hex characters
-                                if (/^#[0-9A-F]{0,6}$/.test(value)) {
-                                  setPaintSettings({ color: value });
-                                }
-                              }}
-                              onBlur={(e) => {
-                                const value = e.target.value;
-                                // Pad incomplete hex codes with zeros on blur
-                                if (value.length > 1 && value.length < 7) {
-                                  const padded = value.padEnd(7, '0');
-                                  setPaintSettings({ color: padded });
-                                } else if (!/^#[0-9A-F]{6}$/.test(value)) {
-                                  setPaintSettings({ color: '#000000' });
-                                }
-                              }}
-                              className="flex-1 px-2 py-1 bg-slate-700 border border-slate-600 rounded text-slate-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              placeholder="#000000"
-                              maxLength={7}
-                            />
-                            <button
-                              onClick={async () => {
-                                if ('EyeDropper' in window) {
-                                  try {
-                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                    const eyeDropper = new (window as any).EyeDropper();
-                                    const result = await eyeDropper.open();
-                                    setPaintSettings({ color: result.sRGBHex.toUpperCase() });
-                                  } catch {
-                                    // User cancelled or error
-                                  }
-                                } else {
-                                  alert('Eyedropper not supported in this browser. Try Chrome, Edge, or Opera.');
-                                }
-                              }}
-                              className="p-2 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded transition-colors"
-                              title="Pick color from screen"
-                            >
-                              <svg className="w-4 h-4 text-slate-300" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M19.35 11.72l-3.07-3.07 1.41-1.41a1 1 0 000-1.42L15.12 3.3a1 1 0 00-1.42 0l-1.41 1.41-1.42-1.41a1 1 0 00-1.41 0L6.39 6.37a1 1 0 000 1.42l1.42 1.41L4.73 12.3a3 3 0 00-.88 2.12v3.17a1 1 0 001 1h3.17a3 3 0 002.12-.88l3.17-3.17 1.41 1.42a1 1 0 001.42 0l3.07-3.07a1 1 0 00.14-1.17zM9 17a1 1 0 01-.29.71l-2.83 2.83-.71-.71 2.83-2.83A1 1 0 019 17z"/>
-                              </svg>
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                      
-                      <div>
-                        <label className="text-xs text-slate-400 block mb-1">
-                          Size: {state.paintSettings.brushSize}px
-                        </label>
-                        <input
-                          type="range"
-                          min="1"
-                          max="50"
-                          value={state.paintSettings.brushSize}
-                          onChange={(e) => setPaintSettings({ brushSize: parseInt(e.target.value) })}
-                          className="w-full"
-                        />
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
 
             <button
               onClick={() => setShowLayersPanel(!showLayersPanel)}
@@ -573,28 +426,66 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
               <div className="w-px h-6 bg-slate-700" />
 
-              <div className="flex items-center gap-2">
-                <label className="text-xs font-medium text-slate-400">Font:</label>
-                <select
-                  value={textElement.fontFamily}
-                  onChange={(e) => {
-                    const newFontFamily = e.target.value;
-                    const measured = measureText(textElement.text, textElement.fontSize, newFontFamily, textElement.fontWeight, textElement.fontStyle);
-                    updateElement(state.selectedId!, { fontFamily: newFontFamily, width: measured.width, height: measured.height });
-                  }}
-                  className="px-2 py-1 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <div className="relative" ref={fontDropdownRef}>
+                <label className="text-xs font-medium text-slate-400 mr-2">Font:</label>
+                <button
+                  onClick={() => setShowFontDropdown(!showFontDropdown)}
+                  className="px-3 py-1.5 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hover:bg-slate-600 transition-colors inline-flex items-center gap-2 min-w-[180px] justify-between"
+                  style={{ fontFamily: textElement.fontFamily }}
                 >
-                  <optgroup label="License Plate Fonts">
-                    {vehiclePlateFonts.map(font => (
-                      <option key={font.value} value={font.value}>{font.name}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Other Fonts">
-                    {generalFonts.map(font => (
-                      <option key={font.value} value={font.value}>{font.name}</option>
-                    ))}
-                  </optgroup>
-                </select>
+                  <span>{vehiclePlateFonts.find(f => f.value === textElement.fontFamily)?.name || generalFonts.find(f => f.value === textElement.fontFamily)?.name || 'Select Font'}</span>
+                  <ChevronDown className="w-4 h-4" />
+                </button>
+                
+                {showFontDropdown && (
+                  <div className="absolute top-full left-0 mt-1 w-64 bg-slate-800 border border-slate-600 rounded-lg shadow-2xl z-50 max-h-96 overflow-y-auto">
+                    {/* License Plate Fonts */}
+                    <div className="p-2 border-b border-slate-700">
+                      <div className="text-xs font-semibold text-slate-400 px-2 py-1">License Plate Fonts</div>
+                      {vehiclePlateFonts.map(font => (
+                        <button
+                          key={font.value}
+                          onClick={() => {
+                            const measured = measureText(textElement.text, textElement.fontSize, font.value, textElement.fontWeight, textElement.fontStyle);
+                            updateElement(state.selectedId!, { fontFamily: font.value, width: measured.width, height: measured.height });
+                            setShowFontDropdown(false);
+                          }}
+                          className={`w-full px-3 py-2 text-left text-sm rounded transition-colors ${
+                            textElement.fontFamily === font.value
+                              ? 'bg-blue-500 text-white'
+                              : 'text-white hover:bg-slate-700'
+                          }`}
+                          style={{ fontFamily: font.value }}
+                        >
+                          {font.name}
+                        </button>
+                      ))}
+                    </div>
+                    
+                    {/* General Fonts */}
+                    <div className="p-2">
+                      <div className="text-xs font-semibold text-slate-400 px-2 py-1">Other Fonts</div>
+                      {generalFonts.map(font => (
+                        <button
+                          key={font.value}
+                          onClick={() => {
+                            const measured = measureText(textElement.text, textElement.fontSize, font.value, textElement.fontWeight, textElement.fontStyle);
+                            updateElement(state.selectedId!, { fontFamily: font.value, width: measured.width, height: measured.height });
+                            setShowFontDropdown(false);
+                          }}
+                          className={`w-full px-3 py-2 text-left text-sm rounded transition-colors ${
+                            textElement.fontFamily === font.value
+                              ? 'bg-blue-500 text-white'
+                              : 'text-white hover:bg-slate-700'
+                          }`}
+                          style={{ fontFamily: font.value }}
+                        >
+                          {font.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="w-px h-6 bg-slate-700" />
@@ -774,6 +665,247 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   <FlipVertical className="w-4 h-4" />
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Paint Toolbar (appears when paint tool is active) */}
+        {isPaintToolActive && (
+          <div className="px-4 py-2 bg-slate-800/50 backdrop-blur-sm border-t border-slate-700">
+            <div className="flex items-center gap-4 flex-wrap">
+              {/* Paint Tool Selection */}
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-medium text-slate-400">Tool:</label>
+                <div className="flex items-center gap-1 bg-slate-700/50 rounded-lg p-1">
+                  <button
+                    onClick={() => {
+                      if (state.activeTool === 'brush') {
+                        setActiveTool('select');
+                      } else {
+                        setActiveTool('brush');
+                        setPaintSettings({ brushType: 'brush' });
+                      }
+                    }}
+                    className={`p-2 rounded transition-all ${
+                      state.activeTool === 'brush'
+                        ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
+                        : 'text-slate-300 hover:bg-slate-600'
+                    }`}
+                    title="Brush"
+                  >
+                    <Brush className="w-4 h-4" />
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      if (state.activeTool === 'airbrush') {
+                        setActiveTool('select');
+                      } else {
+                        setActiveTool('airbrush');
+                        setPaintSettings({ brushType: 'airbrush' });
+                      }
+                    }}
+                    className={`p-2 rounded transition-all ${
+                      state.activeTool === 'airbrush'
+                        ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
+                        : 'text-slate-300 hover:bg-slate-600'
+                    }`}
+                    title="Airbrush"
+                  >
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="4" opacity="0.8"/>
+                      <circle cx="12" cy="12" r="7" opacity="0.3"/>
+                    </svg>
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      if (state.activeTool === 'spray') {
+                        setActiveTool('select');
+                      } else {
+                        setActiveTool('spray');
+                        setPaintSettings({ brushType: 'spray' });
+                      }
+                    }}
+                    className={`p-2 rounded transition-all ${
+                      state.activeTool === 'spray'
+                        ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
+                        : 'text-slate-300 hover:bg-slate-600'
+                    }`}
+                    title="Spray"
+                  >
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                      <circle cx="8" cy="8" r="1"/><circle cx="16" cy="8" r="1"/>
+                      <circle cx="12" cy="12" r="1"/><circle cx="6" cy="16" r="1"/>
+                      <circle cx="18" cy="16" r="1"/><circle cx="10" cy="18" r="1"/>
+                      <circle cx="14" cy="6" r="1"/>
+                    </svg>
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      if (state.activeTool === 'eraser') {
+                        setActiveTool('select');
+                      } else {
+                        setActiveTool('eraser');
+                      }
+                    }}
+                    className={`p-2 rounded transition-all ${
+                      state.activeTool === 'eraser'
+                        ? 'bg-red-500 text-white shadow-lg shadow-red-500/30'
+                        : 'text-slate-300 hover:bg-slate-600'
+                    }`}
+                    title="Eraser"
+                  >
+                    <Eraser className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Color Picker (only show for non-eraser tools) */}
+              {state.activeTool !== 'eraser' && (
+                <>
+                  <div className="w-px h-8 bg-slate-700" />
+                  
+                  <div className="flex items-center gap-2 flex-1 min-w-[400px]">
+                    <label className="text-xs font-medium text-slate-400">Color:</label>
+                    
+                    {/* Color Preview */}
+                    <div 
+                      className="w-10 h-10 rounded-lg border-2 border-slate-600 shadow-inner cursor-pointer hover:border-slate-500 transition-colors"
+                      style={{ backgroundColor: state.paintSettings.color }}
+                      title="Current color"
+                    />
+                    
+                    {/* Preset Colors */}
+                    <div className="flex items-center gap-1">
+                      {['#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF',
+                        '#FFA500', '#800080', '#FFC0CB', '#A52A2A'].map((color) => (
+                        <button
+                          key={color}
+                          onClick={() => setPaintSettings({ color })}
+                          className={`w-7 h-7 rounded-md border-2 transition-all hover:scale-110 ${
+                            state.paintSettings.color === color
+                              ? 'border-blue-400 ring-2 ring-blue-400/50 shadow-lg'
+                              : 'border-slate-600 hover:border-slate-400'
+                          }`}
+                          style={{ backgroundColor: color }}
+                          title={color}
+                        />
+                      ))}
+                    </div>
+                    
+                    {/* Hex Input */}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={state.paintSettings.color}
+                        onChange={(e) => {
+                          const value = e.target.value.toUpperCase();
+                          if (/^#[0-9A-F]{0,6}$/.test(value)) {
+                            setPaintSettings({ color: value });
+                          }
+                        }}
+                        onBlur={(e) => {
+                          const value = e.target.value;
+                          if (value.length > 1 && value.length < 7) {
+                            const padded = value.padEnd(7, '0');
+                            setPaintSettings({ color: padded });
+                          } else if (!/^#[0-9A-F]{6}$/.test(value)) {
+                            setPaintSettings({ color: '#000000' });
+                          }
+                        }}
+                        className="w-24 px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-slate-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="#000000"
+                        maxLength={7}
+                      />
+                      
+                      {/* Eyedropper */}
+                      <button
+                        onClick={async () => {
+                          if ('EyeDropper' in window) {
+                            try {
+                              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                              const eyeDropper = new (window as any).EyeDropper();
+                              const result = await eyeDropper.open();
+                              setPaintSettings({ color: result.sRGBHex.toUpperCase() });
+                            } catch {
+                              // User cancelled or error
+                            }
+                          } else {
+                            alert('Eyedropper not supported in this browser. Try Chrome, Edge, or Opera.');
+                          }
+                        }}
+                        className="p-2 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded transition-colors"
+                        title="Pick color from screen"
+                      >
+                        <svg className="w-4 h-4 text-slate-300" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M19.35 11.72l-3.07-3.07 1.41-1.41a1 1 0 000-1.42L15.12 3.3a1 1 0 00-1.42 0l-1.41 1.41-1.42-1.41a1 1 0 00-1.41 0L6.39 6.37a1 1 0 000 1.42l1.42 1.41L4.73 12.3a3 3 0 00-.88 2.12v3.17a1 1 0 001 1h3.17a3 3 0 002.12-.88l3.17-3.17 1.41 1.42a1 1 0 001.42 0l3.07-3.07a1 1 0 00.14-1.17zM9 17a1 1 0 01-.29.71l-2.83 2.83-.71-.71 2.83-2.83A1 1 0 019 17z"/>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div className="w-px h-8 bg-slate-700" />
+
+              {/* Brush Size */}
+              <div className="flex items-center gap-3 min-w-[280px]">
+                <label className="text-xs font-medium text-slate-400 whitespace-nowrap">
+                  Size: <span className="text-white font-semibold">{state.paintSettings.brushSize}px</span>
+                </label>
+                
+                {/* Dynamic Brush Size Preview */}
+                <div className="flex items-center justify-center w-12 h-12 bg-slate-900/50 rounded-lg border border-slate-600">
+                  <div 
+                    className="rounded-full transition-all duration-150"
+                    style={{
+                      width: `${Math.min(state.paintSettings.brushSize, 40)}px`,
+                      height: `${Math.min(state.paintSettings.brushSize, 40)}px`,
+                      backgroundColor: state.activeTool === 'eraser' ? '#ef4444' : state.paintSettings.color,
+                      opacity: state.activeTool === 'eraser' ? 0.7 : 1,
+                    }}
+                    title={`Preview: ${state.paintSettings.brushSize}px`}
+                  />
+                </div>
+                
+                <input
+                  type="range"
+                  min="1"
+                  max="50"
+                  value={state.paintSettings.brushSize}
+                  onChange={(e) => setPaintSettings({ brushSize: parseInt(e.target.value) })}
+                  className="flex-1 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                  style={{
+                    background: `linear-gradient(to right, rgb(168 85 247) 0%, rgb(168 85 247) ${(state.paintSettings.brushSize / 50) * 100}%, rgb(51 65 85) ${(state.paintSettings.brushSize / 50) * 100}%, rgb(51 65 85) 100%)`
+                  }}
+                />
+              </div>
+
+              {/* Opacity (for future enhancement) */}
+              {state.activeTool !== 'eraser' && (
+                <>
+                  <div className="w-px h-8 bg-slate-700" />
+                  
+                  <div className="flex items-center gap-3 min-w-[180px]">
+                    <label className="text-xs font-medium text-slate-400 whitespace-nowrap">
+                      Opacity: <span className="text-white font-semibold">{Math.round((state.paintSettings.opacity || 1) * 100)}%</span>
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={(state.paintSettings.opacity || 1) * 100}
+                      onChange={(e) => setPaintSettings({ opacity: parseInt(e.target.value) / 100 })}
+                      className="flex-1 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                      style={{
+                        background: `linear-gradient(to right, rgb(168 85 247) 0%, rgb(168 85 247) ${(state.paintSettings.opacity || 1) * 100}%, rgb(51 65 85) ${(state.paintSettings.opacity || 1) * 100}%, rgb(51 65 85) 100%)`
+                      }}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}

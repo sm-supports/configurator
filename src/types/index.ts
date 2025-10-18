@@ -73,6 +73,7 @@ export interface ImageElement extends DesignElement {
   imageUrl: string;
   originalWidth: number;
   originalHeight: number;
+  filename?: string;
 }
 
 export interface EditorState {
