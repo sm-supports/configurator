@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Undo2, Redo2, Type, ImagePlus, Trash2, Save, Download, ChevronDown, FlipHorizontal, FlipVertical, 
-  Bold, Italic, Underline, Brush, Eraser, Layers, Home, Sparkles, ZoomIn, ZoomOut
+  Bold, Italic, Underline, Brush, Eraser, Layers, Home, Sparkles, ZoomIn, ZoomOut, Shapes
 } from 'lucide-react';
 import { PlateTemplate, TextElement } from '@/types';
-import { EditorState, Element, ToolType, PaintSettings } from '../../core/types';
+import { EditorState, Element, ToolType, PaintSettings, ShapeSettings, ShapeElement } from '../../core/types';
 import { vehiclePlateFonts, generalFonts } from '../../core/constants';
 
 interface ToolbarProps {
@@ -37,6 +37,8 @@ interface ToolbarProps {
   flipVertical: (id: string) => void;
   setActiveTool: (tool: ToolType) => void;
   setPaintSettings: (settings: Partial<PaintSettings>) => void;
+  setShapeSettings: (settings: Partial<ShapeSettings>) => void;
+  addShape: (shapeType?: ShapeSettings['shapeType']) => void;
   zoom: number;
   zoomIn: () => void;
   zoomOut: () => void;
@@ -71,6 +73,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   flipVertical,
   setActiveTool,
   setPaintSettings,
+  setShapeSettings,
+  addShape,
   zoom,
   zoomIn,
   zoomOut,
@@ -79,12 +83,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const selectedElement = state.elements.find(el => el.id === state.selectedId);
   const isTextElement = selectedElement?.type === 'text';
   const textElement = isTextElement ? selectedElement as TextElement : null;
-  const [showPaintSettings, setShowPaintSettings] = useState(false);
+  const isShapeElement = selectedElement?.type === 'shape';
+  const shapeElement = isShapeElement ? selectedElement as ShapeElement : null;
   const [showTextColorPicker, setShowTextColorPicker] = useState(false);
   const [showFontDropdown, setShowFontDropdown] = useState(false);
   const fontDropdownRef = useRef<HTMLDivElement>(null);
 
   const isPaintToolActive = ['brush', 'airbrush', 'spray', 'eraser'].includes(state.activeTool);
+  const isShapeToolActive = state.activeTool === 'shape';
 
   const zoomPercentage = Math.round(zoom * 100);
   const isMinZoom = zoom <= 0.1;
@@ -92,11 +98,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
   const isMac = typeof navigator !== 'undefined' && /mac/i.test(navigator.userAgent);
   const modKey = isMac ? '⌘' : 'Ctrl';
-
-  // Sync paint settings visibility with active tool
-  useEffect(() => {
-    setShowPaintSettings(isPaintToolActive);
-  }, [isPaintToolActive]);
 
   // Close font dropdown when clicking outside
   useEffect(() => {
@@ -260,6 +261,24 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 title={isPaintToolActive ? "Close Paint Tools" : "Paint Tools"}
               >
                 <Brush className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={() => {
+                  if (isShapeToolActive) {
+                    setActiveTool('select');
+                  } else {
+                    setActiveTool('shape');
+                  }
+                }}
+                className={`p-2 rounded-md transition-all shadow-sm ${
+                  isShapeToolActive
+                    ? 'bg-purple-500 hover:bg-purple-600 text-white'
+                    : 'bg-purple-500 hover:bg-purple-600 text-white'
+                }`}
+                title={isShapeToolActive ? "Close Shape Tools" : "Shape Tools"}
+              >
+                <Shapes className="w-4 h-4" />
               </button>
             </div>
 
@@ -904,6 +923,292 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                       }}
                     />
                   </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Shape Toolbar (appears when shape tool is active) */}
+        {isShapeToolActive && (
+          <div className="px-4 py-2 bg-slate-800/50 backdrop-blur-sm border-t border-slate-700">
+            <div className="flex items-center gap-4 flex-wrap">
+              {/* Shape Type Selection */}
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-medium text-slate-400">Shape:</label>
+                <div className="flex items-center gap-1 bg-slate-700/50 rounded-lg p-1">
+                  <button
+                    onClick={() => addShape('rectangle')}
+                    className="p-2 rounded transition-all text-slate-300 hover:bg-slate-600 hover:text-white"
+                    title="Add Rectangle"
+                  >
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                      <rect x="4" y="6" width="16" height="12" rx="1"/>
+                    </svg>
+                  </button>
+                  
+                  <button
+                    onClick={() => addShape('circle')}
+                    className="p-2 rounded transition-all text-slate-300 hover:bg-slate-600 hover:text-white"
+                    title="Add Circle"
+                  >
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="8"/>
+                    </svg>
+                  </button>
+                  
+                  <button
+                    onClick={() => addShape('triangle')}
+                    className="p-2 rounded transition-all text-slate-300 hover:bg-slate-600 hover:text-white"
+                    title="Add Triangle"
+                  >
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 4 L20 20 L4 20 Z"/>
+                    </svg>
+                  </button>
+                  
+                  <button
+                    onClick={() => addShape('star')}
+                    className="p-2 rounded transition-all text-slate-300 hover:bg-slate-600 hover:text-white"
+                    title="Add Star"
+                  >
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2 L15 9 L22 10 L17 15 L18 22 L12 18 L6 22 L7 15 L2 10 L9 9 Z"/>
+                    </svg>
+                  </button>
+                  
+                  <button
+                    onClick={() => addShape('hexagon')}
+                    className="p-2 rounded transition-all text-slate-300 hover:bg-slate-600 hover:text-white"
+                    title="Add Hexagon"
+                  >
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2 L20 7 L20 17 L12 22 L4 17 L4 7 Z"/>
+                    </svg>
+                  </button>
+                  
+                  <button
+                    onClick={() => addShape('pentagon')}
+                    className="p-2 rounded transition-all text-slate-300 hover:bg-slate-600 hover:text-white"
+                    title="Add Pentagon"
+                  >
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2 L20 9 L17 20 L7 20 L4 9 Z"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <div className="w-px h-8 bg-slate-700" />
+
+              {/* Fill Type Toggle */}
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-medium text-slate-400">Fill:</label>
+                <div className="flex items-center gap-1 bg-slate-700/50 rounded-lg p-1">
+                  <button
+                    onClick={() => setShapeSettings({ fillType: 'solid' })}
+                    className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                      state.shapeSettings.fillType === 'solid'
+                        ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
+                        : 'text-slate-300 hover:bg-slate-600'
+                    }`}
+                    title="Solid Fill"
+                  >
+                    Solid
+                  </button>
+                  <button
+                    onClick={() => setShapeSettings({ fillType: 'outline' })}
+                    className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                      state.shapeSettings.fillType === 'outline'
+                        ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
+                        : 'text-slate-300 hover:bg-slate-600'
+                    }`}
+                    title="Outline Only"
+                  >
+                    Outline
+                  </button>
+                </div>
+              </div>
+
+              <div className="w-px h-8 bg-slate-700" />
+
+              {/* Fill Color (for solid shapes) */}
+              {state.shapeSettings.fillType === 'solid' && (
+                <>
+                  <div className="flex items-center gap-2 flex-1 min-w-[400px]">
+                    <label className="text-xs font-medium text-slate-400">Fill Color:</label>
+                    
+                    {/* Color Preview */}
+                    <div 
+                      className="w-10 h-10 rounded-lg border-2 border-slate-600 shadow-inner cursor-pointer hover:border-slate-500 transition-colors"
+                      style={{ backgroundColor: isShapeElement && shapeElement ? shapeElement.fillColor : state.shapeSettings.fillColor }}
+                      title="Current fill color"
+                    />
+                    
+                    {/* Preset Colors */}
+                    <div className="flex items-center gap-1">
+                      {['#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899',
+                        '#000000', '#FFFFFF', '#6B7280', '#F3F4F6'].map((color) => (
+                        <button
+                          key={color}
+                          onClick={() => {
+                            setShapeSettings({ fillColor: color });
+                            if (isShapeElement && shapeElement && state.selectedId) {
+                              updateElement(state.selectedId, { fillColor: color });
+                            }
+                          }}
+                          className={`w-7 h-7 rounded-md border-2 transition-all hover:scale-110 ${
+                            (isShapeElement && shapeElement ? shapeElement.fillColor : state.shapeSettings.fillColor) === color
+                              ? 'border-blue-400 ring-2 ring-blue-400/50 shadow-lg'
+                              : 'border-slate-600 hover:border-slate-400'
+                          }`}
+                          style={{ backgroundColor: color }}
+                          title={color}
+                        />
+                      ))}
+                    </div>
+                    
+                    {/* Hex Input */}
+                    <input
+                      type="text"
+                      value={isShapeElement && shapeElement ? shapeElement.fillColor : state.shapeSettings.fillColor}
+                      onChange={(e) => {
+                        const value = e.target.value.toUpperCase();
+                        if (/^#[0-9A-F]{0,6}$/.test(value)) {
+                          setShapeSettings({ fillColor: value });
+                          if (isShapeElement && shapeElement && state.selectedId) {
+                            updateElement(state.selectedId, { fillColor: value });
+                          }
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const value = e.target.value;
+                        if (value.length > 1 && value.length < 7) {
+                          const padded = value.padEnd(7, '0');
+                          setShapeSettings({ fillColor: padded });
+                          if (isShapeElement && shapeElement && state.selectedId) {
+                            updateElement(state.selectedId, { fillColor: padded });
+                          }
+                        } else if (!/^#[0-9A-F]{6}$/.test(value)) {
+                          const defaultColor = '#3B82F6';
+                          setShapeSettings({ fillColor: defaultColor });
+                          if (isShapeElement && shapeElement && state.selectedId) {
+                            updateElement(state.selectedId, { fillColor: defaultColor });
+                          }
+                        }
+                      }}
+                      className="w-24 px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-slate-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="#3B82F6"
+                      maxLength={7}
+                    />
+                  </div>
+                  
+                  <div className="w-px h-8 bg-slate-700" />
+                </>
+              )}
+
+              {/* Stroke Settings (for outline shapes) */}
+              {state.shapeSettings.fillType === 'outline' && (
+                <>
+                  <div className="flex items-center gap-2 flex-1 min-w-[400px]">
+                    <label className="text-xs font-medium text-slate-400">Stroke Color:</label>
+                    
+                    {/* Color Preview */}
+                    <div 
+                      className="w-10 h-10 rounded-lg border-2 border-slate-600 shadow-inner cursor-pointer hover:border-slate-500 transition-colors"
+                      style={{ backgroundColor: isShapeElement && shapeElement ? shapeElement.strokeColor : state.shapeSettings.strokeColor }}
+                      title="Current stroke color"
+                    />
+                    
+                    {/* Preset Colors */}
+                    <div className="flex items-center gap-1">
+                      {['#000000', '#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6',
+                        '#EC4899', '#FFFFFF', '#6B7280'].map((color) => (
+                        <button
+                          key={color}
+                          onClick={() => {
+                            setShapeSettings({ strokeColor: color });
+                            if (isShapeElement && shapeElement && state.selectedId) {
+                              updateElement(state.selectedId, { strokeColor: color });
+                            }
+                          }}
+                          className={`w-7 h-7 rounded-md border-2 transition-all hover:scale-110 ${
+                            (isShapeElement && shapeElement ? shapeElement.strokeColor : state.shapeSettings.strokeColor) === color
+                              ? 'border-blue-400 ring-2 ring-blue-400/50 shadow-lg'
+                              : 'border-slate-600 hover:border-slate-400'
+                          }`}
+                          style={{ backgroundColor: color }}
+                          title={color}
+                        />
+                      ))}
+                    </div>
+                    
+                    {/* Hex Input */}
+                    <input
+                      type="text"
+                      value={isShapeElement && shapeElement ? shapeElement.strokeColor : state.shapeSettings.strokeColor}
+                      onChange={(e) => {
+                        const value = e.target.value.toUpperCase();
+                        if (/^#[0-9A-F]{0,6}$/.test(value)) {
+                          setShapeSettings({ strokeColor: value });
+                          if (isShapeElement && shapeElement && state.selectedId) {
+                            updateElement(state.selectedId, { strokeColor: value });
+                          }
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const value = e.target.value;
+                        if (value.length > 1 && value.length < 7) {
+                          const padded = value.padEnd(7, '0');
+                          setShapeSettings({ strokeColor: padded });
+                          if (isShapeElement && shapeElement && state.selectedId) {
+                            updateElement(state.selectedId, { strokeColor: padded });
+                          }
+                        } else if (!/^#[0-9A-F]{6}$/.test(value)) {
+                          const defaultColor = '#000000';
+                          setShapeSettings({ strokeColor: defaultColor });
+                          if (isShapeElement && shapeElement && state.selectedId) {
+                            updateElement(state.selectedId, { strokeColor: defaultColor });
+                          }
+                        }
+                      }}
+                      className="w-24 px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-slate-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="#000000"
+                      maxLength={7}
+                    />
+                  </div>
+                  
+                  <div className="w-px h-8 bg-slate-700" />
+                  
+                  {/* Stroke Width */}
+                  <div className="flex items-center gap-3 min-w-[220px]">
+                    <label className="text-xs font-medium text-slate-400 whitespace-nowrap">
+                      Width: <span className="text-white font-semibold">
+                        {isShapeElement && shapeElement ? shapeElement.strokeWidth : state.shapeSettings.strokeWidth}px
+                      </span>
+                    </label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="20"
+                      value={isShapeElement && shapeElement ? shapeElement.strokeWidth : state.shapeSettings.strokeWidth}
+                      onChange={(e) => {
+                        const newWidth = parseInt(e.target.value);
+                        // Update global settings for future shapes
+                        setShapeSettings({ strokeWidth: newWidth });
+                        // Update currently selected shape in real-time
+                        if (isShapeElement && shapeElement && state.selectedId) {
+                          updateElement(state.selectedId, { strokeWidth: newWidth });
+                        }
+                      }}
+                      className="flex-1 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                      style={{
+                        background: `linear-gradient(to right, rgb(168 85 247) 0%, rgb(168 85 247) ${((isShapeElement && shapeElement ? shapeElement.strokeWidth : state.shapeSettings.strokeWidth) / 20) * 100}%, rgb(51 65 85) ${((isShapeElement && shapeElement ? shapeElement.strokeWidth : state.shapeSettings.strokeWidth) / 20) * 100}%, rgb(51 65 85) 100%)`
+                      }}
+                    />
+                  </div>
+                  
+                  <div className="w-px h-8 bg-slate-700" />
                 </>
               )}
             </div>

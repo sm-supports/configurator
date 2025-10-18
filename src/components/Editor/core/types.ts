@@ -37,9 +37,41 @@ export interface PaintElement {
   layer?: 'base' | 'licenseplate';
 }
 
-export type Element = TextElement | ImageElement | PaintElement;
+// Shape element interface
+export interface ShapeElement {
+  id: string;
+  type: 'shape';
+  shapeType: 'rectangle' | 'circle' | 'triangle' | 'star' | 'hexagon' | 'pentagon';
+  fillType: 'solid' | 'outline';
+  fillColor: string;
+  strokeColor: string;
+  strokeWidth: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation?: number;
+  opacity: number;
+  zIndex: number;
+  locked?: boolean;
+  visible?: boolean;
+  flippedH?: boolean;
+  flippedV?: boolean;
+  layer?: 'base' | 'licenseplate';
+}
 
-export type ToolType = 'select' | 'text' | 'image' | 'brush' | 'airbrush' | 'spray' | 'eraser';
+export type Element = TextElement | ImageElement | PaintElement | ShapeElement;
+
+export type ToolType = 'select' | 'text' | 'image' | 'brush' | 'airbrush' | 'spray' | 'eraser' | 'shape';
+
+export interface ShapeSettings {
+  shapeType: 'rectangle' | 'circle' | 'triangle' | 'star' | 'hexagon' | 'pentagon';
+  fillType: 'solid' | 'outline';
+  fillColor: string;
+  strokeColor: string;
+  strokeWidth: number;
+  opacity: number;
+}
 
 export interface PaintSettings {
   color: string;
@@ -55,6 +87,7 @@ export interface EditorState {
   activeLayer: 'base' | 'licenseplate';
   activeTool: ToolType;
   paintSettings: PaintSettings;
+  shapeSettings: ShapeSettings;
   isPainting: boolean;
   currentPaintStroke: PaintPoint[] | null;
 }

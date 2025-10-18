@@ -76,6 +76,10 @@ const EditorCore: React.FC = () => {
     finishPainting,
     eraseAtPoint,
     
+    // Shape tool operations
+    setShapeSettings,
+    addShape,
+    
     // Save/Export operations
     handleSaveDesign,
     handleDownload,
@@ -122,6 +126,8 @@ const EditorCore: React.FC = () => {
       flipVertical={flipVertical}
       setActiveTool={setActiveTool}
       setPaintSettings={setPaintSettings}
+      setShapeSettings={setShapeSettings}
+      addShape={addShape}
       zoom={zoom}
       zoomIn={zoomIn}
       zoomOut={zoomOut}

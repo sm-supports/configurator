@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useRef, useCallback, useEff
 import type Konva from 'konva';
 import { PlateTemplate } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
-import { EditorState, Element, ToolType, PaintSettings } from '../types';
+import { EditorState, Element, ToolType, PaintSettings, ShapeSettings } from '../types';
 import { TextElement } from '@/types';
 import { vehiclePlateFonts } from '../constants';
 import { User } from '@supabase/supabase-js';
@@ -79,6 +79,10 @@ export interface EditorContextValue {
   finishPainting: () => void;
   eraseAtPoint: (x: number, y: number, eraserSize: number) => void;
   
+  // Shape tool operations
+  setShapeSettings: (settings: Partial<ShapeSettings>) => void;
+  addShape: () => void;
+  
   // Save/Export operations
   handleSaveDesign: () => Promise<void>;
   handleDownload: (format: 'png' | 'jpeg' | 'pdf' | 'eps' | 'tiff') => Promise<void>;
@@ -143,6 +147,14 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
       opacity: 1.0,
       brushType: 'brush'
     },
+    shapeSettings: {
+      shapeType: 'rectangle',
+      fillType: 'solid',
+      fillColor: '#3b82f6',
+      strokeColor: '#000000',
+      strokeWidth: 2,
+      opacity: 1.0
+    },
     isPainting: false,
     currentPaintStroke: null
   });
@@ -196,7 +208,8 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
   const { 
     addText, addImage, selectElement, updateElement, deleteElement, 
     flipHorizontal, flipVertical, toggleLayer, finishTextEdit,
-    setActiveTool, setPaintSettings, startPainting, addPaintPoint, finishPainting, eraseAtPoint
+    setActiveTool, setPaintSettings, startPainting, addPaintPoint, finishPainting, eraseAtPoint,
+    setShapeSettings, addShape
   } = useElementManipulation(
     state, setState, pushHistory, template, nextRand, vehiclePlateFonts, editingValue, setEditingValue, zoom
   );
@@ -359,6 +372,10 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
     finishPainting,
     eraseAtPoint,
     
+    // Shape tool operations
+    setShapeSettings,
+    addShape,
+    
     // Save/Export operations
     handleSaveDesign,
     handleDownload,
@@ -379,6 +396,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
     addText, addImage, selectElement, updateElement, deleteElement,
     flipHorizontal, flipVertical, toggleLayer, finishTextEdit, startTextEdit,
     setActiveTool, setPaintSettings, startPainting, addPaintPoint, finishPainting, eraseAtPoint,
+    setShapeSettings, addShape,
     handleSaveDesign, handleDownload, setEditingPos,
     user, isAdmin, setShowDownloadDropdown, setShowLayersPanel, setEditingValue
   ]);

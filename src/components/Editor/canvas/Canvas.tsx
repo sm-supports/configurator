@@ -2,10 +2,11 @@ import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react'
 import { Stage, Layer, Image as KonvaImage, Group, Transformer, Line, Rect, Circle } from 'react-konva';
 import type Konva from 'konva';
 import { PlateTemplate, ImageElement, TextElement } from '@/types';
-import { EditorState, Element, PaintElement } from '../core/types';
+import { EditorState, Element, PaintElement, ShapeElement } from '../core/types';
 import { ImageElementComponent } from './elements/ImageElement';
 import { TextElementComponent } from './elements/TextElement';
 import { PaintElementComponent } from './elements/PaintElement';
+import { ShapeElementComponent } from './elements/ShapeElement';
 import { getWASMStatus } from '@/lib/wasmBridge';
 
 interface CanvasProps {
@@ -380,9 +381,23 @@ export const Canvas: React.FC<CanvasProps> = ({
                       />
                     </Group>
                   );
+                } else if (element.type === 'shape') {
+                  const shapeEl = element as ShapeElement;
+                  return (
+                    <ShapeElementComponent
+                      key={element.id}
+                      element={shapeEl}
+                      zoom={zoom}
+                      plateOffsetY={plateOffsetY}
+                      isInteractive={isInteractive}
+                      onSelect={() => selectElement(element.id)}
+                      onUpdate={(updates) => updateElement(element.id, updates)}
+                      bumpOverlay={bumpOverlay}
+                    />
+                  );
                 }
                 return null;
-                });
+              });
             })()}
           </Layer>
         )}
@@ -487,11 +502,25 @@ export const Canvas: React.FC<CanvasProps> = ({
                           />
                         </Group>
                       );
+                    } else if (element.type === 'shape') {
+                      const shapeEl = element as ShapeElement;
+                      return (
+                        <ShapeElementComponent
+                          key={element.id}
+                          element={shapeEl}
+                          zoom={zoom}
+                          plateOffsetY={plateOffsetY}
+                          isInteractive={isInteractive}
+                          onSelect={() => selectElement(element.id)}
+                          onUpdate={(updates) => updateElement(element.id, updates)}
+                          bumpOverlay={bumpOverlay}
+                        />
+                      );
                     }
                     return null;
                   })}
                 
-                {/* Render ALL license plate layer elements (images, text, paint) sorted by zIndex */}
+                {/* Render ALL license plate layer elements (images, text, paint, shapes) sorted by zIndex */}
                 {sortedElements
                   .filter(element => (element.layer || 'base') === 'licenseplate')
                   .map(element => {
@@ -559,6 +588,20 @@ export const Canvas: React.FC<CanvasProps> = ({
                             onUpdate={(updates) => updateElement(element.id, updates)}
                           />
                         </Group>
+                      );
+                    } else if (element.type === 'shape') {
+                      const shapeEl = element as ShapeElement;
+                      return (
+                        <ShapeElementComponent
+                          key={element.id}
+                          element={shapeEl}
+                          zoom={zoom}
+                          plateOffsetY={plateOffsetY}
+                          isInteractive={isInteractive}
+                          onSelect={() => selectElement(element.id)}
+                          onUpdate={(updates) => updateElement(element.id, updates)}
+                          bumpOverlay={bumpOverlay}
+                        />
                       );
                     }
                     return null;

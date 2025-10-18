@@ -2,7 +2,7 @@
 import { useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { TextElement, ImageElement, PlateTemplate } from '@/types';
-import { EditorState, Element, PaintElement, PaintPoint, ToolType } from '../core/types';
+import { EditorState, Element, PaintElement, PaintPoint, ToolType, ShapeElement, ShapeSettings } from '../core/types';
 import { measureText, computeSpawnPosition } from '../canvas/utils/canvasUtils';
 import { wasmOps } from '@/lib/wasmBridge';
 
@@ -459,6 +459,56 @@ export const useElementManipulation = (
     }
   }, [state.elements, setState, pushHistory]);
 
+  // Shape functions
+  const setShapeSettings = useCallback((settings: Partial<ShapeSettings>) => {
+    setState(prev => ({
+      ...prev,
+      shapeSettings: { ...prev.shapeSettings, ...settings }
+    }));
+  }, [setState]);
+
+  const addShape = useCallback((shapeType?: ShapeSettings['shapeType']) => {
+    const defaultSize = 100;
+    const centerX = (template.width_px - defaultSize) / 2;
+    const centerY = (template.height_px - defaultSize) / 2;
+
+    // Use the provided shapeType or fall back to current settings
+    const finalShapeType = shapeType || state.shapeSettings.shapeType;
+
+    const newShape: ShapeElement = {
+      id: uuidv4(),
+      type: 'shape',
+      shapeType: finalShapeType,
+      fillType: state.shapeSettings.fillType,
+      fillColor: state.shapeSettings.fillColor,
+      strokeColor: state.shapeSettings.strokeColor,
+      strokeWidth: state.shapeSettings.strokeWidth,
+      opacity: state.shapeSettings.opacity,
+      x: centerX,
+      y: centerY,
+      width: defaultSize,
+      height: defaultSize,
+      rotation: 0,
+      zIndex: state.elements.length,
+      visible: true,
+      locked: false,
+      flippedH: false,
+      flippedV: false,
+      layer: state.activeLayer
+    };
+
+    setState(prev => {
+      pushHistory(prev);
+      return {
+        ...prev,
+        elements: [...prev.elements, newShape],
+        selectedId: newShape.id,
+        // Update the shapeType in settings to match what was created
+        shapeSettings: { ...prev.shapeSettings, shapeType: finalShapeType }
+      };
+    });
+  }, [state.elements.length, state.activeLayer, state.shapeSettings, pushHistory, template.width_px, template.height_px, setState]);
+
   return { 
     addText, 
     addImage, 
@@ -474,6 +524,8 @@ export const useElementManipulation = (
     startPainting,
     addPaintPoint,
     finishPainting,
-    eraseAtPoint
+    eraseAtPoint,
+    setShapeSettings,
+    addShape
   };
 };
