@@ -1,6 +1,6 @@
 import React from 'react';
 import { Layers, Eye, Trash2, Copy, MoveUp, MoveDown, ChevronsUp, ChevronsDown } from 'lucide-react';
-import { EditorState, Element } from '../../core/types';
+import { EditorState, Element, ShapeElement } from '../../core/types';
 import { TextElement, ImageElement } from '@/types';
 
 export interface LayersPanelProps {
@@ -44,6 +44,10 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
       return imageEl.filename || 'Image';
     } else if (element.type === 'paint') {
       return 'Paint Stroke';
+    } else if (element.type === 'shape') {
+      const shapeEl = element as ShapeElement;
+      const shapeName = shapeEl.shapeType.charAt(0).toUpperCase() + shapeEl.shapeType.slice(1);
+      return shapeName;
     }
     return 'Element';
   };
@@ -55,6 +59,24 @@ export const LayersPanel: React.FC<LayersPanelProps> = ({
       return '🖼️';
     } else if (element.type === 'paint') {
       return '🎨';
+    } else if (element.type === 'shape') {
+      const shapeEl = element as ShapeElement;
+      switch (shapeEl.shapeType) {
+        case 'rectangle':
+          return '⬜';
+        case 'circle':
+          return '⭕';
+        case 'triangle':
+          return '🔺';
+        case 'star':
+          return '⭐';
+        case 'hexagon':
+          return '⬢';
+        case 'pentagon':
+          return '⬠';
+        default:
+          return '◼️';
+      }
     }
     return '📄';
   };

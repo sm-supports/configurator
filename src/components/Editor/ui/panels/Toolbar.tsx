@@ -55,6 +55,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   showLayersPanel,
   setShowLayersPanel,
   state,
+  setState,
   toggleLayer,
   addText,
   addImage,
@@ -234,7 +235,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               {/* Frame Size Dropdown */}
               <div className="relative" ref={frameSizeDropdownRef}>
                 <button
-                  onClick={() => setShowFrameSizeDropdown(!showFrameSizeDropdown)}
+                  onClick={() => {
+                    // Close any open toolbars (paint/shapes) when dropdown is opened
+                    if (isPaintToolActive || isShapeToolActive) {
+                      setActiveTool('select');
+                    }
+                    setShowFrameSizeDropdown(!showFrameSizeDropdown);
+                  }}
                   className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-700 rounded transition-all"
                   title="Change License Plate Frame Size"
                 >
@@ -756,6 +763,22 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   <FlipVertical className="w-4 h-4" />
                 </button>
               </div>
+
+              {/* Close Text Toolbar Button */}
+              <div className="ml-auto">
+                <button
+                  onClick={() => {
+                    // Deselect the text element to close the toolbar
+                    setState(prev => ({ ...prev, selectedId: null }));
+                  }}
+                  className="p-2 rounded bg-slate-700 text-slate-300 hover:bg-red-500 hover:text-white transition-colors"
+                  title="Close text toolbar"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1010,9 +1033,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 <label className="text-xs font-medium text-slate-400">Shape:</label>
                 <div className="flex items-center gap-1 bg-slate-700/50 rounded-lg p-1">
                   <button
-                    onClick={() => addShape('rectangle')}
-                    className="p-2 rounded transition-all text-slate-300 hover:bg-slate-600 hover:text-white"
-                    title="Add Rectangle"
+                    onClick={() => setShapeSettings({ shapeType: 'rectangle' })}
+                    className={`p-2 rounded transition-all ${
+                      state.shapeSettings.shapeType === 'rectangle'
+                        ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
+                        : 'text-slate-300 hover:bg-slate-600 hover:text-white'
+                    }`}
+                    title="Rectangle"
                   >
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                       <rect x="4" y="6" width="16" height="12" rx="1"/>
@@ -1020,9 +1047,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   </button>
                   
                   <button
-                    onClick={() => addShape('circle')}
-                    className="p-2 rounded transition-all text-slate-300 hover:bg-slate-600 hover:text-white"
-                    title="Add Circle"
+                    onClick={() => setShapeSettings({ shapeType: 'circle' })}
+                    className={`p-2 rounded transition-all ${
+                      state.shapeSettings.shapeType === 'circle'
+                        ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
+                        : 'text-slate-300 hover:bg-slate-600 hover:text-white'
+                    }`}
+                    title="Circle"
                   >
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                       <circle cx="12" cy="12" r="8"/>
@@ -1030,9 +1061,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   </button>
                   
                   <button
-                    onClick={() => addShape('triangle')}
-                    className="p-2 rounded transition-all text-slate-300 hover:bg-slate-600 hover:text-white"
-                    title="Add Triangle"
+                    onClick={() => setShapeSettings({ shapeType: 'triangle' })}
+                    className={`p-2 rounded transition-all ${
+                      state.shapeSettings.shapeType === 'triangle'
+                        ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
+                        : 'text-slate-300 hover:bg-slate-600 hover:text-white'
+                    }`}
+                    title="Triangle"
                   >
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M12 4 L20 20 L4 20 Z"/>
@@ -1040,9 +1075,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   </button>
                   
                   <button
-                    onClick={() => addShape('star')}
-                    className="p-2 rounded transition-all text-slate-300 hover:bg-slate-600 hover:text-white"
-                    title="Add Star"
+                    onClick={() => setShapeSettings({ shapeType: 'star' })}
+                    className={`p-2 rounded transition-all ${
+                      state.shapeSettings.shapeType === 'star'
+                        ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
+                        : 'text-slate-300 hover:bg-slate-600 hover:text-white'
+                    }`}
+                    title="Star"
                   >
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M12 2 L15 9 L22 10 L17 15 L18 22 L12 18 L6 22 L7 15 L2 10 L9 9 Z"/>
@@ -1050,9 +1089,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   </button>
                   
                   <button
-                    onClick={() => addShape('hexagon')}
-                    className="p-2 rounded transition-all text-slate-300 hover:bg-slate-600 hover:text-white"
-                    title="Add Hexagon"
+                    onClick={() => setShapeSettings({ shapeType: 'hexagon' })}
+                    className={`p-2 rounded transition-all ${
+                      state.shapeSettings.shapeType === 'hexagon'
+                        ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
+                        : 'text-slate-300 hover:bg-slate-600 hover:text-white'
+                    }`}
+                    title="Hexagon"
                   >
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M12 2 L20 7 L20 17 L12 22 L4 17 L4 7 Z"/>
@@ -1060,9 +1103,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   </button>
                   
                   <button
-                    onClick={() => addShape('pentagon')}
-                    className="p-2 rounded transition-all text-slate-300 hover:bg-slate-600 hover:text-white"
-                    title="Add Pentagon"
+                    onClick={() => setShapeSettings({ shapeType: 'pentagon' })}
+                    className={`p-2 rounded transition-all ${
+                      state.shapeSettings.shapeType === 'pentagon'
+                        ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
+                        : 'text-slate-300 hover:bg-slate-600 hover:text-white'
+                    }`}
+                    title="Pentagon"
                   >
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M12 2 L20 9 L17 20 L7 20 L4 9 Z"/>
@@ -1279,10 +1326,41 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                       }}
                     />
                   </div>
-                  
-                  <div className="w-px h-8 bg-slate-700" />
                 </>
               )}
+
+              {/* Add Shape Button */}
+              <div className="w-px h-8 bg-slate-700" />
+              
+              <button
+                onClick={() => {
+                  addShape(state.shapeSettings.shapeType);
+                  setActiveTool('select'); // Return to select mode after adding
+                }}
+                className="px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-500 text-white font-medium rounded-lg shadow-lg hover:shadow-xl hover:from-purple-600 hover:to-blue-600 transition-all flex items-center gap-2"
+                title="Add shape to canvas"
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                </svg>
+                Add {state.shapeSettings.shapeType.charAt(0).toUpperCase() + state.shapeSettings.shapeType.slice(1)}
+              </button>
+
+              {/* Close Shape Toolbar Button */}
+              <div className="ml-auto">
+                <button
+                  onClick={() => {
+                    // Deactivate shape tool to close the toolbar
+                    setActiveTool('select');
+                  }}
+                  className="p-2 rounded bg-slate-700 text-slate-300 hover:bg-red-500 hover:text-white transition-colors"
+                  title="Close shape toolbar"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         )}

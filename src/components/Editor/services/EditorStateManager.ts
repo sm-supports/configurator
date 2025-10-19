@@ -170,9 +170,12 @@ export class EditorStateManager {
       const element = prev.elements.find(el => el.id === id);
       if (!element) return prev;
 
+      // Normalize layer to default to 'base' if undefined
+      const elementLayer = element.layer || 'base';
+
       // Get all elements in the same layer, sorted by zIndex
       const sameLayerElements = prev.elements
-        .filter(el => el.layer === element.layer)
+        .filter(el => (el.layer || 'base') === elementLayer)
         .sort((a, b) => a.zIndex - b.zIndex);
       
       const currentIndex = sameLayerElements.findIndex(el => el.id === id);
@@ -203,9 +206,12 @@ export class EditorStateManager {
       const element = prev.elements.find(el => el.id === id);
       if (!element) return prev;
 
+      // Normalize layer to default to 'base' if undefined
+      const elementLayer = element.layer || 'base';
+
       // Get all elements in the same layer, sorted by zIndex
       const sameLayerElements = prev.elements
-        .filter(el => el.layer === element.layer)
+        .filter(el => (el.layer || 'base') === elementLayer)
         .sort((a, b) => a.zIndex - b.zIndex);
       
       const currentIndex = sameLayerElements.findIndex(el => el.id === id);
@@ -236,8 +242,11 @@ export class EditorStateManager {
       const element = prev.elements.find(el => el.id === id);
       if (!element) return prev;
 
+      // Normalize layer to default to 'base' if undefined
+      const elementLayer = element.layer || 'base';
+
       // Get all elements in the same layer
-      const sameLayerElements = prev.elements.filter(el => el.layer === element.layer);
+      const sameLayerElements = prev.elements.filter(el => (el.layer || 'base') === elementLayer);
       const maxZ = Math.max(...sameLayerElements.map(el => el.zIndex), 0);
       
       // Only move if not already at front
@@ -259,8 +268,11 @@ export class EditorStateManager {
       const element = prev.elements.find(el => el.id === id);
       if (!element) return prev;
 
+      // Normalize layer to default to 'base' if undefined
+      const elementLayer = element.layer || 'base';
+
       // Get all elements in the same layer
-      const sameLayerElements = prev.elements.filter(el => el.layer === element.layer);
+      const sameLayerElements = prev.elements.filter(el => (el.layer || 'base') === elementLayer);
       const minZ = Math.min(...sameLayerElements.map(el => el.zIndex), 0);
       
       // Only move if not already at back
