@@ -43,7 +43,7 @@ interface ToolbarProps {
   zoomIn: () => void;
   zoomOut: () => void;
   resetZoom: () => void;
-  changeFrameSize: (size: 'small' | 'std' | 'xl') => Promise<void>;
+  changeFrameSize: (size: 'slim' | 'std' | 'xl') => Promise<void>;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({
@@ -239,7 +239,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   title="Change License Plate Frame Size"
                 >
                   <span>
-                    {state.frameSize === 'small' ? 'Small' : state.frameSize === 'std' ? 'Std' : 'XL'}
+                    {state.frameSize === 'slim' ? 'Slim' : state.frameSize === 'std' ? 'Std' : 'XL'}
                   </span>
                   <ChevronDown className="w-3 h-3" />
                 </button>
@@ -248,14 +248,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   <div className="absolute top-full left-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden z-50 min-w-[120px]">
                     <button
                       onClick={async () => {
-                        await changeFrameSize('small');
+                        await changeFrameSize('slim');
                         setShowFrameSizeDropdown(false);
                       }}
                       className={`w-full px-3 py-2 text-left text-xs hover:bg-slate-700 transition-colors ${
-                        state.frameSize === 'small' ? 'bg-blue-500/20 text-blue-400' : 'text-slate-300'
+                        state.frameSize === 'slim' ? 'bg-blue-500/20 text-blue-400' : 'text-slate-300'
                       }`}
                     >
-                      Small
+                      Slim
                     </button>
                     <button
                       onClick={async () => {

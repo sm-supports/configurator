@@ -80,7 +80,7 @@ export interface PaintSettings {
   brushType: 'brush' | 'airbrush' | 'spray';
 }
 
-export type FrameSize = 'small' | 'std' | 'xl';
+export type FrameSize = 'slim' | 'std' | 'xl';
 
 export interface EditorState {
   elements: Element[];

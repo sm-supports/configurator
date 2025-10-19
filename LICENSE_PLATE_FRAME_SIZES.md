@@ -1,22 +1,22 @@
 # License Plate Frame Size Selection Feature
 
 ## Overview
-Added support for multiple license plate frame sizes with a dropdown selector in the toolbar. Users can now switch between three different frame sizes: Small, Std (Standard), and XL.
+Added support for multiple license plate frame sizes with a dropdown selector in the toolbar. Users can now switch between three different frame sizes: Slim, Std (Standard), and XL.
 
 ## Changes Made
 
 ### 1. Frame Files
 The following frame files are used:
-- **Small**: `/license-plate-frame.png` (existing file)
+- **Slim**: `/license-plate-frame.png` (existing file)
 - **Std**: `/license-plate-frame2.svg` (new file)
 - **XL**: `/license-plate-frame3.svg` (new file)
 
 ### 2. Type Definitions (`src/components/Editor/core/types.ts`)
-- Added `FrameSize` type: `'small' | 'std' | 'xl'`
-- Added `frameSize` property to `EditorState` interface with default value of `'small'`
+- Added `FrameSize` type: `'slim' | 'std' | 'xl'`
+- Added `frameSize` property to `EditorState` interface with default value of `'slim'`
 
 ### 3. Editor Context (`src/components/Editor/core/context/EditorContext.tsx`)
-- Added `frameSize: 'small'` to the initial state
+- Added `frameSize: 'slim'` to the initial state
 - Added `changeFrameSize` function to update both state and load the new frame image
 - Exposed `changeFrameSize` in the context value and type definition
 - Updated dependencies array to include `changeFrameSize`
@@ -24,7 +24,7 @@ The following frame files are used:
 ### 4. Image Service (`src/components/Editor/services/EditorImageService.ts`)
 - Added `currentFrameSize` property to track the selected frame size
 - Added `getFrameUrl(size)` method to map frame sizes to file paths:
-  - `'small'` → `/license-plate-frame.png`
+  - `'slim'` → `/license-plate-frame.png`
   - `'std'` → `/license-plate-frame2.svg`
   - `'xl'` → `/license-plate-frame3.svg`
 - Added `changeFrameSize(size)` method to:
@@ -55,7 +55,7 @@ The following frame files are used:
 The frame size selector is located in the top toolbar, to the right of the Base/Plate layer toggle switch.
 
 ### Functionality
-1. The dropdown shows the currently selected frame size (Small, Std, or XL)
+1. The dropdown shows the currently selected frame size (Slim, Std, or XL)
 2. Clicking the dropdown reveals all three size options
 3. Clicking a size option:
    - Loads the corresponding frame image

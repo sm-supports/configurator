@@ -14,7 +14,7 @@ export class EditorImageService {
   private bgImage: HTMLImageElement | null = null;
   private frameImage: HTMLImageElement | null = null;
   private onImageLoad?: (type: 'background' | 'frame', image: HTMLImageElement) => void;
-  private currentFrameSize: 'small' | 'std' | 'xl' = 'small';
+  private currentFrameSize: 'slim' | 'std' | 'xl' = 'slim';
 
   constructor(template: PlateTemplate, onImageLoad?: (type: 'background' | 'frame', image: HTMLImageElement) => void) {
     this.template = template;
@@ -445,9 +445,9 @@ export class EditorImageService {
     return this.frameImage;
   }
 
-  private getFrameUrl(size: 'small' | 'std' | 'xl'): string {
+  private getFrameUrl(size: 'slim' | 'std' | 'xl'): string {
     switch (size) {
-      case 'small':
+      case 'slim':
         return '/license-plate-frame.png';
       case 'std':
         return '/license-plate-frame2.svg';
@@ -458,7 +458,7 @@ export class EditorImageService {
     }
   }
 
-  async changeFrameSize(size: 'small' | 'std' | 'xl'): Promise<void> {
+  async changeFrameSize(size: 'slim' | 'std' | 'xl'): Promise<void> {
     this.currentFrameSize = size;
     try {
       const frameUrl = this.getFrameUrl(size);
@@ -814,7 +814,7 @@ export const useEditorImageService = (
   );
 
   const changeFrameSize = useCallback(
-    async (size: 'small' | 'std' | 'xl') => {
+    async (size: 'slim' | 'std' | 'xl') => {
       await imageService?.changeFrameSize(size);
     },
     [imageService]

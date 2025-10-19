@@ -70,7 +70,7 @@ export interface EditorContextValue {
   toggleLayer: (layer: 'base' | 'licenseplate') => void;
   finishTextEdit: (save?: boolean, reselect?: boolean) => void;
   startTextEdit: (id: string) => void;
-  changeFrameSize: (size: 'small' | 'std' | 'xl') => Promise<void>;
+  changeFrameSize: (size: 'slim' | 'std' | 'xl') => Promise<void>;
   
   // Paint tool operations
   setActiveTool: (tool: ToolType) => void;
@@ -158,7 +158,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
     },
     isPainting: false,
     currentPaintStroke: null,
-    frameSize: 'small'
+    frameSize: 'slim'
   });
 
   // UI state
@@ -260,7 +260,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
   }, []);
 
   // Frame size change function
-  const changeFrameSize = useCallback(async (size: 'small' | 'std' | 'xl') => {
+  const changeFrameSize = useCallback(async (size: 'slim' | 'std' | 'xl') => {
     setState(prev => ({ ...prev, frameSize: size }));
     await changeFrameSizeService(size);
   }, [changeFrameSizeService]);
