@@ -8,8 +8,8 @@ Added support for multiple license plate frame sizes with a dropdown selector in
 ### 1. Frame Files
 The following frame files are used:
 - **Slim**: `/license-plate-frame.png` (existing file)
-- **Std**: `/license-plate-frame2.svg` (new file)
-- **XL**: `/license-plate-frame3.svg` (new file)
+- **Std**: `/license-plate-frame-std.png` (new file)
+- **XL**: `/license-plate-frame-xl.png` (new file)
 
 ### 2. Type Definitions (`src/components/Editor/core/types.ts`)
 - Added `FrameSize` type: `'slim' | 'std' | 'xl'`
@@ -25,8 +25,8 @@ The following frame files are used:
 - Added `currentFrameSize` property to track the selected frame size
 - Added `getFrameUrl(size)` method to map frame sizes to file paths:
   - `'slim'` → `/license-plate-frame.png`
-  - `'std'` → `/license-plate-frame2.svg`
-  - `'xl'` → `/license-plate-frame3.svg`
+  - `'std'` → `/license-plate-frame-std.png`
+  - `'xl'` → `/license-plate-frame-xl.png`
 - Added `changeFrameSize(size)` method to:
   - Update `currentFrameSize`
   - Load the new frame image

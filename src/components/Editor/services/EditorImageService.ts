@@ -450,9 +450,9 @@ export class EditorImageService {
       case 'slim':
         return '/license-plate-frame.png';
       case 'std':
-        return '/license-plate-frame2.svg';
+        return '/license-plate-frame-std.png';
       case 'xl':
-        return '/license-plate-frame3.svg';
+        return '/license-plate-frame-xl.png';
       default:
         return '/license-plate-frame.png';
     }
