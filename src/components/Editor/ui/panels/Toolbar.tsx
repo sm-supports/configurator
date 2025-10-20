@@ -1351,7 +1351,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               <button
                 onClick={() => {
                   addShape(state.shapeSettings.shapeType);
-                  setActiveTool('select'); // Return to select mode after adding
+                  // Don't call setActiveTool here - shape is auto-selected in addShape
+                  // and we want to keep it selected to show transformation handles
                 }}
                 className="px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-500 text-white font-medium rounded-lg shadow-lg hover:shadow-xl hover:from-purple-600 hover:to-blue-600 transition-all flex items-center gap-2"
                 title="Add shape to canvas"
