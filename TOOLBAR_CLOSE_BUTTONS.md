@@ -2,12 +2,13 @@
 
 ## Overview
 
-Added close buttons (X) to both text and shape formatting toolbars, giving users control over when these contextual toolbars are visible. Users can now dismiss toolbars when they want a cleaner workspace and reopen them by selecting elements or clicking tool buttons.
+Added close buttons (X) to text, paint, and shape formatting toolbars, giving users control over when these contextual toolbars are visible. Users can now dismiss toolbars when they want a cleaner workspace and reopen them by selecting elements or clicking tool buttons.
 
 ## Problem Statement
 
-Previously, contextual toolbars (text and shape) would remain open as long as:
+Previously, contextual toolbars (text, paint, and shape) would remain open as long as:
 - Text element was selected (text toolbar)
+- Paint tool was active (paint toolbar)
 - Shape tool was active (shape toolbar)
 
 This caused issues:
@@ -18,7 +19,7 @@ This caused issues:
 
 ## Solution Implemented
 
-Added prominent close buttons (X) at the right end of both toolbars with intelligent behavior.
+Added prominent close buttons (X) at the right end of all three toolbars with intelligent behavior.
 
 ### Text Toolbar Close Button
 **Behavior:**
@@ -26,6 +27,13 @@ Added prominent close buttons (X) at the right end of both toolbars with intelli
 - Toolbar closes immediately
 - Text remains on canvas (not deleted)
 - Can reopen by clicking the text element again
+
+### Paint Toolbar Close Button
+**Behavior:**
+- Clicking X switches active tool back to 'select'
+- Toolbar closes immediately
+- Paint settings are preserved
+- Can reopen by clicking any paint tool button again
 
 ### Shape Toolbar Close Button
 **Behavior:**
@@ -119,6 +127,35 @@ Added prominent close buttons (X) at the right end of both toolbars with intelli
 3. React re-renders, shape toolbar condition fails (`isShapeToolActive && ...`)
 4. Toolbar disappears from UI
 
+### Paint Toolbar Close Button
+
+**Location:** After opacity slider, before closing div
+
+**Code:**
+```tsx
+{/* Close Paint Toolbar Button */}
+<div className="ml-auto">
+  <button
+    onClick={() => {
+      // Deactivate paint tool to close the toolbar
+      setActiveTool('select');
+    }}
+    className="p-2 rounded bg-slate-700 text-slate-300 hover:bg-red-500 hover:text-white transition-colors"
+    title="Close paint toolbar"
+  >
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  </button>
+</div>
+```
+
+**How it works:**
+1. Uses `setActiveTool` prop function
+2. Sets active tool to `'select'` (default mode)
+3. React re-renders, paint toolbar condition fails (`isPaintToolActive && ...`)
+4. Toolbar disappears from UI
+
 ### Props Added to Destructuring
 
 **Before:**
@@ -189,6 +226,35 @@ This was necessary for the text toolbar close button to access `setState`.
 3. Shape appears on canvas
 4. Toolbar auto-closes (tool switches to 'select')
 5. New shape is selected for positioning
+```
+
+### Closing Paint Toolbar
+
+**Scenario 1: Hide toolbar while painting**
+```
+1. User clicks Brush tool
+2. Paint toolbar opens
+3. User configures color, size, opacity
+4. User clicks X button → Toolbar closes
+5. Paint settings preserved
+6. Clean canvas view achieved
+```
+
+**Scenario 2: Reopen paint toolbar**
+```
+1. User clicks any paint tool (Brush, Airbrush, Spray, Eraser)
+2. Paint toolbar reopens
+3. Previous settings still configured
+4. Can continue painting with same settings
+```
+
+**Scenario 3: Switch tools**
+```
+1. Paint toolbar is open with Brush selected
+2. User clicks Eraser button
+3. Toolbar updates to show eraser (no color picker)
+4. User clicks X button → Toolbar closes
+5. Back to select mode
 ```
 
 ## Benefits
@@ -296,8 +362,18 @@ This was necessary for the text toolbar close button to access `setState`.
 - [x] Hover over X shows red background
 - [x] Tooltip appears on hover
 
+### Paint Toolbar
+- [x] Click paint tool (Brush/Airbrush/Spray/Eraser) → toolbar appears
+- [x] Configure paint settings (color, size, opacity)
+- [x] Click X button → toolbar closes
+- [x] Paint tool deactivated (select mode active)
+- [x] Click paint tool again → toolbar reopens
+- [x] Previous settings preserved after reopen
+- [x] Hover over X shows red background
+- [x] Tooltip appears on hover
+
 ### Integration
-- [x] Both toolbars can be closed independently
+- [x] All three toolbars can be closed independently
 - [x] No errors in console
 - [x] Build succeeds
 - [x] Smooth transitions
@@ -312,7 +388,6 @@ Potential improvements to consider:
 3. **Minimize Instead of Close:** Option to collapse toolbar to icon bar
 4. **Persistent Preference:** Remember user's toolbar visibility preference
 5. **Animation:** Slide-out animation when closing/opening
-6. **Other Toolbars:** Add close buttons to paint toolbar if needed
 
 ## Commit Information
 
@@ -322,11 +397,12 @@ Potential improvements to consider:
 **Changes Summary:**
 - Added `setState` to props destructuring
 - Added close button to text toolbar (deselects element)
+- Added close button to paint toolbar (switches to select mode)
 - Added close button to shape toolbar (switches to select mode)
-- Both buttons use consistent styling and behavior
+- All three buttons use consistent styling and behavior
 
 **Lines Changed:** ~40 lines added
 
 ---
 
-**Impact:** Users now have full control over toolbar visibility, creating a cleaner and more flexible editing experience. The close buttons are discoverable, intuitive, and follow standard UI patterns while maintaining non-destructive behavior.
+**Impact:** Users now have full control over all toolbar visibility (text, paint, and shape), creating a cleaner and more flexible editing experience. The close buttons are discoverable, intuitive, and follow standard UI patterns while maintaining non-destructive behavior.
