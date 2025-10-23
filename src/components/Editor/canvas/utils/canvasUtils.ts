@@ -16,7 +16,15 @@ export const measureText = (text: string, fontSize: number, fontFamily: string, 
   if (!ctx) {
     return { width: 100, height: Math.ceil(fontSize * 1.2) };
   }
-  ctx.font = `${fontStyle} ${String(fontWeight)} ${fontSize}px ${fontFamily}`.trim();
+  // Convert fontWeight string to numeric value
+  const numericWeight = fontWeight === 'bold' ? 700 : fontWeight === 'normal' ? 400 : fontWeight;
+  // Build font string in correct CSS order: style weight size family
+  const fontParts = [];
+  if (fontStyle && fontStyle !== 'normal') fontParts.push(fontStyle);
+  fontParts.push(String(numericWeight));
+  fontParts.push(`${fontSize}px`);
+  fontParts.push(fontFamily);
+  ctx.font = fontParts.join(' ');
   const lines = (text || '').split('\n');
   let width = 0;
   for (const line of lines) {

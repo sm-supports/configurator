@@ -41,6 +41,9 @@ export const TextElementComponent: React.FC<TextElementProps> = React.memo(funct
         textDecoration={element.textDecoration || 'none'}
         fill={element.color}
         align={element.textAlign}
+        // Add prominent stroke effect for bold text
+        stroke={element.fontWeight === 'bold' ? element.color : undefined}
+        strokeWidth={element.fontWeight === 'bold' ? 2.5 * zoom : 0}
         rotation={element.rotation || 0}
         scaleX={element.flippedH ? -1 : 1}
         scaleY={element.flippedV ? -1 : 1}
