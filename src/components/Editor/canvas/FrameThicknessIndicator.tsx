@@ -5,14 +5,12 @@ interface FrameThicknessIndicatorProps {
   frameSize: 'slim' | 'std' | 'xl';
   canvasWidth: number;
   canvasHeight: number;
-  zoom: number;
 }
 
 export const FrameThicknessIndicator: React.FC<FrameThicknessIndicatorProps> = ({
   frameSize,
   canvasWidth,
   canvasHeight,
-  zoom,
 }) => {
   // Frame thickness values in mm
   const thicknessValues = {

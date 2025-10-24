@@ -27,7 +27,6 @@ interface CanvasProps {
   addPaintPoint: (x: number, y: number) => void;
   finishPainting: () => void;
   eraseAtPoint: (x: number, y: number, eraserSize: number) => void;
-  showRulers?: boolean;
 }
 
 export const Canvas: React.FC<CanvasProps> = ({
@@ -35,7 +34,6 @@ export const Canvas: React.FC<CanvasProps> = ({
   bgImage, licensePlateFrame, state, selectElement, updateElement,
   bumpOverlay,
   startPainting, addPaintPoint, finishPainting, eraseAtPoint,
-  showRulers = false,
 }) => {
   const transformerRef = useRef<Konva.Transformer>(null);
   const selectedNodeRef = useRef<Konva.Node | null>(null);

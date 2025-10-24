@@ -35,7 +35,6 @@ export const EditorContent: React.FC<EditorContentProps> = ({
   licensePlateFrame,
   state,
   selectElement,
-  setActiveTool,
   updateElement,
   bumpOverlay,
   startPainting,
@@ -115,7 +114,7 @@ export const EditorContent: React.FC<EditorContentProps> = ({
                         <line x1={x} y1={30} x2={x} y2={48} stroke="#3b82f6" strokeWidth="2" />
                         {/* Inch number */}
                         <text x={x + 4} y={28} fill="#60a5fa" fontSize="11" fontWeight="600" fontFamily="system-ui">
-                          {inch}"
+                          {inch}&quot;
                         </text>
                       
                         {/* Half inch */}
@@ -200,7 +199,7 @@ export const EditorContent: React.FC<EditorContentProps> = ({
                       <line x1={30} y1={y} x2={48} y2={y} stroke="#3b82f6" strokeWidth="2" />
                       {/* Inch number - positioned just above the line */}
                       <text x={32} y={y - 3} fill="#60a5fa" fontSize="11" fontWeight="600" fontFamily="system-ui">
-                        {inch}"
+                        {inch}&quot;
                       </text>
                       
                       {/* Half inch */}

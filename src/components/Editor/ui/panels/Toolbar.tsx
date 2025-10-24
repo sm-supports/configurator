@@ -152,7 +152,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         updateElement(elementId, { isDemoText: false });
       }
     }
-  }, [textElement?.id, textElement?.isDemoText, state.editingTextId, state.selectedId, updateElement]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [textElement?.id, textElement?.isDemoText, state.editingTextId, state.selectedId]);
 
   return (
     <>

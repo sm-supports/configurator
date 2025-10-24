@@ -8,7 +8,6 @@ interface CenterlineElementProps {
   stageWidth: number;
   stageHeight: number;
   plateOffsetY: number;
-  zoom: number;
 }
 
 export const CenterlineElement: React.FC<CenterlineElementProps> = ({
@@ -17,7 +16,6 @@ export const CenterlineElement: React.FC<CenterlineElementProps> = ({
   stageWidth,
   stageHeight,
   plateOffsetY,
-  zoom,
 }) => {
   // Center point of the actual canvas
   // The actual stage/canvas height includes the plate height + text space (plateOffsetY)
