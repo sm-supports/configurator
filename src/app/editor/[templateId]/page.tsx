@@ -16,7 +16,7 @@ if (typeof window !== 'undefined') {
 // Sample template data for demo
 const SAMPLE_TEMPLATE: PlateTemplate = {
   id: '1',
-  name: 'US Standard License Plate',
+  name: 'US Standard',
   image_url: 'https://via.placeholder.com/1200x600/2563eb/ffffff?text=US+Standard',
   width_px: 1200,
   height_px: 600,
