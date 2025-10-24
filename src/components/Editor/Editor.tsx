@@ -88,9 +88,6 @@ const EditorCore: React.FC = () => {
     // Save/Export operations
     handleSaveDesign,
     handleDownload,
-    
-    // Auth context
-    isAdmin,
   } = useEditorContext();
 
   const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
@@ -124,7 +121,6 @@ const EditorCore: React.FC = () => {
       isSaving={isSaving}
       saveSuccess={saveSuccess}
       saveError={saveError}
-      isAdmin={isAdmin}
       isDownloading={isDownloading}
       showDownloadDropdown={showDownloadDropdown}
       setShowDownloadDropdown={setShowDownloadDropdown}

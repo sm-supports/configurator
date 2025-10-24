@@ -160,7 +160,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
 
   // UI state
   const isSaving = false; // Always false in demo mode
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const saveSuccess = false; // Always false in demo mode
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);

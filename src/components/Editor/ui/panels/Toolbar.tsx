@@ -27,7 +27,6 @@ interface ToolbarProps {
   isSaving: boolean;
   saveSuccess: boolean;
   saveError: string | null;
-  isAdmin: boolean;
   isDownloading: boolean;
   showDownloadDropdown: boolean;
   setShowDownloadDropdown: React.Dispatch<React.SetStateAction<boolean>>;
@@ -66,7 +65,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   isSaving,
   saveSuccess,
   saveError,
-  isAdmin,
   isDownloading,
   showDownloadDropdown,
   setShowDownloadDropdown,
@@ -99,6 +97,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const [showTextColorPicker, setShowTextColorPicker] = useState(false);
   const [showFontDropdown, setShowFontDropdown] = useState(false);
   const [showFrameSizeDropdown, setShowFrameSizeDropdown] = useState(false);
+  const [showTesterCodeModal, setShowTesterCodeModal] = useState(false);
+  const [testerCode, setTesterCode] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [codeError, setCodeError] = useState('');
   const fontDropdownRef = useRef<HTMLDivElement>(null);
   const frameSizeDropdownRef = useRef<HTMLDivElement>(null);
   const textInputRef = useRef<HTMLInputElement>(null);
@@ -154,6 +156,28 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [textElement?.id, textElement?.isDemoText, state.editingTextId, state.selectedId]);
+
+  // Tester code verification
+  const handleVerifyTesterCode = () => {
+    if (testerCode === '197123') {
+      setIsAuthenticated(true);
+      setShowTesterCodeModal(false);
+      setCodeError('');
+      setTesterCode('');
+      // Show download dropdown after successful authentication
+      setShowDownloadDropdown(true);
+    } else {
+      setCodeError('Invalid code. Please try again.');
+    }
+  };
+
+  const handleExportClick = () => {
+    if (isAuthenticated) {
+      setShowDownloadDropdown(!showDownloadDropdown);
+    } else {
+      setShowTesterCodeModal(true);
+    }
+  };
 
   return (
     <>
@@ -515,20 +539,19 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               {isSaving ? 'Saving...' : saveSuccess ? 'Saved!' : 'Save'}
             </button>
 
-            {isAdmin && (
-              <div className="relative">
-                <button
-                  onClick={() => setShowDownloadDropdown(!showDownloadDropdown)}
-                  disabled={isDownloading}
-                  className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-lg font-medium transition-all shadow-lg disabled:opacity-50"
-                  title="Download (Admin)"
-                >
-                  <Download className="w-4 h-4 inline-block mr-2" />
-                  Export
-                  <ChevronDown className="w-3 h-3 inline-block ml-1" />
-                </button>
+            <div className="relative">
+              <button
+                onClick={handleExportClick}
+                disabled={isDownloading}
+                className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-lg font-medium transition-all shadow-lg disabled:opacity-50"
+                title="Download"
+              >
+                <Download className="w-4 h-4 inline-block mr-2" />
+                Export
+                <ChevronDown className="w-3 h-3 inline-block ml-1" />
+              </button>
 
-                {showDownloadDropdown && (
+              {showDownloadDropdown && (
                   <div className="absolute top-full right-0 mt-2 w-72 bg-slate-800 border border-slate-700 rounded-lg shadow-2xl z-[100]">
                     <div className="p-3 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border-b border-slate-700">
                       <div className="text-sm font-semibold text-white">Professional Export</div>
@@ -588,9 +611,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   </div>
                 )}
               </div>
-            )}
+            </div>
           </div>
-        </div>
 
         {/* Text Formatting Bar (appears when text is selected) */}
         {textElement && !isPaintToolActive && !isShapeToolActive && (
@@ -1680,6 +1702,81 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           </div>
         )}
       </div>
+
+      {/* Tester Code Modal */}
+      {showTesterCodeModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4">
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full mb-4">
+                <Download className="w-8 h-8 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-2">Tester Access Required</h2>
+              <p className="text-slate-400">Enter the 6-digit tester code to download your designs</p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="testerCode" className="block text-sm font-medium text-slate-300 mb-2">
+                  Tester Code
+                </label>
+                <input
+                  id="testerCode"
+                  type="text"
+                  maxLength={6}
+                  value={testerCode}
+                  onChange={(e) => {
+                    setTesterCode(e.target.value.replace(/\D/g, ''));
+                    setCodeError('');
+                  }}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && testerCode.length === 6) {
+                      handleVerifyTesterCode();
+                    }
+                  }}
+                  placeholder="Enter 6-digit code"
+                  className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white text-center text-2xl tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  autoFocus
+                />
+                {codeError && (
+                  <p className="mt-2 text-sm text-red-400 flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    {codeError}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => {
+                    setShowTesterCodeModal(false);
+                    setTesterCode('');
+                    setCodeError('');
+                  }}
+                  className="flex-1 px-4 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleVerifyTesterCode}
+                  disabled={testerCode.length !== 6}
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Verify
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-6 pt-6 border-t border-slate-700">
+              <p className="text-xs text-slate-500 text-center">
+                This application is in testing phase. Please contact support if you need a tester code.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

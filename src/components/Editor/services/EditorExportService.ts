@@ -15,6 +15,11 @@ export interface SaveOptions {
   designId?: string;
 }
 
+export interface SaveResult {
+  success: boolean;
+  message: string;
+}
+
 export class EditorExportService {
   private stageRef: React.RefObject<Konva.Stage>;
   private template: PlateTemplate;
@@ -65,12 +70,13 @@ export class EditorExportService {
     }
   }
 
-  async saveDesign(_state: EditorState, _userId: string, _options: SaveOptions = {}): Promise<{ success: boolean; error?: string; designId?: string }> {
-    // Save functionality disabled in demo version
-    return { success: false, error: 'Save feature coming soon in the full version!' };
-  }
-
-  generatePreviewUrl(): string | null {
+  
+  async saveDesign(): Promise<SaveResult> {
+    return {
+      success: true,
+      message: 'Save functionality coming soon!'
+    };
+  }  generatePreviewUrl(): string | null {
     if (!this.stageRef.current) return null;
     
     try {
