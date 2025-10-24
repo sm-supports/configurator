@@ -530,7 +530,6 @@ export const Canvas: React.FC<CanvasProps> = ({
                             stageWidth={template.width_px * zoom}
                             stageHeight={template.height_px * zoom}
                             plateOffsetY={plateOffsetY}
-                            zoom={zoom}
                           />
                         </Group>
                       );
@@ -627,7 +626,6 @@ export const Canvas: React.FC<CanvasProps> = ({
                             stageWidth={template.width_px * zoom}
                             stageHeight={template.height_px * zoom}
                             plateOffsetY={plateOffsetY}
-                            zoom={zoom}
                           />
                         </Group>
                       );
