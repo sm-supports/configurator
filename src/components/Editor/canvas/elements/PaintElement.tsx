@@ -100,12 +100,13 @@ export const PaintElementComponent: React.FC<PaintElementProps> = React.memo(fun
 
       case 'spray':
         // ============================================================
-        // SPRAY: Speckled, random dots scattered in circular pattern
-        // - Each point generates multiple random dots within radius
+        // SPRAY: Realistic spray can effect with particle distribution
+        // - Each point generates random dots in a cone pattern
+        // - Higher density at center, sparser at edges (like real spray)
         // - Dots have varying sizes and opacity for natural spray look
         // - Uses fast seeded random for stable rendering (no jitter)
-        // - Optimized: 5-8 dots per point (not hundreds)
-        // - Mimics: Spray can, splatter effect
+        // - Optimized: 8-12 dots per point for realistic spray pattern
+        // - Mimics: Spray paint can with aerosol dispersion
         // - Returns flat array of elements for Konva compatibility
         // ============================================================
         
@@ -123,17 +124,28 @@ export const PaintElementComponent: React.FC<PaintElementProps> = React.memo(fun
           const centerY = point.y * zoom;
           const sprayRadius = (element.brushSize * 0.8) * zoom;
           
-          // Optimized dot count: 5-8 dots per point (visible spray pattern)
-          const dotCount = 6;
+          // More dots for realistic spray can effect
+          const dotCount = 10;
           const baseSeed = point.x * 1000 + point.y * 100 + pointIndex;
           
-          // Generate spray dots
+          // Generate spray dots with realistic distribution
           for (let i = 0; i < dotCount; i++) {
             const seed = baseSeed + i;
             const angle = fastRandom(seed * 2) * Math.PI * 2;
-            const distance = fastRandom(seed * 3 + 100) * sprayRadius;
-            const dotSize = (fastRandom(seed * 5 + 500) * 1.5 + 0.8) * zoom;
-            const dotOpacity = element.opacity * (fastRandom(seed * 7 + 1000) * 0.4 + 0.6);
+            
+            // Non-uniform distribution: more dots near center (like real spray)
+            const randomDist = fastRandom(seed * 3 + 100);
+            // Using power function to cluster dots near center
+            const distance = Math.pow(randomDist, 0.6) * sprayRadius;
+            
+            // Vary dot size: smaller dots further from center
+            const distanceRatio = distance / sprayRadius;
+            const baseDotSize = fastRandom(seed * 5 + 500) * 1.2 + 0.6;
+            const dotSize = (baseDotSize * (1.2 - distanceRatio * 0.4)) * zoom;
+            
+            // Vary opacity: fainter dots further from center
+            const baseOpacity = fastRandom(seed * 7 + 1000) * 0.3 + 0.7;
+            const dotOpacity = element.opacity * baseOpacity * (1 - distanceRatio * 0.3);
             
             sprayDots.push(
               <Circle

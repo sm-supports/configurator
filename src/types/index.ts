@@ -66,6 +66,7 @@ export interface TextElement extends DesignElement {
   textDecoration?: 'none' | 'underline';
   color: string;
   textAlign?: 'left' | 'center' | 'right';
+  writingMode?: 'horizontal' | 'vertical';
 }
 
 export interface ImageElement extends DesignElement {

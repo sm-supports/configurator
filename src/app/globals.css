@@ -92,6 +92,12 @@ body {
   cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cg transform='rotate(-45 16 16)'%3E%3Ccircle cx='16' cy='5' r='2' fill='%23FF6B6B' stroke='%23fff' stroke-width='0.5'/%3E%3Cpath d='M13 7 L13 12 L19 12 L19 7 Z' fill='%23222' stroke='%23000' stroke-width='0.5'/%3E%3Crect x='12.5' y='12' width='7' height='3.5' fill='%23silver' stroke='%23666' stroke-width='0.5' rx='0.5'/%3E%3Cpath d='M13.5 15.5 L13.5 26 L18.5 26 L18.5 15.5 Z' fill='%23D2691E' stroke='%238B4513' stroke-width='1'/%3E%3Cpath d='M14 15.5 L14 26 L16 26 L16 15.5 Z' fill='%23CD853F' opacity='0.6'/%3E%3C/g%3E%3C/svg%3E") 8 8, crosshair;
 }
 
+.cursor-spray {
+  /* Realistic spray can cursor - tilted at natural spraying angle */
+  /* Hotspot at the nozzle where spray comes out */
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cg transform='rotate(-15 16 16)'%3E%3C!-- Can body --%3E%3Cdefs%3E%3ClinearGradient id='canGrad' x1='0%25' y1='0%25' x2='100%25' y2='0%25'%3E%3Cstop offset='0%25' style='stop-color:%23E63946;stop-opacity:1' /%3E%3Cstop offset='50%25' style='stop-color:%23FF6B6B;stop-opacity:1' /%3E%3Cstop offset='100%25' style='stop-color:%23E63946;stop-opacity:1' /%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='12' y='14' width='8' height='14' rx='1.5' fill='url(%23canGrad)' stroke='%23000' stroke-width='0.8'/%3E%3C!-- Highlight on can --%3E%3Crect x='13' y='15' width='2' height='11' rx='1' fill='%23fff' opacity='0.3'/%3E%3C!-- Can cap --%3E%3Crect x='13' y='11' width='6' height='3' rx='0.8' fill='%23333' stroke='%23000' stroke-width='0.6'/%3E%3C!-- Nozzle button --%3E%3Crect x='14' y='8' width='4' height='3' rx='0.8' fill='%23666' stroke='%23000' stroke-width='0.6'/%3E%3Cellipse cx='16' cy='9' rx='1.5' ry='0.8' fill='%23888' opacity='0.6'/%3E%3C!-- Spray particles --%3E%3Ccircle cx='10' cy='6' r='0.8' fill='%23FF6B6B' opacity='0.7'/%3E%3Ccircle cx='8' cy='8' r='0.6' fill='%23FF6B6B' opacity='0.5'/%3E%3Ccircle cx='11' cy='4' r='0.7' fill='%23FF6B6B' opacity='0.6'/%3E%3Ccircle cx='13' cy='5' r='0.5' fill='%23FF6B6B' opacity='0.4'/%3E%3Ccircle cx='9' cy='5' r='0.6' fill='%23FF6B6B' opacity='0.5'/%3E%3C/g%3E%3C/svg%3E") 12 8, crosshair;
+}
+
 .cursor-eraser {
   cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23ef4444' stroke-width='2'%3E%3Cpath d='M20 20H7l-4-4 9.5-9.5a2.828 2.828 0 1 1 4 4L7 20z'/%3E%3C/svg%3E") 8 8, cell;
 }

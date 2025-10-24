@@ -114,8 +114,11 @@ export const Canvas: React.FC<CanvasProps> = ({
   // Determine cursor class based on active tool (memoized for performance)
   // Must be called before any conditional returns to follow Rules of Hooks
   const cursorClass = useMemo(() => {
-    if (state.activeTool === 'brush' || state.activeTool === 'airbrush' || state.activeTool === 'spray') {
+    if (state.activeTool === 'brush' || state.activeTool === 'airbrush') {
       return 'cursor-brush';
+    }
+    if (state.activeTool === 'spray') {
+      return 'cursor-spray';
     }
     if (state.activeTool === 'eraser') {
       return 'cursor-eraser';
@@ -137,9 +140,12 @@ export const Canvas: React.FC<CanvasProps> = ({
         
         const node = stageRef.current.findOne(`#${state.selectedId}`);
         
-        if (node && node !== selectedNodeRef.current) {
+        if (node) {
           selectedNodeRef.current = node;
           transformerRef.current.nodes([node]);
+          
+          // Force transformer to recalculate its bounds
+          transformerRef.current.forceUpdate();
           
           // Force immediate layer update - critical for Windows browsers
           const layer = transformerRef.current.getLayer();
@@ -152,7 +158,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           if (nodeLayer && nodeLayer !== layer) {
             nodeLayer.batchDraw();
           }
-        } else if (!node) {
+        } else {
           // Node not found - try again after a short delay (Windows browser fix)
           setTimeout(() => {
             if (!stageRef.current || !transformerRef.current) return;
@@ -160,6 +166,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             if (retryNode) {
               selectedNodeRef.current = retryNode;
               transformerRef.current.nodes([retryNode]);
+              transformerRef.current.forceUpdate();
               transformerRef.current.getLayer()?.batchDraw();
               retryNode.getLayer()?.batchDraw();
             }
@@ -171,7 +178,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       transformerRef.current.nodes([]);
       transformerRef.current.getLayer()?.batchDraw();
     }
-  }, [state.selectedId, stageRef]);
+  }, [state.selectedId, state.elements, stageRef]);
 
   // Show loading state while WASM initializes
   if (!wasmReady) {
@@ -633,6 +640,60 @@ export const Canvas: React.FC<CanvasProps> = ({
                 
                 {/* Live paint stroke preview */}
                 {state.isPainting && state.currentPaintStroke && state.currentPaintStroke.length > 1 && (() => {
+                  // For spray tool, render actual spray particles in real-time
+                  if (state.activeTool === 'spray') {
+                    // Fast seeded random generator (deterministic)
+                    const fastRandom = (seed: number) => {
+                      const x = Math.sin(seed) * 10000;
+                      return x - Math.floor(x);
+                    };
+                    
+                    const sprayDots: React.ReactElement[] = [];
+                    state.currentPaintStroke.forEach((point, pointIndex) => {
+                      const centerX = point.x * zoom;
+                      const centerY = point.y * zoom + plateOffsetY;
+                      const sprayRadius = (state.paintSettings.brushSize * 0.8) * zoom;
+                      
+                      // Generate spray dots (same algorithm as PaintElement)
+                      const dotCount = 10;
+                      const baseSeed = point.x * 1000 + point.y * 100 + pointIndex;
+                      
+                      for (let i = 0; i < dotCount; i++) {
+                        const seed = baseSeed + i;
+                        const angle = fastRandom(seed * 2) * Math.PI * 2;
+                        
+                        // Non-uniform distribution: more dots near center
+                        const randomDist = fastRandom(seed * 3 + 100);
+                        const distance = Math.pow(randomDist, 0.6) * sprayRadius;
+                        
+                        // Vary dot size: smaller dots further from center
+                        const distanceRatio = distance / sprayRadius;
+                        const baseDotSize = fastRandom(seed * 5 + 500) * 1.2 + 0.6;
+                        const dotSize = (baseDotSize * (1.2 - distanceRatio * 0.4)) * zoom;
+                        
+                        // Vary opacity: fainter dots further from center
+                        const baseOpacity = fastRandom(seed * 7 + 1000) * 0.3 + 0.7;
+                        const dotOpacity = state.paintSettings.opacity * baseOpacity * (1 - distanceRatio * 0.3);
+                        
+                        sprayDots.push(
+                          <Circle
+                            key={`live-${pointIndex}-${i}`}
+                            x={centerX + Math.cos(angle) * distance}
+                            y={centerY + Math.sin(angle) * distance}
+                            radius={dotSize}
+                            fill={state.paintSettings.color}
+                            opacity={dotOpacity}
+                            listening={false}
+                            perfectDrawEnabled={false}
+                          />
+                        );
+                      }
+                    });
+                    
+                    return <>{sprayDots}</>;
+                  }
+                  
+                  // For brush/airbrush/eraser, use line
                   const points: number[] = [];
                   state.currentPaintStroke.forEach(point => {
                     // Apply same coordinate transformation as finished strokes
@@ -678,7 +739,19 @@ export const Canvas: React.FC<CanvasProps> = ({
           <Transformer
             ref={transformerRef}
             boundBoxFunc={(oldBox, newBox) => {
-              // Limit resize to reasonable bounds - prevent shapes from becoming too small
+              // Get the selected element to check its type
+              const selectedElement = state.elements.find(el => el.id === state.selectedId);
+              
+              // For text elements, allow free resizing but enforce minimums
+              if (selectedElement?.type === 'text') {
+                // Minimum size for text
+                if (newBox.width < 20 || newBox.height < 20) {
+                  return oldBox;
+                }
+                return newBox;
+              }
+              
+              // For other elements, prevent them from becoming too small
               if (newBox.width < 10 || newBox.height < 10) {
                 return oldBox;
               }
@@ -704,7 +777,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             borderDash={[4, 2]}
             rotateAnchorFill="#4285f4"
             rotateAnchorStroke="#ffffff"
-            keepRatio={true}
+            keepRatio={false}
             ignoreStroke={true}
             shouldOverdrawWholeArea={true}
             useSingleNodeRotation={false}
@@ -725,25 +798,65 @@ export const Canvas: React.FC<CanvasProps> = ({
         {/* Brush Preview - Shows exact area that will be painted */}
         {cursorPos && (state.activeTool === 'brush' || state.activeTool === 'airbrush' || state.activeTool === 'spray' || state.activeTool === 'eraser') && (
           <Layer offsetX={-view.x} offsetY={-view.y}>
-            <Circle
-              x={cursorPos.x}
-              y={cursorPos.y}
-              radius={(state.paintSettings.brushSize / 2) * zoom}
-              stroke={state.activeTool === 'eraser' ? '#ef4444' : state.paintSettings.color}
-              strokeWidth={2}
-              opacity={0.6}
-              listening={false}
-              dash={[4, 4]}
-            />
-            {/* Center dot to show exact paint origin */}
-            <Circle
-              x={cursorPos.x}
-              y={cursorPos.y}
-              radius={2}
-              fill={state.activeTool === 'eraser' ? '#ef4444' : state.paintSettings.color}
-              opacity={0.8}
-              listening={false}
-            />
+            {state.activeTool === 'spray' ? (
+              /* Spray effect preview - shows the spray area */
+              <>
+                {/* Main spray radius indicator */}
+                <Circle
+                  x={cursorPos.x}
+                  y={cursorPos.y}
+                  radius={(state.paintSettings.brushSize * 0.8) * zoom}
+                  stroke={state.paintSettings.color}
+                  strokeWidth={1.5}
+                  opacity={0.4}
+                  listening={false}
+                  dash={[3, 3]}
+                />
+                {/* Inner concentrated spray area */}
+                <Circle
+                  x={cursorPos.x}
+                  y={cursorPos.y}
+                  radius={(state.paintSettings.brushSize * 0.4) * zoom}
+                  stroke={state.paintSettings.color}
+                  strokeWidth={1}
+                  opacity={0.6}
+                  listening={false}
+                  dash={[2, 2]}
+                />
+                {/* Center spray origin point */}
+                <Circle
+                  x={cursorPos.x}
+                  y={cursorPos.y}
+                  radius={1.5}
+                  fill={state.paintSettings.color}
+                  opacity={0.7}
+                  listening={false}
+                />
+              </>
+            ) : (
+              /* Circle brush preview for other tools */
+              <>
+                <Circle
+                  x={cursorPos.x}
+                  y={cursorPos.y}
+                  radius={(state.paintSettings.brushSize / 2) * zoom}
+                  stroke={state.activeTool === 'eraser' ? '#ef4444' : state.paintSettings.color}
+                  strokeWidth={2}
+                  opacity={0.6}
+                  listening={false}
+                  dash={[4, 4]}
+                />
+                {/* Center dot to show exact paint origin */}
+                <Circle
+                  x={cursorPos.x}
+                  y={cursorPos.y}
+                  radius={2}
+                  fill={state.activeTool === 'eraser' ? '#ef4444' : state.paintSettings.color}
+                  opacity={0.8}
+                  listening={false}
+                />
+              </>
+            )}
           </Layer>
         )}
 

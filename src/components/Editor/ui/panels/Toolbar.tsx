@@ -296,9 +296,17 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               <div className="relative" ref={frameSizeDropdownRef}>
                 <button
                   onClick={() => {
-                    // Close any open toolbars (paint/shapes) when dropdown is opened
+                    // Close any open toolbars (paint/shapes/text) when dropdown is opened
                     if (isPaintToolActive || isShapeToolActive) {
                       setActiveTool('select');
+                    }
+                    // Close text toolbar by deselecting text element
+                    if (isTextElement || state.editingTextId) {
+                      setState(prev => ({ 
+                        ...prev, 
+                        selectedId: null, 
+                        editingTextId: null 
+                      }));
                     }
                     setShowFrameSizeDropdown(!showFrameSizeDropdown);
                   }}
@@ -825,6 +833,58 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 >
                   <FlipVertical className="w-4 h-4" />
                 </button>
+
+                <button
+                  onClick={() => {
+                    const newWritingMode = textElement.writingMode === 'vertical' ? 'horizontal' : 'vertical';
+                    
+                    let newWidth, newHeight;
+                    if (newWritingMode === 'vertical') {
+                      // Switching to vertical: need height to fit all characters
+                      const charCount = textElement.text.length;
+                      // Each character needs approximately fontSize * lineHeight space
+                      const lineHeight = 1.1;
+                      newHeight = Math.max(charCount * textElement.fontSize * lineHeight, 100);
+                      // Width can be narrow, just enough for one character
+                      newWidth = textElement.fontSize * 1.5;
+                    } else {
+                      // Switching back to horizontal: use original measured dimensions
+                      const measured = measureText(textElement.text, textElement.fontSize, textElement.fontFamily, textElement.fontWeight, textElement.fontStyle);
+                      newWidth = measured.width;
+                      newHeight = measured.height;
+                    }
+                    
+                    updateElement(state.selectedId!, { 
+                      writingMode: newWritingMode,
+                      width: newWidth,
+                      height: newHeight
+                    });
+                  }}
+                  className={`p-2 rounded ${
+                    textElement.writingMode === 'vertical'
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  }`}
+                  title={textElement.writingMode === 'vertical' ? 'Switch to Horizontal Text' : 'Switch to Vertical Text'}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                    {textElement.writingMode === 'vertical' ? (
+                      /* Horizontal text icon */
+                      <>
+                        <line x1="4" y1="8" x2="20" y2="8" strokeLinecap="round" />
+                        <line x1="4" y1="12" x2="20" y2="12" strokeLinecap="round" />
+                        <line x1="4" y1="16" x2="20" y2="16" strokeLinecap="round" />
+                      </>
+                    ) : (
+                      /* Vertical text icon */
+                      <>
+                        <line x1="8" y1="4" x2="8" y2="20" strokeLinecap="round" />
+                        <line x1="12" y1="4" x2="12" y2="20" strokeLinecap="round" />
+                        <line x1="16" y1="4" x2="16" y2="20" strokeLinecap="round" />
+                      </>
+                    )}
+                  </svg>
+                </button>
               </div>
 
               {/* Close Text Toolbar Button */}
@@ -911,11 +971,18 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                     }`}
                     title="Spray"
                   >
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                      <circle cx="8" cy="8" r="1"/><circle cx="16" cy="8" r="1"/>
-                      <circle cx="12" cy="12" r="1"/><circle cx="6" cy="16" r="1"/>
-                      <circle cx="18" cy="16" r="1"/><circle cx="10" cy="18" r="1"/>
-                      <circle cx="14" cy="6" r="1"/>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      {/* Spray can body */}
+                      <rect x="8" y="10" width="6" height="11" rx="1" />
+                      {/* Can top/cap */}
+                      <rect x="9" y="7" width="4" height="3" rx="0.5" />
+                      {/* Nozzle button */}
+                      <rect x="10" y="4" width="2" height="3" rx="0.5" />
+                      {/* Spray particles */}
+                      <circle cx="5" cy="3" r="0.5" fill="currentColor" />
+                      <circle cx="7" cy="2" r="0.5" fill="currentColor" />
+                      <circle cx="4" cy="5" r="0.5" fill="currentColor" />
+                      <circle cx="6" cy="6" r="0.5" fill="currentColor" />
                     </svg>
                   </button>
                   
