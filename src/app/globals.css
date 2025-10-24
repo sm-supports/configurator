@@ -1,8 +1,16 @@
 @import "tailwindcss";
 
+/* Import handwriting font for pencil-style text */
+@import url('https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap');
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
+}
+
+/* Custom handwriting font utility */
+.font-handwriting {
+  font-family: 'Patrick Hand', cursive;
 }
 
 @media (prefers-color-scheme: dark) {

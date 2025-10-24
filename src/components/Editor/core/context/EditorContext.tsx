@@ -41,6 +41,8 @@ export interface EditorContextValue {
   setShowCenterline: React.Dispatch<React.SetStateAction<boolean>>;
   showRulers: boolean;
   setShowRulers: React.Dispatch<React.SetStateAction<boolean>>;
+  showFrameThickness: boolean;
+  setShowFrameThickness: React.Dispatch<React.SetStateAction<boolean>>;
   editingValue: string;
   setEditingValue: React.Dispatch<React.SetStateAction<string>>;
   
@@ -175,6 +177,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
   const [showLayersPanel, setShowLayersPanel] = useState(false);
   const [showCenterline, setShowCenterline] = useState(false);
   const [showRulers, setShowRulers] = useState(false);
+  const [showFrameThickness, setShowFrameThickness] = useState(false);
   const [editingValue, setEditingValue] = useState('');
   const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null);
   const [licensePlateFrame, setLicensePlateFrame] = useState<HTMLImageElement | null>(null);
@@ -350,6 +353,8 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
     setShowCenterline,
     showRulers,
     setShowRulers,
+    showFrameThickness,
+    setShowFrameThickness,
     editingValue,
     setEditingValue,
     
@@ -411,7 +416,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
   }), [
     // Dependencies for memoization
     state, template, stateManager, exportService, imageService,
-    isSaving, saveSuccess, saveError, isDownloading, showDownloadDropdown, showLayersPanel, showCenterline, showRulers,
+    isSaving, saveSuccess, saveError, isDownloading, showDownloadDropdown, showLayersPanel, showCenterline, showRulers, showFrameThickness,
     editingValue, bgImage, licensePlateFrame,
     undo, redo, canUndo, canRedo, pushHistory,
     zoom, view, zoomIn, zoomOut, resetZoom, bumpOverlay,
@@ -420,7 +425,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
     setActiveTool, setPaintSettings, startPainting, addPaintPoint, finishPainting, eraseAtPoint,
     setShapeSettings, addShape, addCenterline,
     handleSaveDesign, handleDownload, setEditingPos,
-    user, isAdmin, setShowDownloadDropdown, setShowLayersPanel, setEditingValue, setShowCenterline, setShowRulers
+    user, isAdmin, setShowDownloadDropdown, setShowLayersPanel, setEditingValue, setShowCenterline, setShowRulers, setShowFrameThickness
   ]);
 
   return (

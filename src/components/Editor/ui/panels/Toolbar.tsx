@@ -86,8 +86,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   resetZoom,
   changeFrameSize,
 }) => {
-  // Get showCenterline and showRulers from context
-  const { showCenterline, setShowCenterline, showRulers, setShowRulers } = useEditorContext();
+  // Get showCenterline, showRulers, and showFrameThickness from context
+  const { showCenterline, setShowCenterline, showRulers, setShowRulers, showFrameThickness, setShowFrameThickness } = useEditorContext();
   
   // Check for selected element OR editing text element
   const selectedElement = state.elements.find(el => el.id === state.selectedId);
@@ -101,6 +101,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const [showFrameSizeDropdown, setShowFrameSizeDropdown] = useState(false);
   const fontDropdownRef = useRef<HTMLDivElement>(null);
   const frameSizeDropdownRef = useRef<HTMLDivElement>(null);
+  const textInputRef = useRef<HTMLInputElement>(null);
 
   const isPaintToolActive = ['brush', 'airbrush', 'spray', 'eraser'].includes(state.activeTool);
   const isShapeToolActive = state.activeTool === 'shape';
@@ -140,120 +141,158 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     }
   }, [showFrameSizeDropdown]);
 
+  // Auto-select text input when text toolbar opens with demo text
+  useEffect(() => {
+    if (textElement && textElement.isDemoText && textInputRef.current) {
+      // Select all the demo text so user can immediately type to replace it
+      textInputRef.current.select();
+      // Remove the isDemoText flag so it doesn't keep selecting on every render
+      const elementId = state.editingTextId || state.selectedId;
+      if (elementId) {
+        updateElement(elementId, { isDemoText: false });
+      }
+    }
+  }, [textElement?.id, textElement?.isDemoText, state.editingTextId, state.selectedId, updateElement]);
+
   return (
     <>
       {/* Main Toolbar */}
       <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b border-slate-700 shadow-2xl">
         <div className="px-4 py-2.5 flex items-center gap-3">
-          {/* Left Section - Navigation & History */}
+          {/* Left Section - Navigation & Tools */}
           <div className="flex items-center gap-2">
+            {/* Home Button */}
             <button
               onClick={() => window.location.href = '/'}
-              className="p-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-all duration-200"
+              className="p-2.5 text-slate-300 hover:text-white hover:bg-slate-700/80 rounded-xl transition-all duration-200 hover:scale-105 group"
               title="Go to Home"
             >
-              <Home className="w-5 h-5" />
+              <Home className="w-5 h-5 group-hover:scale-110 transition-transform" />
             </button>
             
-            <div className="w-px h-6 bg-slate-700" />
+            <div className="w-px h-8 bg-slate-700/50 mx-1" />
             
-            <button
-              onClick={undo}
-              disabled={!canUndo}
-              className="p-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-              title="Undo (Cmd/Ctrl+Z)"
-            >
-              <Undo2 className="w-5 h-5" />
-            </button>
-            <button
-              onClick={redo}
-              disabled={!canRedo}
-              className="p-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-              title="Redo (Cmd/Ctrl+Shift+Z)"
-            >
-              <Redo2 className="w-5 h-5" />
-            </button>
+            {/* History Group */}
+            <div className="flex items-center gap-1 bg-slate-800/60 backdrop-blur-sm rounded-xl p-1 border border-slate-700/50">
+              <button
+                onClick={undo}
+                disabled={!canUndo}
+                className="p-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                title={`Undo (${modKey}+Z)`}
+              >
+                <Undo2 className="w-4 h-4" />
+              </button>
+              <button
+                onClick={redo}
+                disabled={!canRedo}
+                className="p-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                title={`Redo (${modKey}+Shift+Z)`}
+              >
+                <Redo2 className="w-4 h-4" />
+              </button>
+            </div>
 
-            <div className="w-px h-6 bg-slate-700" />
+            <div className="w-px h-8 bg-slate-700/50 mx-1" />
 
-            {/* Zoom Controls */}
-            <button
-              onClick={zoomOut}
-              disabled={isMinZoom}
-              className="p-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-              title={`Zoom Out (${modKey} -)`}
-            >
-              <ZoomOut className="w-5 h-5" />
-            </button>
-            
-            <button
-              onClick={resetZoom}
-              className="px-3 py-1.5 text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-all min-w-[52px]"
-              title={`Reset Zoom (${modKey} 0)`}
-            >
-              {zoomPercentage}%
-            </button>
-            
-            <button
-              onClick={zoomIn}
-              disabled={isMaxZoom}
-              className="p-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-              title={`Zoom In (${modKey} +)`}
-            >
-              <ZoomIn className="w-5 h-5" />
-            </button>
+            {/* View Controls Group */}
+            <div className="flex items-center gap-1 bg-slate-800/60 backdrop-blur-sm rounded-xl p-1 border border-slate-700/50">
+              {/* Zoom Controls */}
+              <button
+                onClick={zoomOut}
+                disabled={isMinZoom}
+                className="p-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                title={`Zoom Out (${modKey}+−)`}
+              >
+                <ZoomOut className="w-4 h-4" />
+              </button>
+              
+              <button
+                onClick={resetZoom}
+                className="px-3 py-1.5 text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-all min-w-[48px]"
+                title={`Reset Zoom (${modKey}+0)`}
+              >
+                {zoomPercentage}%
+              </button>
+              
+              <button
+                onClick={zoomIn}
+                disabled={isMaxZoom}
+                className="p-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                title={`Zoom In (${modKey}++)`}
+              >
+                <ZoomIn className="w-4 h-4" />
+              </button>
+            </div>
 
-            {/* Centerline Toggle Button */}
-            <button
-              onClick={() => {
-                setShowCenterline(!showCenterline);
-                if (!showCenterline) {
-                  // Add centerline when turning on
-                  addCenterline();
-                } else {
-                  // Remove centerline when turning off
-                  setState(prev => ({
-                    ...prev,
-                    elements: prev.elements.filter(el => el.type !== 'centerline')
-                  }));
-                }
-              }}
-              className={`p-2 rounded-lg transition-all ${
-                showCenterline
-                  ? 'bg-teal-500 text-white shadow-lg shadow-teal-500/30'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-700'
-              }`}
-              title={showCenterline ? "Hide Centerline" : "Show Centerline (Horizontal & Vertical)"}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-                <line x1="2" y1="12" x2="22" y2="12" />
-                <line x1="12" y1="2" x2="12" y2="22" />
-              </svg>
-            </button>
+            <div className="w-px h-8 bg-slate-700/50 mx-1" />
 
-            {/* Ruler Toggle Button */}
-            <button
-              onClick={() => setShowRulers(!showRulers)}
-              className={`p-2 rounded-lg transition-all ${
-                showRulers
-                  ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-700'
-              }`}
-              title={showRulers ? "Hide Rulers" : "Show Rulers (in/mm with pointer detection)"}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-                <line x1="3" y1="3" x2="3" y2="21" />
-                <line x1="3" y1="3" x2="21" y2="3" />
-                <line x1="6" y1="3" x2="6" y2="6" />
-                <line x1="9" y1="3" x2="9" y2="6" />
-                <line x1="12" y1="3" x2="12" y2="6" />
-                <line x1="15" y1="3" x2="15" y2="6" />
-                <line x1="18" y1="3" x2="18" y2="6" />
-                <line x1="3" y1="6" x2="6" y2="6" />
-                <line x1="3" y1="9" x2="6" y2="9" />
-                <line x1="3" y1="12" x2="6" y2="12" />
-              </svg>
-            </button>
+            {/* Measurement Tools Group */}
+            <div className="flex items-center gap-1 bg-slate-800/60 backdrop-blur-sm rounded-xl p-1 border border-slate-700/50">
+              {/* Centerline Toggle */}
+              <button
+                onClick={() => {
+                  setShowCenterline(!showCenterline);
+                  if (!showCenterline) {
+                    addCenterline();
+                  } else {
+                    setState(prev => ({
+                      ...prev,
+                      elements: prev.elements.filter(el => el.type !== 'centerline')
+                    }));
+                  }
+                }}
+                className={`p-2 rounded-lg transition-all group ${
+                  showCenterline
+                    ? 'bg-gradient-to-br from-teal-500 to-cyan-500 text-white shadow-lg shadow-teal-500/30'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-700'
+                }`}
+                title={showCenterline ? "Hide Centerline" : "Show Centerline"}
+              >
+                <svg className="w-4 h-4 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                  <line x1="2" y1="12" x2="22" y2="12" />
+                  <line x1="12" y1="2" x2="12" y2="22" />
+                </svg>
+              </button>
+
+              {/* Ruler Toggle */}
+              <button
+                onClick={() => setShowRulers(!showRulers)}
+                className={`p-2 rounded-lg transition-all group ${
+                  showRulers
+                    ? 'bg-gradient-to-br from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-500/30'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-700'
+                }`}
+                title={showRulers ? "Hide Rulers" : "Show Rulers (in/mm)"}
+              >
+                <svg className="w-4 h-4 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                  <line x1="3" y1="3" x2="3" y2="21" />
+                  <line x1="3" y1="3" x2="21" y2="3" />
+                  <line x1="6" y1="3" x2="6" y2="6" />
+                  <line x1="9" y1="3" x2="9" y2="6" />
+                  <line x1="12" y1="3" x2="12" y2="6" />
+                  <line x1="15" y1="3" x2="15" y2="6" />
+                  <line x1="18" y1="3" x2="18" y2="6" />
+                  <line x1="3" y1="6" x2="6" y2="6" />
+                  <line x1="3" y1="9" x2="6" y2="9" />
+                  <line x1="3" y1="12" x2="6" y2="12" />
+                </svg>
+              </button>
+
+              {/* Frame Thickness Toggle */}
+              <button
+                onClick={() => setShowFrameThickness(!showFrameThickness)}
+                className={`p-2 rounded-lg transition-all group ${
+                  showFrameThickness
+                    ? 'bg-gradient-to-br from-amber-500 to-yellow-500 text-white shadow-lg shadow-amber-500/30'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-700'
+                }`}
+                title={showFrameThickness ? "Hide Frame Thickness" : "Show Frame Thickness"}
+              >
+                <svg className="w-4 h-4 group-hover:scale-110 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            </div>
           </div>
 
           {/* Center Section - Template Name & Layer Toggle */}
@@ -362,21 +401,21 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
           {/* Right Section - Tools & Actions */}
           <div className="flex items-center gap-2">
-            {/* Add Tools */}
-            <div className="flex items-center gap-1 bg-slate-800/50 backdrop-blur-sm rounded-lg p-1 border border-slate-700">
+            {/* Add Content Tools */}
+            <div className="flex items-center gap-1 bg-slate-800/60 backdrop-blur-sm rounded-xl p-1 border border-slate-700/50">
               <button
                 onClick={() => {
                   setActiveTool('select');
                   addText();
                 }}
-                className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md transition-all shadow-sm"
+                className="p-2 bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg transition-all shadow-md hover:shadow-lg hover:scale-105 group"
                 title="Add Text"
               >
-                <Type className="w-4 h-4" />
+                <Type className="w-4 h-4 group-hover:scale-110 transition-transform" />
               </button>
               
-              <label className="p-2 bg-green-500 hover:bg-green-600 text-white rounded-md cursor-pointer transition-all shadow-sm">
-                <ImagePlus className="w-4 h-4" />
+              <label className="p-2 bg-gradient-to-br from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-lg cursor-pointer transition-all shadow-md hover:shadow-lg hover:scale-105 group">
+                <ImagePlus className="w-4 h-4 group-hover:scale-110 transition-transform" />
                 <input
                   type="file"
                   accept="image/*"
@@ -400,14 +439,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                     setPaintSettings({ brushType: 'brush' });
                   }
                 }}
-                className={`p-2 rounded-md transition-all shadow-sm ${
+                className={`p-2 rounded-lg transition-all shadow-md hover:shadow-lg hover:scale-105 group ${
                   isPaintToolActive
-                    ? 'bg-pink-500 hover:bg-pink-600 text-white'
-                    : 'bg-pink-500 hover:bg-pink-600 text-white'
+                    ? 'bg-gradient-to-br from-pink-500 to-rose-600 text-white'
+                    : 'bg-gradient-to-br from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white'
                 }`}
                 title={isPaintToolActive ? "Close Paint Tools" : "Paint Tools"}
               >
-                <Brush className="w-4 h-4" />
+                <Brush className="w-4 h-4 group-hover:scale-110 transition-transform" />
               </button>
 
               <button
@@ -418,52 +457,56 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                     setActiveTool('shape');
                   }
                 }}
-                className={`p-2 rounded-md transition-all shadow-sm ${
+                className={`p-2 rounded-lg transition-all shadow-md hover:shadow-lg hover:scale-105 group ${
                   isShapeToolActive
-                    ? 'bg-purple-500 hover:bg-purple-600 text-white'
-                    : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                    ? 'bg-gradient-to-br from-purple-500 to-violet-600 text-white'
+                    : 'bg-gradient-to-br from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white'
                 }`}
                 title={isShapeToolActive ? "Close Shape Tools" : "Shape Tools"}
               >
-                <Shapes className="w-4 h-4" />
+                <Shapes className="w-4 h-4 group-hover:scale-110 transition-transform" />
               </button>
             </div>
 
-            <div className="w-px h-6 bg-slate-700" />
+            <div className="w-px h-8 bg-slate-700/50 mx-1" />
 
-            <button
-              onClick={() => setShowLayersPanel(!showLayersPanel)}
-              className={`p-2 rounded-lg transition-all ${
-                showLayersPanel
-                  ? 'bg-indigo-500 text-white'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-700'
-              }`}
-              title="Layers"
-            >
-              <Layers className="w-5 h-5" />
-            </button>
-
-            {state.selectedId && (
+            {/* View Tools */}
+            <div className="flex items-center gap-1 bg-slate-800/60 backdrop-blur-sm rounded-xl p-1 border border-slate-700/50">
               <button
-                onClick={() => state.selectedId && deleteElement(state.selectedId)}
-                className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all"
-                title="Delete Selected"
+                onClick={() => setShowLayersPanel(!showLayersPanel)}
+                className={`p-2 rounded-lg transition-all hover:scale-105 group ${
+                  showLayersPanel
+                    ? 'bg-gradient-to-br from-indigo-500 to-blue-600 text-white shadow-lg'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-700'
+                }`}
+                title="Layers Panel"
               >
-                <Trash2 className="w-4 h-4" />
+                <Layers className="w-4 h-4 group-hover:scale-110 transition-transform" />
               </button>
-            )}
 
-            <div className="w-px h-6 bg-slate-700" />
+              {state.selectedId && (
+                <button
+                  onClick={() => state.selectedId && deleteElement(state.selectedId)}
+                  className="p-2 bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-lg transition-all shadow-md hover:shadow-lg hover:scale-105 group"
+                  title="Delete Selected"
+                >
+                  <Trash2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                </button>
+              )}
+            </div>
 
+            <div className="w-px h-8 bg-slate-700/50 mx-1" />
+
+            {/* Save Actions */}
             <button
               onClick={handleSaveDesign}
               disabled={isSaving}
-              className={`px-4 py-2 rounded-lg font-medium transition-all ${
+              className={`px-4 py-2 rounded-xl font-medium transition-all shadow-lg hover:shadow-xl hover:scale-105 ${
                 isSaving
                   ? 'bg-slate-600 text-slate-400 cursor-not-allowed'
                   : saveSuccess
-                  ? 'bg-green-500 text-white'
-                  : 'bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white shadow-lg'
+                  ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
+                  : 'bg-gradient-to-r from-purple-500 via-violet-500 to-blue-500 hover:from-purple-600 hover:via-violet-600 hover:to-blue-600 text-white'
               }`}
               title="Save Design"
             >
@@ -549,13 +592,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         </div>
 
         {/* Text Formatting Bar (appears when text is selected) */}
-        {textElement && (
+        {textElement && !isPaintToolActive && !isShapeToolActive && (
           <div className="px-4 py-2 bg-slate-800/50 backdrop-blur-sm border-t border-slate-700">
             <div className="flex items-center gap-3 flex-wrap">
               {/* Text Content Input */}
               <div className="flex items-center gap-2 flex-1 min-w-[300px]">
                 <label className="text-xs font-medium text-slate-400">Text:</label>
                 <input
+                  ref={textInputRef}
                   type="text"
                   value={textElement.text}
                   onChange={(e) => {

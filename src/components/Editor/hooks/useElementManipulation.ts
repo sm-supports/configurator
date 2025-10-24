@@ -17,11 +17,11 @@ export const useElementManipulation = (
 ) => {
 
   const addText = useCallback(() => {
-    const defaultText = ''; // Start with empty text to force user input
+    const demoText = 'Type your text here'; // Demo text that appears on canvas
     const defaultFontSize = 24;
     const defaultFontFamily = vehiclePlateFonts[0].value;
     const defaultFontWeight = 'normal';
-    const measured = measureText('New Text', defaultFontSize, defaultFontFamily, defaultFontWeight, 'normal'); // Measure placeholder for initial size
+    const measured = measureText(demoText, defaultFontSize, defaultFontFamily, defaultFontWeight, 'normal');
     
     // Position text at the very top edge of the canvas with random horizontal position
     const margin = 10;
@@ -33,7 +33,7 @@ export const useElementManipulation = (
     const newText: TextElement = {
       id: uuidv4(),
       type: 'text',
-      text: defaultText, // Empty text - user must type
+      text: demoText, // Demo text visible on canvas
       x: randomX,
       y: topY,
       width: Math.max(50, measured.width),
@@ -49,7 +49,8 @@ export const useElementManipulation = (
       visible: true,
       locked: false,
       flippedH: false,
-      flippedV: false
+      flippedV: false,
+      isDemoText: true // Flag to indicate this is demo text
     };
 
     setState(prev => {
@@ -62,8 +63,8 @@ export const useElementManipulation = (
       };
     });
     
-    // Set editing value to empty so user can start typing
-    setEditingValue('');
+    // Set editing value to demo text so it appears in the input
+    setEditingValue(demoText);
   }, [state.elements.length, pushHistory, template, nextRand, vehiclePlateFonts, setState, setEditingValue]);
 
   const addImage = useCallback((file: File) => {
@@ -239,15 +240,18 @@ export const useElementManipulation = (
     if (element && element.type === 'text') {
       const textEl = element as TextElement;
       const currentText = textEl.text || '';
+      const isDemoText = textEl.isDemoText || currentText === 'Type your text here';
       
-      if (currentText.trim()) {
-        // Text is not empty - save it with trimmed value and recalculated dimensions
+      // Check if text was actually edited (not demo text or empty)
+      if (currentText.trim() && !isDemoText) {
+        // Text is not empty and not demo text - save it with trimmed value and recalculated dimensions
         if (save) {
           const measured = measureText(currentText.trim(), textEl.fontSize, textEl.fontFamily, textEl.fontWeight, textEl.fontStyle);
           updateElement(editingId, { 
             text: currentText.trim(),
             width: measured.width,
-            height: measured.height
+            height: measured.height,
+            isDemoText: false
           });
         }
         
@@ -258,7 +262,7 @@ export const useElementManipulation = (
           selectedId: save && reselect ? editingId : null
         }));
       } else {
-        // Text is empty - delete the element to prevent accidental creation
+        // Text is empty or still demo text - delete the element (user didn't actually type anything)
         setState(prev => {
           pushHistory(prev);
           return {
@@ -283,8 +287,37 @@ export const useElementManipulation = (
 
   // Paint functionality
   const setActiveTool = useCallback((tool: ToolType) => {
-    setState(prev => ({ ...prev, activeTool: tool, selectedId: null }));
-  }, [setState]);
+    setState(prev => {
+      // If switching to paint or shape tools while editing text, finish the text edit first
+      if ((tool === 'brush' || tool === 'airbrush' || tool === 'spray' || tool === 'eraser' || tool === 'shape') && prev.editingTextId) {
+        const editingElement = prev.elements.find(el => el.id === prev.editingTextId);
+        if (editingElement && editingElement.type === 'text') {
+          const textEl = editingElement as TextElement;
+          const currentText = textEl.text || '';
+          const isDemoText = textEl.isDemoText || currentText === 'Type your text here';
+          
+          // If text wasn't edited, remove it
+          if (!currentText.trim() || isDemoText) {
+            pushHistory(prev);
+            return {
+              ...prev,
+              elements: prev.elements.filter(el => el.id !== prev.editingTextId),
+              editingTextId: null,
+              selectedId: null,
+              activeTool: tool
+            };
+          }
+        }
+      }
+      
+      return { 
+        ...prev, 
+        activeTool: tool, 
+        selectedId: null,
+        editingTextId: null // Close text editing when switching tools
+      };
+    });
+  }, [setState, pushHistory]);
 
   const setPaintSettings = useCallback((settings: Partial<EditorState['paintSettings']>) => {
     setState(prev => ({

@@ -39,6 +39,7 @@ const EditorCore: React.FC = () => {
     showLayersPanel,
     setShowLayersPanel,
     showRulers,
+    showFrameThickness,
     
     // Background images
     bgImage,
@@ -186,6 +187,7 @@ const EditorCore: React.FC = () => {
           finishPainting={finishPainting}
           eraseAtPoint={eraseAtPoint}
           showRulers={showRulers}
+          showFrameThickness={showFrameThickness}
         />
       </EditorLayout>
 

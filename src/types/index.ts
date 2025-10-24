@@ -67,6 +67,7 @@ export interface TextElement extends DesignElement {
   color: string;
   textAlign?: 'left' | 'center' | 'right';
   writingMode?: 'horizontal' | 'vertical';
+  isDemoText?: boolean; // Flag to indicate if this is demo text that should be auto-selected
 }
 
 export interface ImageElement extends DesignElement {

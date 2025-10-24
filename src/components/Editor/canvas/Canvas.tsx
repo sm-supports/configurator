@@ -8,7 +8,6 @@ import { TextElementComponent } from './elements/TextElement';
 import { PaintElementComponent } from './elements/PaintElement';
 import { ShapeElementComponent } from './elements/ShapeElement';
 import { CenterlineElement as CenterlineElementComponent } from './elements/CenterlineElement';
-import { Rulers } from './Rulers';
 import { getWASMStatus } from '@/lib/wasmBridge';
 
 interface CanvasProps {
@@ -783,17 +782,6 @@ export const Canvas: React.FC<CanvasProps> = ({
             useSingleNodeRotation={false}
           />
         </Layer>
-
-        {/* Rulers Layer */}
-        {showRulers && (
-          <Layer offsetX={-view.x} offsetY={-view.y}>
-            <Rulers
-              canvasWidth={template.width_px * zoom}
-              canvasHeight={template.height_px * zoom + (Math.min(template.width_px, template.height_px) * zoom * 0.2)}
-              stageRef={stageRef}
-            />
-          </Layer>
-        )}
 
         {/* Brush Preview - Shows exact area that will be painted */}
         {cursorPos && (state.activeTool === 'brush' || state.activeTool === 'airbrush' || state.activeTool === 'spray' || state.activeTool === 'eraser') && (
