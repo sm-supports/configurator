@@ -2,9 +2,8 @@
 import { useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { TextElement, ImageElement, PlateTemplate } from '@/types';
-import { EditorState, Element, PaintElement, PaintPoint, ToolType, ShapeElement, ShapeSettings } from '../core/types';
-import { measureText, computeSpawnPosition } from '../canvas/utils/canvasUtils';
-import { wasmOps } from '@/lib/wasmBridge';
+import { EditorState, Element, PaintElement, PaintPoint, ToolType, ShapeElement, ShapeSettings, CenterlineElement } from '../core/types';
+import { measureText } from '../canvas/utils/canvasUtils';
 
 export const useElementManipulation = (
   state: EditorState,
@@ -15,7 +14,6 @@ export const useElementManipulation = (
   vehiclePlateFonts: Array<{ name: string; value: string }>,
   editingValue: string,
   setEditingValue: React.Dispatch<React.SetStateAction<string>>,
-  zoom: number = 1,
 ) => {
 
   const addText = useCallback(() => {
@@ -66,7 +64,7 @@ export const useElementManipulation = (
     
     // Set editing value to empty so user can start typing
     setEditingValue('');
-  }, [state.elements, state.activeLayer, pushHistory, template, nextRand, vehiclePlateFonts, setState, setEditingValue]);
+  }, [state.elements.length, pushHistory, template, nextRand, vehiclePlateFonts, setState, setEditingValue]);
 
   const addImage = useCallback((file: File) => {
     const reader = new FileReader();
@@ -128,7 +126,7 @@ export const useElementManipulation = (
       img.src = e.target?.result as string;
     };
     reader.readAsDataURL(file);
-  }, [state.elements.length, state.activeLayer, pushHistory, template.width_px, template.height_px, setState]);
+  }, [state.elements.length, pushHistory, template.width_px, template.height_px, setState]);
 
   const selectElement = useCallback((id: string) => {
     setState(prev => {
@@ -560,7 +558,7 @@ export const useElementManipulation = (
     const centerX = template.width_px / 2;
     const centerY = template.height_px / 2;
 
-    const newCenterline: any = {
+    const newCenterline: CenterlineElement = {
       id: uuidv4(),
       type: 'centerline',
       x: centerX,

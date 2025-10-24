@@ -49,8 +49,7 @@ export class EditorImageService {
         // Generate a fallback placeholder image
         this.bgImage = this.generatePlaceholderImage(
           this.template.width_px,
-          this.template.height_px + Math.min(this.template.width_px, this.template.height_px) * 0.2,
-          this.template.name || 'Template'
+          this.template.height_px + Math.min(this.template.width_px, this.template.height_px) * 0.2
         );
         
         if (this.bgImage) {
@@ -154,7 +153,7 @@ export class EditorImageService {
   /**
    * Generate a placeholder image when template image fails to load
    */
-  private generatePlaceholderImage(width: number, height: number, text: string): HTMLImageElement | null {
+  private generatePlaceholderImage(width: number, height: number): HTMLImageElement | null {
     try {
       if (typeof document === 'undefined') return null;
 

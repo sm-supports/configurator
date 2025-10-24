@@ -8,7 +8,6 @@ import { initializeWASM } from '@/lib/wasmBridge';
  * This should be rendered early in the app lifecycle
  */
 export function WASMInitializer() {
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -26,8 +25,6 @@ export function WASMInitializer() {
         const message = err instanceof Error ? err.message : 'Unknown error';
         console.error('[WASM] ❌ Failed to initialize:', message);
         setError(message);
-      } finally {
-        setIsLoading(false);
       }
     };
 

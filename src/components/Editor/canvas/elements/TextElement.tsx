@@ -23,7 +23,6 @@ export const TextElementComponent: React.FC<TextElementProps> = React.memo(funct
   onSelect,
   onUpdate,
   bumpOverlay,
-  template,
 }) {
   return (
     <Group key={element.id}>
