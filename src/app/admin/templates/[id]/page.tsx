@@ -9,6 +9,8 @@ import { checkAdminStatus } from '@/lib/adminUtils';
 import ProtectedRoute from '@/components/Auth/ProtectedRoute';
 import { ArrowLeft, Save, Upload, X, Trash2 } from 'lucide-react';
 
+export const runtime = 'edge';
+
 interface TemplateFormData {
   name: string;
   country_id: string;

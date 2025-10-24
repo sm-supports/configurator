@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
 import { requireAuth, checkRateLimit, sanitizeInput } from '@/lib/authUtils';
 
+export const runtime = 'edge';
+
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     // Rate limiting

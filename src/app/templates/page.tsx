@@ -4,6 +4,8 @@ import { supabase } from '@/lib/supabaseClient';
 import { PlateTemplate, Country } from '@/types';
 import { Filter, Globe } from 'lucide-react';
 
+export const runtime = 'edge';
+
 // Server-rendered page: fetch data in parallel, minimal client JS
 export const revalidate = 60;
 

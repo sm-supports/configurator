@@ -8,6 +8,8 @@ import { getDesign } from '@/lib/designUtils';
 import ClientOnlyEditor from '@/components/Editor/ClientOnlyEditor';
 import EditorNavigation from '@/components/Navigation/EditorNavigation';
 
+export const runtime = 'edge';
+
 // Preload the editor chunk immediately
 if (typeof window !== 'undefined') {
   import('@/components/Editor/Editor').catch(() => {

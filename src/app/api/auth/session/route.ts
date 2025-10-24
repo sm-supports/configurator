@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const runtime = 'edge';
+
 // Util: ensure request originates from same origin to mitigate CSRF
 function isSameOrigin(request: NextRequest) {
   const origin = request.headers.get('origin');

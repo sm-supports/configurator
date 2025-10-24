@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
 import { requireAuth, checkRateLimit, sanitizeInput } from '@/lib/authUtils';
 
+export const runtime = 'edge';
+
 export async function POST(request: NextRequest) {
   try {
     // Rate limiting - 10 requests per minute per user
