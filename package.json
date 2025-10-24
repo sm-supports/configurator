@@ -12,7 +12,7 @@
     "start": "next start",
     "lint": "eslint",
     "type-check": "tsc --noEmit",
-    "pages:build": "npm run asbuild && opennextjs-cloudflare build && cp .open-next/worker.js .open-next/_worker.js",
+    "pages:build": "npm run asbuild && opennextjs-cloudflare build && cp .open-next/worker.js .open-next/assets/_worker.js && cp -r .open-next/cloudflare .open-next/assets/ && cp -r .open-next/middleware .open-next/assets/ && cp -r .open-next/server-functions .open-next/assets/ && cp -r .open-next/.build .open-next/assets/",
     "preview": "npm run asbuild && opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy": "npm run asbuild && opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
