@@ -13,7 +13,7 @@
     "lint": "eslint",
     "type-check": "tsc --noEmit",
     "vercel-build": "npm run asbuild && next build",
-    "pages:build": "npm run asbuild && npm install -D @opennextjs/cloudflare@latest && npx opennextjs-cloudflare build",
+    "pages:build": "npm run asbuild && npm install -D @opennextjs/cloudflare@latest && npx opennextjs-cloudflare build && cp .open-next/worker.js .open-next/assets/_worker.js",
     "preview": "npm run asbuild && opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy": "npm run asbuild && opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
