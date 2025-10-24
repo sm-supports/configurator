@@ -1,13 +1,7 @@
-name = "configurator"name = "configurator"
-
-compatibility_date = "2025-03-25"pages_build_output_dir = ".open-next/assets"
-
-compatibility_flags = ["nodejs_compat"]compatibility_date = "2025-03-25"
-
+name = "configurator"
+compatibility_date = "2025-03-25"
 compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = ".open-next/assets"
 
-[build]
-command = "npm run pages:build"
-
-[build.upload]
-format = "service-worker"
+[env.production]
+vars = { NODE_ENV = "production" }
