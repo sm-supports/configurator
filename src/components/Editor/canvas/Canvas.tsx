@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react'
 import { Stage, Layer, Image as KonvaImage, Group, Transformer, Line, Rect, Circle } from 'react-konva';
 import type Konva from 'konva';
 import { PlateTemplate, ImageElement, TextElement } from '@/types';
-import { EditorState, Element, PaintElement, ShapeElement, CenterlineElement, ToolType } from '../core/types';
+import { EditorState, Element, PaintElement, ShapeElement, CenterlineElement } from '../core/types';
 import { ImageElementComponent } from './elements/ImageElement';
 import { TextElementComponent } from './elements/TextElement';
 import { PaintElementComponent } from './elements/PaintElement';

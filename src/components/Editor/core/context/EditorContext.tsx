@@ -220,7 +220,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
     setActiveTool, setPaintSettings, startPainting, addPaintPoint, finishPainting, eraseAtPoint,
     setShapeSettings, addShape, addCenterline
   } = useElementManipulation(
-    state, setState, pushHistory, template, nextRand, vehiclePlateFonts, editingValue, setEditingValue, zoom
+    state, setState, pushHistory, template, nextRand, vehiclePlateFonts, editingValue, setEditingValue
   );
 
   useKeyboardShortcuts(state, deleteElement, undo, redo);
