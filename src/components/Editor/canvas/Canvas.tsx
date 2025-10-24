@@ -532,7 +532,9 @@ export const Canvas: React.FC<CanvasProps> = ({
                       );
                     }
                     return null;
-                  })}                {/* Render ALL license plate layer elements (images, text, paint, shapes) sorted by zIndex */}
+                  })}
+                
+                {/* Render ALL license plate layer elements (images, text, paint, shapes) sorted by zIndex */}
                 {sortedElements
                   .filter(element => (element.layer || 'base') === 'licenseplate')
                   .map(element => {
