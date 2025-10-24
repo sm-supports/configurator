@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Configure images for Vercel
+  // Configure images for Cloudflare
   images: {
     remotePatterns: [
       {
@@ -11,6 +11,7 @@ const nextConfig: NextConfig = {
         pathname: '/storage/v1/object/public/**',
       },
     ],
+    // Cloudflare uses their own image optimization
     unoptimized: true,
   },
 
@@ -19,8 +20,8 @@ const nextConfig: NextConfig = {
     // optimizeCss: true, // Temporarily disabled due to critters module issue
   },
 
-  // Compression
-  compress: true,
+  // Compression - handled by Cloudflare
+  compress: false,
 
   // Headers for security
   async headers() {
