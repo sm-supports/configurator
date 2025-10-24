@@ -297,7 +297,6 @@ export const EditorContent: React.FC<EditorContentProps> = ({
             addPaintPoint={addPaintPoint}
             finishPainting={finishPainting}
             eraseAtPoint={eraseAtPoint}
-            showRulers={showRulers}
           />
         </div>
 
