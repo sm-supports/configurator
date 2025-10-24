@@ -2,11 +2,13 @@ import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react'
 import { Stage, Layer, Image as KonvaImage, Group, Transformer, Line, Rect, Circle } from 'react-konva';
 import type Konva from 'konva';
 import { PlateTemplate, ImageElement, TextElement } from '@/types';
-import { EditorState, Element, PaintElement, ShapeElement } from '../core/types';
+import { EditorState, Element, PaintElement, ShapeElement, CenterlineElement, ToolType } from '../core/types';
 import { ImageElementComponent } from './elements/ImageElement';
 import { TextElementComponent } from './elements/TextElement';
 import { PaintElementComponent } from './elements/PaintElement';
 import { ShapeElementComponent } from './elements/ShapeElement';
+import { CenterlineElement as CenterlineElementComponent } from './elements/CenterlineElement';
+import { Rulers } from './Rulers';
 import { getWASMStatus } from '@/lib/wasmBridge';
 
 interface CanvasProps {
@@ -20,24 +22,35 @@ interface CanvasProps {
   licensePlateFrame: HTMLImageElement | null;
   state: EditorState;
   selectElement: (id: string) => void;
+  setActiveTool: (tool: ToolType) => void;
   updateElement: (id: string, updates: Partial<Element>) => void;
   bumpOverlay: () => void;
   startPainting: (x: number, y: number) => void;
   addPaintPoint: (x: number, y: number) => void;
   finishPainting: () => void;
   eraseAtPoint: (x: number, y: number, eraserSize: number) => void;
+  showRulers?: boolean;
 }
 
 export const Canvas: React.FC<CanvasProps> = ({
   template, zoom, view, stageRef, handleStageClick, lastPointerRef,
-  bgImage, licensePlateFrame, state, selectElement, updateElement,
+  bgImage, licensePlateFrame, state, selectElement, setActiveTool, updateElement,
   bumpOverlay,
   startPainting, addPaintPoint, finishPainting, eraseAtPoint,
+  showRulers = false,
 }) => {
   const transformerRef = useRef<Konva.Transformer>(null);
   const selectedNodeRef = useRef<Konva.Node | null>(null);
   const [wasmReady, setWasmReady] = useState(false);
   const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
+
+  // Wrapped selectElement that auto-opens shape toolbar for shape elements
+  const handleSelectElement = useCallback((id: string) => {
+    selectElement(id);
+    
+    // Note: We don't call setActiveTool here because it clears selectedId
+    // The shape toolbar will open automatically based on the selected element type
+  }, [selectElement]);
 
   // Check WASM status on mount
   useEffect(() => {
@@ -328,7 +341,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                         zoom={zoom}
                         plateOffsetY={plateOffsetY}
                         isInteractive={isInteractive}
-                        onSelect={() => selectElement(element.id)}
+                        onSelect={() => handleSelectElement(element.id)}
                         onUpdate={(updates) => updateElement(element.id, updates)}
                       />
                     </Group>
@@ -390,7 +403,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                       zoom={zoom}
                       plateOffsetY={plateOffsetY}
                       isInteractive={isInteractive}
-                      onSelect={() => selectElement(element.id)}
+                      onSelect={() => handleSelectElement(element.id)}
                       onUpdate={(updates) => updateElement(element.id, updates)}
                       bumpOverlay={bumpOverlay}
                     />
@@ -453,7 +466,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                             zoom={zoom}
                             plateOffsetY={plateOffsetY}
                             isInteractive={isInteractive}
-                            onSelect={() => selectElement(element.id)}
+                            onSelect={() => handleSelectElement(element.id)}
                             onUpdate={(updates) => updateElement(element.id, updates)}
                           />
                         </Group>
@@ -497,7 +510,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                             plateOffsetY={plateOffsetY}
                             isInteractive={isInteractive}
                             isSelected={isSelected}
-                            onSelect={() => selectElement(element.id)}
+                            onSelect={() => handleSelectElement(element.id)}
                             onUpdate={(updates) => updateElement(element.id, updates)}
                           />
                         </Group>
@@ -511,10 +524,26 @@ export const Canvas: React.FC<CanvasProps> = ({
                           zoom={zoom}
                           plateOffsetY={plateOffsetY}
                           isInteractive={isInteractive}
-                          onSelect={() => selectElement(element.id)}
+                          onSelect={() => handleSelectElement(element.id)}
                           onUpdate={(updates) => updateElement(element.id, updates)}
                           bumpOverlay={bumpOverlay}
                         />
+                      );
+                    } else if (element.type === 'centerline') {
+                      const centerlineEl = element as CenterlineElement;
+                      return (
+                        <Group key={element.id}>
+                          <CenterlineElementComponent
+                            element={centerlineEl}
+                            isSelected={isSelected}
+                            onSelect={() => handleSelectElement(element.id)}
+                            onUpdate={(updates) => updateElement(element.id, updates)}
+                            stageWidth={template.width_px * zoom}
+                            stageHeight={template.height_px * zoom}
+                            plateOffsetY={plateOffsetY}
+                            zoom={zoom}
+                          />
+                        </Group>
                       );
                     }
                     return null;
@@ -540,7 +569,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                             zoom={zoom}
                             plateOffsetY={plateOffsetY}
                             isInteractive={isInteractive}
-                            onSelect={() => selectElement(element.id)}
+                            onSelect={() => handleSelectElement(element.id)}
                             onUpdate={(updates) => updateElement(element.id, updates)}
                           />
                         </Group>
@@ -584,7 +613,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                             plateOffsetY={plateOffsetY}
                             isInteractive={isInteractive}
                             isSelected={isSelected}
-                            onSelect={() => selectElement(element.id)}
+                            onSelect={() => handleSelectElement(element.id)}
                             onUpdate={(updates) => updateElement(element.id, updates)}
                           />
                         </Group>
@@ -598,10 +627,26 @@ export const Canvas: React.FC<CanvasProps> = ({
                           zoom={zoom}
                           plateOffsetY={plateOffsetY}
                           isInteractive={isInteractive}
-                          onSelect={() => selectElement(element.id)}
+                          onSelect={() => handleSelectElement(element.id)}
                           onUpdate={(updates) => updateElement(element.id, updates)}
                           bumpOverlay={bumpOverlay}
                         />
+                      );
+                    } else if (element.type === 'centerline') {
+                      const centerlineEl = element as CenterlineElement;
+                      return (
+                        <Group key={element.id}>
+                          <CenterlineElementComponent
+                            element={centerlineEl}
+                            isSelected={isSelected}
+                            onSelect={() => handleSelectElement(element.id)}
+                            onUpdate={(updates) => updateElement(element.id, updates)}
+                            stageWidth={template.width_px * zoom}
+                            stageHeight={template.height_px * zoom}
+                            plateOffsetY={plateOffsetY}
+                            zoom={zoom}
+                          />
+                        </Group>
                       );
                     }
                     return null;
@@ -654,7 +699,7 @@ export const Canvas: React.FC<CanvasProps> = ({
           <Transformer
             ref={transformerRef}
             boundBoxFunc={(oldBox, newBox) => {
-              // Limit resize to reasonable bounds
+              // Limit resize to reasonable bounds - prevent shapes from becoming too small
               if (newBox.width < 10 || newBox.height < 10) {
                 return oldBox;
               }
@@ -680,12 +725,24 @@ export const Canvas: React.FC<CanvasProps> = ({
             borderDash={[4, 2]}
             rotateAnchorFill="#4285f4"
             rotateAnchorStroke="#ffffff"
-            keepRatio={false}
+            keepRatio={true}
             ignoreStroke={true}
             shouldOverdrawWholeArea={true}
             useSingleNodeRotation={false}
           />
         </Layer>
+
+        {/* Rulers Layer */}
+        {showRulers && (
+          <Layer offsetX={-view.x} offsetY={-view.y}>
+            <Rulers
+              canvasWidth={template.width_px * zoom}
+              canvasHeight={template.height_px * zoom + (Math.min(template.width_px, template.height_px) * zoom * 0.2)}
+              zoom={zoom}
+              stageRef={stageRef}
+            />
+          </Layer>
+        )}
 
         {/* Brush Preview - Shows exact area that will be painted */}
         {cursorPos && (state.activeTool === 'brush' || state.activeTool === 'airbrush' || state.activeTool === 'spray' || state.activeTool === 'eraser') && (

@@ -19,11 +19,11 @@ export const useElementManipulation = (
 ) => {
 
   const addText = useCallback(() => {
-    const defaultText = 'New Text';
+    const defaultText = ''; // Start with empty text to force user input
     const defaultFontSize = 24;
     const defaultFontFamily = vehiclePlateFonts[0].value;
     const defaultFontWeight = 'normal';
-    const measured = measureText(defaultText, defaultFontSize, defaultFontFamily, defaultFontWeight, 'normal');
+    const measured = measureText('New Text', defaultFontSize, defaultFontFamily, defaultFontWeight, 'normal'); // Measure placeholder for initial size
     
     // Position text at the very top edge of the canvas with random horizontal position
     const margin = 10;
@@ -35,7 +35,7 @@ export const useElementManipulation = (
     const newText: TextElement = {
       id: uuidv4(),
       type: 'text',
-      text: defaultText,
+      text: defaultText, // Empty text - user must type
       x: randomX,
       y: topY,
       width: Math.max(50, measured.width),
@@ -59,10 +59,14 @@ export const useElementManipulation = (
       return {
         ...prev,
         elements: [...prev.elements, newText],
-        selectedId: newText.id
+        editingTextId: newText.id, // Immediately enter edit mode
+        selectedId: null // Deselect during editing
       };
     });
-  }, [state.elements, state.activeLayer, pushHistory, template, nextRand, vehiclePlateFonts, setState]);
+    
+    // Set editing value to empty so user can start typing
+    setEditingValue('');
+  }, [state.elements, state.activeLayer, pushHistory, template, nextRand, vehiclePlateFonts, setState, setEditingValue]);
 
   const addImage = useCallback((file: File) => {
     const reader = new FileReader();
@@ -127,8 +131,27 @@ export const useElementManipulation = (
   }, [state.elements.length, state.activeLayer, pushHistory, template.width_px, template.height_px, setState]);
 
   const selectElement = useCallback((id: string) => {
-    setState(prev => ({ ...prev, selectedId: id }));
-  }, [setState]);
+    setState(prev => {
+      // If we're editing text and selecting a different element, finish the text edit first
+      if (prev.editingTextId && prev.editingTextId !== id) {
+        const editingElement = prev.elements.find(el => el.id === prev.editingTextId);
+        if (editingElement && editingElement.type === 'text') {
+          const textEl = editingElement as TextElement;
+          // If text is empty, remove the element
+          if (!textEl.text || !textEl.text.trim()) {
+            pushHistory(prev);
+            return {
+              ...prev,
+              elements: prev.elements.filter(el => el.id !== prev.editingTextId),
+              editingTextId: null,
+              selectedId: id
+            };
+          }
+        }
+      }
+      return { ...prev, selectedId: id, editingTextId: null };
+    });
+  }, [setState, pushHistory]);
 
   const updateElement = useCallback((id: string, updates: Partial<Element>) => {
     setState(prev => {
@@ -197,29 +220,52 @@ export const useElementManipulation = (
     
     // Read the current text from the element (it may have been updated directly via textarea)
     const element = state.elements.find(el => el.id === state.editingTextId);
+    const editingId = state.editingTextId;
     
-    if (save && element && element.type === 'text') {
+    if (element && element.type === 'text') {
       const textEl = element as TextElement;
       const currentText = textEl.text || '';
       
       if (currentText.trim()) {
-        // Recalculate dimensions based on current text
-        const measured = measureText(currentText.trim(), textEl.fontSize, textEl.fontFamily, textEl.fontWeight, textEl.fontStyle);
-        updateElement(state.editingTextId, { 
-          text: currentText.trim(),
-          width: measured.width,
-          height: measured.height
+        // Text is not empty - save it with trimmed value and recalculated dimensions
+        if (save) {
+          const measured = measureText(currentText.trim(), textEl.fontSize, textEl.fontFamily, textEl.fontWeight, textEl.fontStyle);
+          updateElement(editingId, { 
+            text: currentText.trim(),
+            width: measured.width,
+            height: measured.height
+          });
+        }
+        
+        // Keep the element selected if requested
+        setState(prev => ({ 
+          ...prev, 
+          editingTextId: null,
+          selectedId: save && reselect ? editingId : null
+        }));
+      } else {
+        // Text is empty - delete the element to prevent accidental creation
+        setState(prev => {
+          pushHistory(prev);
+          return {
+            ...prev,
+            elements: prev.elements.filter(el => el.id !== editingId),
+            editingTextId: null,
+            selectedId: null
+          };
         });
       }
+    } else {
+      // Element not found or not text - just exit edit mode
+      setState(prev => ({ 
+        ...prev, 
+        editingTextId: null,
+        selectedId: null
+      }));
     }
-
-    setState(prev => ({ 
-      ...prev, 
-      editingTextId: null,
-      selectedId: save && reselect ? prev.editingTextId : null
-    }));
+    
     setEditingValue('');
-  }, [state.editingTextId, state.elements, updateElement, setState, setEditingValue]);
+  }, [state.editingTextId, state.elements, updateElement, setState, setEditingValue, pushHistory]);
 
   // Paint functionality
   const setActiveTool = useCallback((tool: ToolType) => {
@@ -509,6 +555,36 @@ export const useElementManipulation = (
     });
   }, [state.elements.length, state.activeLayer, state.shapeSettings, pushHistory, template.width_px, template.height_px, setState]);
 
+  // Centerline functions
+  const addCenterline = useCallback(() => {
+    const centerX = template.width_px / 2;
+    const centerY = template.height_px / 2;
+
+    const newCenterline: any = {
+      id: uuidv4(),
+      type: 'centerline',
+      x: centerX,
+      y: centerY,
+      width: template.width_px,
+      height: template.height_px,
+      color: '#00FF00',
+      strokeWidth: 2,
+      opacity: 0.8,
+      zIndex: state.elements.length,
+      visible: true,
+      locked: false,
+      layer: 'licenseplate' // Always show on license plate layer so it's visible in both modes
+    };
+
+    setState(prev => {
+      pushHistory(prev);
+      return {
+        ...prev,
+        elements: [...prev.elements, newCenterline]
+      };
+    });
+  }, [state.elements.length, pushHistory, template.width_px, template.height_px, setState]);
+
   return { 
     addText, 
     addImage, 
@@ -526,6 +602,7 @@ export const useElementManipulation = (
     finishPainting,
     eraseAtPoint,
     setShapeSettings,
-    addShape
+    addShape,
+    addCenterline
   };
 };

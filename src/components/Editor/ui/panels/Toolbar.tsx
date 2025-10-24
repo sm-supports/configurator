@@ -6,6 +6,7 @@ import {
 import { PlateTemplate, TextElement } from '@/types';
 import { EditorState, Element, ToolType, PaintSettings, ShapeSettings, ShapeElement } from '../../core/types';
 import { vehiclePlateFonts, generalFonts } from '../../core/constants';
+import { useEditorContext } from '../../core/context/EditorContext';
 
 interface ToolbarProps {
   template: PlateTemplate;
@@ -39,6 +40,7 @@ interface ToolbarProps {
   setPaintSettings: (settings: Partial<PaintSettings>) => void;
   setShapeSettings: (settings: Partial<ShapeSettings>) => void;
   addShape: (shapeType?: ShapeSettings['shapeType']) => void;
+  addCenterline: () => void;
   zoom: number;
   zoomIn: () => void;
   zoomOut: () => void;
@@ -77,15 +79,21 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   setPaintSettings,
   setShapeSettings,
   addShape,
+  addCenterline,
   zoom,
   zoomIn,
   zoomOut,
   resetZoom,
   changeFrameSize,
 }) => {
+  // Get showCenterline and showRulers from context
+  const { showCenterline, setShowCenterline, showRulers, setShowRulers } = useEditorContext();
+  
+  // Check for selected element OR editing text element
   const selectedElement = state.elements.find(el => el.id === state.selectedId);
-  const isTextElement = selectedElement?.type === 'text';
-  const textElement = isTextElement ? selectedElement as TextElement : null;
+  const editingElement = state.editingTextId ? state.elements.find(el => el.id === state.editingTextId) : null;
+  const isTextElement = selectedElement?.type === 'text' || editingElement?.type === 'text';
+  const textElement = (isTextElement ? (editingElement || selectedElement) : null) as TextElement | null;
   const isShapeElement = selectedElement?.type === 'shape';
   const shapeElement = isShapeElement ? selectedElement as ShapeElement : null;
   const [showTextColorPicker, setShowTextColorPicker] = useState(false);
@@ -193,6 +201,58 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               title={`Zoom In (${modKey} +)`}
             >
               <ZoomIn className="w-5 h-5" />
+            </button>
+
+            {/* Centerline Toggle Button */}
+            <button
+              onClick={() => {
+                setShowCenterline(!showCenterline);
+                if (!showCenterline) {
+                  // Add centerline when turning on
+                  addCenterline();
+                } else {
+                  // Remove centerline when turning off
+                  setState(prev => ({
+                    ...prev,
+                    elements: prev.elements.filter(el => el.type !== 'centerline')
+                  }));
+                }
+              }}
+              className={`p-2 rounded-lg transition-all ${
+                showCenterline
+                  ? 'bg-teal-500 text-white shadow-lg shadow-teal-500/30'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-700'
+              }`}
+              title={showCenterline ? "Hide Centerline" : "Show Centerline (Horizontal & Vertical)"}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                <line x1="2" y1="12" x2="22" y2="12" />
+                <line x1="12" y1="2" x2="12" y2="22" />
+              </svg>
+            </button>
+
+            {/* Ruler Toggle Button */}
+            <button
+              onClick={() => setShowRulers(!showRulers)}
+              className={`p-2 rounded-lg transition-all ${
+                showRulers
+                  ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-700'
+              }`}
+              title={showRulers ? "Hide Rulers" : "Show Rulers (in/mm with pointer detection)"}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                <line x1="3" y1="3" x2="3" y2="21" />
+                <line x1="3" y1="3" x2="21" y2="3" />
+                <line x1="6" y1="3" x2="6" y2="6" />
+                <line x1="9" y1="3" x2="9" y2="6" />
+                <line x1="12" y1="3" x2="12" y2="6" />
+                <line x1="15" y1="3" x2="15" y2="6" />
+                <line x1="18" y1="3" x2="18" y2="6" />
+                <line x1="3" y1="6" x2="6" y2="6" />
+                <line x1="3" y1="9" x2="6" y2="9" />
+                <line x1="3" y1="12" x2="6" y2="12" />
+              </svg>
             </button>
           </div>
 
@@ -493,10 +553,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   onChange={(e) => {
                     const newText = e.target.value;
                     const measured = measureText(newText, textElement.fontSize, textElement.fontFamily, textElement.fontWeight, textElement.fontStyle);
-                    updateElement(state.selectedId!, { text: newText, width: measured.width, height: measured.height });
+                    const elementId = state.editingTextId || state.selectedId;
+                    if (elementId) {
+                      updateElement(elementId, { text: newText, width: measured.width, height: measured.height });
+                    }
                   }}
                   className="flex-1 px-3 py-1.5 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter text here..."
+                  placeholder="Type your text here..."
                   autoFocus
                 />
               </div>
@@ -1040,8 +1103,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           </div>
         )}
 
-        {/* Shape Toolbar (appears when shape tool is active) */}
-        {isShapeToolActive && (
+        {/* Shape Toolbar (appears when shape tool is active OR a shape element is selected) */}
+        {(isShapeToolActive || isShapeElement) && (
           <div className="px-4 py-2 bg-slate-800/50 backdrop-blur-sm border-t border-slate-700">
             <div className="flex items-center gap-4 flex-wrap">
               {/* Shape Type Selection */}
@@ -1049,9 +1112,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 <label className="text-xs font-medium text-slate-400">Shape:</label>
                 <div className="flex items-center gap-1 bg-slate-700/50 rounded-lg p-1">
                   <button
-                    onClick={() => setShapeSettings({ shapeType: 'rectangle' })}
+                    onClick={() => {
+                      setShapeSettings({ shapeType: 'rectangle' });
+                      if (isShapeElement && shapeElement && state.selectedId) {
+                        updateElement(state.selectedId, { shapeType: 'rectangle' });
+                      }
+                    }}
                     className={`p-2 rounded transition-all ${
-                      state.shapeSettings.shapeType === 'rectangle'
+                      (isShapeElement && shapeElement?.shapeType === 'rectangle') || (!isShapeElement && state.shapeSettings.shapeType === 'rectangle')
                         ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
                         : 'text-slate-300 hover:bg-slate-600 hover:text-white'
                     }`}
@@ -1063,9 +1131,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   </button>
                   
                   <button
-                    onClick={() => setShapeSettings({ shapeType: 'circle' })}
+                    onClick={() => {
+                      setShapeSettings({ shapeType: 'circle' });
+                      if (isShapeElement && shapeElement && state.selectedId) {
+                        updateElement(state.selectedId, { shapeType: 'circle' });
+                      }
+                    }}
                     className={`p-2 rounded transition-all ${
-                      state.shapeSettings.shapeType === 'circle'
+                      (isShapeElement && shapeElement?.shapeType === 'circle') || (!isShapeElement && state.shapeSettings.shapeType === 'circle')
                         ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
                         : 'text-slate-300 hover:bg-slate-600 hover:text-white'
                     }`}
@@ -1077,9 +1150,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   </button>
                   
                   <button
-                    onClick={() => setShapeSettings({ shapeType: 'triangle' })}
+                    onClick={() => {
+                      setShapeSettings({ shapeType: 'triangle' });
+                      if (isShapeElement && shapeElement && state.selectedId) {
+                        updateElement(state.selectedId, { shapeType: 'triangle' });
+                      }
+                    }}
                     className={`p-2 rounded transition-all ${
-                      state.shapeSettings.shapeType === 'triangle'
+                      (isShapeElement && shapeElement?.shapeType === 'triangle') || (!isShapeElement && state.shapeSettings.shapeType === 'triangle')
                         ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
                         : 'text-slate-300 hover:bg-slate-600 hover:text-white'
                     }`}
@@ -1091,9 +1169,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   </button>
                   
                   <button
-                    onClick={() => setShapeSettings({ shapeType: 'star' })}
+                    onClick={() => {
+                      setShapeSettings({ shapeType: 'star' });
+                      if (isShapeElement && shapeElement && state.selectedId) {
+                        updateElement(state.selectedId, { shapeType: 'star' });
+                      }
+                    }}
                     className={`p-2 rounded transition-all ${
-                      state.shapeSettings.shapeType === 'star'
+                      (isShapeElement && shapeElement?.shapeType === 'star') || (!isShapeElement && state.shapeSettings.shapeType === 'star')
                         ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
                         : 'text-slate-300 hover:bg-slate-600 hover:text-white'
                     }`}
@@ -1105,9 +1188,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   </button>
                   
                   <button
-                    onClick={() => setShapeSettings({ shapeType: 'hexagon' })}
+                    onClick={() => {
+                      setShapeSettings({ shapeType: 'hexagon' });
+                      if (isShapeElement && shapeElement && state.selectedId) {
+                        updateElement(state.selectedId, { shapeType: 'hexagon' });
+                      }
+                    }}
                     className={`p-2 rounded transition-all ${
-                      state.shapeSettings.shapeType === 'hexagon'
+                      (isShapeElement && shapeElement?.shapeType === 'hexagon') || (!isShapeElement && state.shapeSettings.shapeType === 'hexagon')
                         ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
                         : 'text-slate-300 hover:bg-slate-600 hover:text-white'
                     }`}
@@ -1119,9 +1207,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   </button>
                   
                   <button
-                    onClick={() => setShapeSettings({ shapeType: 'pentagon' })}
+                    onClick={() => {
+                      setShapeSettings({ shapeType: 'pentagon' });
+                      if (isShapeElement && shapeElement && state.selectedId) {
+                        updateElement(state.selectedId, { shapeType: 'pentagon' });
+                      }
+                    }}
                     className={`p-2 rounded transition-all ${
-                      state.shapeSettings.shapeType === 'pentagon'
+                      (isShapeElement && shapeElement?.shapeType === 'pentagon') || (!isShapeElement && state.shapeSettings.shapeType === 'pentagon')
                         ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
                         : 'text-slate-300 hover:bg-slate-600 hover:text-white'
                     }`}
@@ -1141,9 +1234,27 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 <label className="text-xs font-medium text-slate-400">Fill:</label>
                 <div className="flex items-center gap-1 bg-slate-700/50 rounded-lg p-1">
                   <button
-                    onClick={() => setShapeSettings({ fillType: 'solid' })}
+                    onClick={() => {
+                      // When switching to solid, sync the fillColor with current color for consistency
+                      const currentColor = isShapeElement && shapeElement 
+                        ? shapeElement.fillType === 'solid' ? shapeElement.fillColor : shapeElement.strokeColor
+                        : state.shapeSettings.fillType === 'solid' ? state.shapeSettings.fillColor : state.shapeSettings.strokeColor;
+                      
+                      setShapeSettings({ 
+                        fillType: 'solid',
+                        fillColor: currentColor,
+                        strokeColor: currentColor,
+                      });
+                      if (isShapeElement && shapeElement && state.selectedId) {
+                        updateElement(state.selectedId, { 
+                          fillType: 'solid',
+                          fillColor: currentColor,
+                          strokeColor: currentColor,
+                        });
+                      }
+                    }}
                     className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
-                      state.shapeSettings.fillType === 'solid'
+                      (isShapeElement && shapeElement?.fillType === 'solid') || (!isShapeElement && state.shapeSettings.fillType === 'solid')
                         ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
                         : 'text-slate-300 hover:bg-slate-600'
                     }`}
@@ -1152,9 +1263,27 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                     Solid
                   </button>
                   <button
-                    onClick={() => setShapeSettings({ fillType: 'outline' })}
+                    onClick={() => {
+                      // When switching to outline, sync the strokeColor with current color for consistency
+                      const currentColor = isShapeElement && shapeElement 
+                        ? shapeElement.fillType === 'solid' ? shapeElement.fillColor : shapeElement.strokeColor
+                        : state.shapeSettings.fillType === 'solid' ? state.shapeSettings.fillColor : state.shapeSettings.strokeColor;
+                      
+                      setShapeSettings({ 
+                        fillType: 'outline',
+                        fillColor: currentColor,
+                        strokeColor: currentColor,
+                      });
+                      if (isShapeElement && shapeElement && state.selectedId) {
+                        updateElement(state.selectedId, { 
+                          fillType: 'outline',
+                          fillColor: currentColor,
+                          strokeColor: currentColor,
+                        });
+                      }
+                    }}
                     className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
-                      state.shapeSettings.fillType === 'outline'
+                      (isShapeElement && shapeElement?.fillType === 'outline') || (!isShapeElement && state.shapeSettings.fillType === 'outline')
                         ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
                         : 'text-slate-300 hover:bg-slate-600'
                     }`}

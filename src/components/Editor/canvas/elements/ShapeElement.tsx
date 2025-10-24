@@ -182,12 +182,9 @@ export const ShapeElementComponent: React.FC<ShapeElementProps> = ({
       }}
       onTransform={(e: Konva.KonvaEventObject<Event>) => {
         const node = e.target as Konva.Group;
-        const scaleX = node.scaleX();
-        const scaleY = node.scaleY();
         
-        // During transform, we keep the scale applied for smooth visual feedback
-        // The actual dimension update happens in onTransformEnd
-        // Just trigger a redraw for smooth transformation
+        // Just trigger visual redraw - let keepRatio handle proportions
+        // State update happens only in onTransformEnd to avoid re-render lag
         const layer = node.getLayer();
         if (layer) {
           layer.batchDraw();
@@ -198,17 +195,20 @@ export const ShapeElementComponent: React.FC<ShapeElementProps> = ({
         const scaleX = node.scaleX();
         const scaleY = node.scaleY();
         
-        // Calculate new dimensions based on scale
-        const newWidth = Math.max(10, element.width * Math.abs(scaleX));
-        const newHeight = Math.max(10, element.height * Math.abs(scaleY));
+        // Update position, dimensions, and rotation when transform is complete
         const newX = node.x() / zoom;
         const newY = (node.y() - plateOffsetY) / zoom;
         
-        // Reset scale back to 1 (scale is now absorbed into width/height)
+        // Use the same scale for both dimensions to maintain proportions
+        const scale = Math.abs(scaleX);
+        const newWidth = Math.max(10, element.width * scale);
+        const newHeight = Math.max(10, element.height * scale);
+        
+        // Reset scale back to 1 (dimensions are now stored in width/height)
         node.scaleX(element.flippedH ? -1 : 1);
         node.scaleY(element.flippedV ? -1 : 1);
         
-        // Update element with new dimensions
+        // Final state update with all changes
         onUpdate({
           x: newX,
           y: newY,
@@ -217,6 +217,7 @@ export const ShapeElementComponent: React.FC<ShapeElementProps> = ({
           rotation: node.rotation(),
         });
         
+        // Bump overlay to ensure transformer is properly updated
         bumpOverlay();
       }}
     >

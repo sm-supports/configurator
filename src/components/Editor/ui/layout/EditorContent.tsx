@@ -2,7 +2,7 @@ import React from 'react';
 import { Canvas } from '../../canvas/Canvas';
 import type Konva from 'konva';
 import { PlateTemplate } from '@/types';
-import { EditorState, Element } from '../../core/types';
+import { EditorState, Element, ToolType } from '../../core/types';
 
 export interface EditorContentProps {
   template: PlateTemplate;
@@ -14,12 +14,14 @@ export interface EditorContentProps {
   licensePlateFrame: HTMLImageElement | null;
   state: EditorState;
   selectElement: (id: string) => void;
+  setActiveTool: (tool: ToolType) => void;
   updateElement: (id: string, updates: Partial<Element>) => void;
   bumpOverlay: () => void;
   startPainting: (x: number, y: number) => void;
   addPaintPoint: (x: number, y: number) => void;
   finishPainting: () => void;
   eraseAtPoint: (x: number, y: number, eraserSize: number) => void;
+  showRulers?: boolean;
 }
 
 export const EditorContent: React.FC<EditorContentProps> = ({
@@ -32,12 +34,14 @@ export const EditorContent: React.FC<EditorContentProps> = ({
   licensePlateFrame,
   state,
   selectElement,
+  setActiveTool,
   updateElement,
   bumpOverlay,
   startPainting,
   addPaintPoint,
   finishPainting,
   eraseAtPoint,
+  showRulers = false,
 }) => {
   return (
     <div className="relative">
@@ -61,12 +65,14 @@ export const EditorContent: React.FC<EditorContentProps> = ({
           licensePlateFrame={licensePlateFrame}
           state={state}
           selectElement={selectElement}
+          setActiveTool={setActiveTool}
           updateElement={updateElement}
           bumpOverlay={bumpOverlay}
           startPainting={startPainting}
           addPaintPoint={addPaintPoint}
           finishPainting={finishPainting}
           eraseAtPoint={eraseAtPoint}
+          showRulers={showRulers}
         />
       </div>
     </div>

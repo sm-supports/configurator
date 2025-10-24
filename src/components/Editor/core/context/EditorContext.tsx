@@ -37,6 +37,10 @@ export interface EditorContextValue {
   setShowDownloadDropdown: React.Dispatch<React.SetStateAction<boolean>>;
   showLayersPanel: boolean;
   setShowLayersPanel: React.Dispatch<React.SetStateAction<boolean>>;
+  showCenterline: boolean;
+  setShowCenterline: React.Dispatch<React.SetStateAction<boolean>>;
+  showRulers: boolean;
+  setShowRulers: React.Dispatch<React.SetStateAction<boolean>>;
   editingValue: string;
   setEditingValue: React.Dispatch<React.SetStateAction<string>>;
   
@@ -83,6 +87,7 @@ export interface EditorContextValue {
   // Shape tool operations
   setShapeSettings: (settings: Partial<ShapeSettings>) => void;
   addShape: () => void;
+  addCenterline: () => void;
   
   // Save/Export operations
   handleSaveDesign: () => Promise<void>;
@@ -168,6 +173,8 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
   const [isDownloading, setIsDownloading] = useState(false);
   const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
   const [showLayersPanel, setShowLayersPanel] = useState(false);
+  const [showCenterline, setShowCenterline] = useState(false);
+  const [showRulers, setShowRulers] = useState(false);
   const [editingValue, setEditingValue] = useState('');
   const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null);
   const [licensePlateFrame, setLicensePlateFrame] = useState<HTMLImageElement | null>(null);
@@ -211,7 +218,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
     addText, addImage, selectElement, updateElement, deleteElement, 
     flipHorizontal, flipVertical, toggleLayer, finishTextEdit,
     setActiveTool, setPaintSettings, startPainting, addPaintPoint, finishPainting, eraseAtPoint,
-    setShapeSettings, addShape
+    setShapeSettings, addShape, addCenterline
   } = useElementManipulation(
     state, setState, pushHistory, template, nextRand, vehiclePlateFonts, editingValue, setEditingValue, zoom
   );
@@ -339,6 +346,10 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
     setShowDownloadDropdown,
     showLayersPanel,
     setShowLayersPanel,
+    showCenterline,
+    setShowCenterline,
+    showRulers,
+    setShowRulers,
     editingValue,
     setEditingValue,
     
@@ -385,6 +396,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
     // Shape tool operations
     setShapeSettings,
     addShape,
+    addCenterline,
     
     // Save/Export operations
     handleSaveDesign,
@@ -399,16 +411,16 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
   }), [
     // Dependencies for memoization
     state, template, stateManager, exportService, imageService,
-    isSaving, saveSuccess, saveError, isDownloading, showDownloadDropdown, showLayersPanel,
+    isSaving, saveSuccess, saveError, isDownloading, showDownloadDropdown, showLayersPanel, showCenterline, showRulers,
     editingValue, bgImage, licensePlateFrame,
     undo, redo, canUndo, canRedo, pushHistory,
     zoom, view, zoomIn, zoomOut, resetZoom, bumpOverlay,
     addText, addImage, selectElement, updateElement, deleteElement,
     flipHorizontal, flipVertical, toggleLayer, finishTextEdit, startTextEdit, changeFrameSize,
     setActiveTool, setPaintSettings, startPainting, addPaintPoint, finishPainting, eraseAtPoint,
-    setShapeSettings, addShape,
+    setShapeSettings, addShape, addCenterline,
     handleSaveDesign, handleDownload, setEditingPos,
-    user, isAdmin, setShowDownloadDropdown, setShowLayersPanel, setEditingValue
+    user, isAdmin, setShowDownloadDropdown, setShowLayersPanel, setEditingValue, setShowCenterline, setShowRulers
   ]);
 
   return (

@@ -60,7 +60,26 @@ export interface ShapeElement {
   layer?: 'base' | 'licenseplate';
 }
 
-export type Element = TextElement | ImageElement | PaintElement | ShapeElement;
+// Centerline element interface
+export interface CenterlineElement {
+  id: string;
+  type: 'centerline';
+  x: number; // Center point x
+  y: number; // Center point y
+  width: number; // Canvas width
+  height: number; // Canvas height
+  color: string;
+  strokeWidth: number;
+  opacity: number;
+  zIndex: number;
+  visible?: boolean;
+  locked?: boolean;
+  layer?: 'base' | 'licenseplate';
+  flippedH?: boolean;
+  flippedV?: boolean;
+}
+
+export type Element = TextElement | ImageElement | PaintElement | ShapeElement | CenterlineElement;
 
 export type ToolType = 'select' | 'text' | 'image' | 'brush' | 'airbrush' | 'spray' | 'eraser' | 'shape';
 

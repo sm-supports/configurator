@@ -69,20 +69,41 @@ export const ImageElementComponent: React.FC<ImageElementProps> = React.memo(fun
           y: plateOffsetY !== undefined ? (e.target.y() - plateOffsetY) / zoom : e.target.y() / zoom
         });
       } : undefined}
+      onTransform={isInteractive ? (e) => {
+        const node = e.target;
+        
+        // Just trigger visual redraw - let keepRatio handle proportions
+        // State update happens only in onTransformEnd to avoid re-render lag
+        const layer = node.getLayer();
+        if (layer) {
+          layer.batchDraw();
+        }
+      } : undefined}
       onTransformEnd={isInteractive ? (e) => {
         const node = e.target;
         const scaleX = node.scaleX();
         const scaleY = node.scaleY();
         
-        // Reset scale and apply to dimensions
-        node.scaleX(1);
-        node.scaleY(1);
+        // Update position, dimensions, and rotation when transform is complete
+        const newX = node.x() / zoom;
+        const newY = plateOffsetY !== undefined ? (node.y() - plateOffsetY) / zoom : node.y() / zoom;
         
+        // Use the same scale for both dimensions to maintain proportions
+        // This works with keepRatio={true} on the Transformer
+        const scale = Math.abs(scaleX);
+        const newWidth = Math.max(10, (element.width || 100) * scale);
+        const newHeight = Math.max(10, (element.height || 100) * scale);
+        
+        // Reset scale back to 1 (dimensions are now stored in width/height)
+        node.scaleX(element.flippedH ? -1 : 1);
+        node.scaleY(element.flippedV ? -1 : 1);
+        
+        // Final state update with all changes
         onUpdate({
-          x: node.x() / zoom,
-          y: plateOffsetY !== undefined ? (node.y() - plateOffsetY) / zoom : node.y() / zoom,
-          width: Math.max(10, node.width() * Math.abs(scaleX) / zoom),
-          height: Math.max(10, node.height() * Math.abs(scaleY) / zoom),
+          x: newX,
+          y: newY,
+          width: newWidth,
+          height: newHeight,
           rotation: node.rotation()
         });
       } : undefined}

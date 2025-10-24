@@ -38,6 +38,7 @@ const EditorCore: React.FC = () => {
     setShowDownloadDropdown,
     showLayersPanel,
     setShowLayersPanel,
+    showRulers,
     
     // Background images
     bgImage,
@@ -67,6 +68,7 @@ const EditorCore: React.FC = () => {
     flipHorizontal,
     flipVertical,
     toggleLayer,
+    finishTextEdit,
     changeFrameSize,
     
     // Paint tool operations
@@ -80,6 +82,7 @@ const EditorCore: React.FC = () => {
     // Shape tool operations
     setShapeSettings,
     addShape,
+    addCenterline,
     
     // Save/Export operations
     handleSaveDesign,
@@ -92,6 +95,10 @@ const EditorCore: React.FC = () => {
   const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
     const isBackground = e.target === e.target.getStage() || e.target.name?.() === 'background';
     if (isBackground) {
+      // If in text edit mode, finish editing (this will delete empty text)
+      if (state.editingTextId) {
+        finishTextEdit(true, false);
+      }
       setState(prev => ({ ...prev, selectedId: null }));
     }
   };
@@ -129,6 +136,7 @@ const EditorCore: React.FC = () => {
       setPaintSettings={setPaintSettings}
       setShapeSettings={setShapeSettings}
       addShape={addShape}
+      addCenterline={addCenterline}
       zoom={zoom}
       zoomIn={zoomIn}
       zoomOut={zoomOut}
@@ -170,12 +178,14 @@ const EditorCore: React.FC = () => {
           licensePlateFrame={licensePlateFrame}
           state={state}
           selectElement={selectElement}
+          setActiveTool={setActiveTool}
           updateElement={updateElement}
           bumpOverlay={bumpOverlay}
           startPainting={startPainting}
           addPaintPoint={addPaintPoint}
           finishPainting={finishPainting}
           eraseAtPoint={eraseAtPoint}
+          showRulers={showRulers}
         />
       </EditorLayout>
 
