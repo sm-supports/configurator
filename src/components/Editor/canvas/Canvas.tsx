@@ -22,7 +22,6 @@ interface CanvasProps {
   licensePlateFrame: HTMLImageElement | null;
   state: EditorState;
   selectElement: (id: string) => void;
-  setActiveTool: (tool: ToolType) => void;
   updateElement: (id: string, updates: Partial<Element>) => void;
   bumpOverlay: () => void;
   startPainting: (x: number, y: number) => void;
@@ -34,7 +33,7 @@ interface CanvasProps {
 
 export const Canvas: React.FC<CanvasProps> = ({
   template, zoom, view, stageRef, handleStageClick, lastPointerRef,
-  bgImage, licensePlateFrame, state, selectElement, setActiveTool, updateElement,
+  bgImage, licensePlateFrame, state, selectElement, updateElement,
   bumpOverlay,
   startPainting, addPaintPoint, finishPainting, eraseAtPoint,
   showRulers = false,
@@ -324,7 +323,6 @@ export const Canvas: React.FC<CanvasProps> = ({
               return sortedElements
                 .filter(element => (element.layer || 'base') === 'base')
                 .map(element => {
-                const elementLayer = element.layer || 'base';
                 // Disable interaction when paint tools are active to allow painting over elements
                 const isPaintToolActive = ['brush', 'airbrush', 'spray', 'eraser'].includes(state.activeTool);
                 const isInteractive = !isPaintToolActive;
@@ -382,15 +380,8 @@ export const Canvas: React.FC<CanvasProps> = ({
                       <PaintElementComponent
                         element={paintEl}
                         zoom={zoom}
-                        plateOffsetY={plateOffsetY}
                         isInteractive={isInteractive}
-                        isSelected={isSelected}
                         onSelect={() => isInteractive ? selectElement(element.id) : undefined}
-                        onUpdate={(updates) => {
-                          if (isInteractive) {
-                            updateElement(element.id, updates);
-                          }
-                        }}
                       />
                     </Group>
                   );
@@ -450,7 +441,6 @@ export const Canvas: React.FC<CanvasProps> = ({
                 {state.activeLayer === 'licenseplate' && sortedElements
                   .filter(element => (element.layer || 'base') === 'base')
                   .map(element => {
-                    const elementLayer = element.layer || 'base';
                     // Disable interaction when paint tools are active to allow painting over elements
                     const isPaintToolActive = ['brush', 'airbrush', 'spray', 'eraser'].includes(state.activeTool);
                     const isInteractive = !isPaintToolActive;
@@ -466,7 +456,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                             zoom={zoom}
                             plateOffsetY={plateOffsetY}
                             isInteractive={isInteractive}
-                            onSelect={() => handleSelectElement(element.id)}
+                            onSelect={() => selectElement(element.id)}
                             onUpdate={(updates) => updateElement(element.id, updates)}
                           />
                         </Group>
@@ -507,11 +497,8 @@ export const Canvas: React.FC<CanvasProps> = ({
                           <PaintElementComponent
                             element={paintEl}
                             zoom={zoom}
-                            plateOffsetY={plateOffsetY}
                             isInteractive={isInteractive}
-                            isSelected={isSelected}
                             onSelect={() => handleSelectElement(element.id)}
-                            onUpdate={(updates) => updateElement(element.id, updates)}
                           />
                         </Group>
                       );
@@ -535,9 +522,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                         <Group key={element.id}>
                           <CenterlineElementComponent
                             element={centerlineEl}
-                            isSelected={isSelected}
                             onSelect={() => handleSelectElement(element.id)}
-                            onUpdate={(updates) => updateElement(element.id, updates)}
                             stageWidth={template.width_px * zoom}
                             stageHeight={template.height_px * zoom}
                             plateOffsetY={plateOffsetY}
@@ -547,13 +532,10 @@ export const Canvas: React.FC<CanvasProps> = ({
                       );
                     }
                     return null;
-                  })}
-                
-                {/* Render ALL license plate layer elements (images, text, paint, shapes) sorted by zIndex */}
+                  })}                {/* Render ALL license plate layer elements (images, text, paint, shapes) sorted by zIndex */}
                 {sortedElements
                   .filter(element => (element.layer || 'base') === 'licenseplate')
                   .map(element => {
-                    const elementLayer = element.layer || 'base';
                     // Disable interaction when paint tools are active to allow painting over elements
                     const isPaintToolActive = ['brush', 'airbrush', 'spray', 'eraser'].includes(state.activeTool);
                     const isInteractive = !isPaintToolActive;
@@ -569,7 +551,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                             zoom={zoom}
                             plateOffsetY={plateOffsetY}
                             isInteractive={isInteractive}
-                            onSelect={() => handleSelectElement(element.id)}
+                            onSelect={() => selectElement(element.id)}
                             onUpdate={(updates) => updateElement(element.id, updates)}
                           />
                         </Group>
@@ -610,11 +592,8 @@ export const Canvas: React.FC<CanvasProps> = ({
                           <PaintElementComponent
                             element={paintEl}
                             zoom={zoom}
-                            plateOffsetY={plateOffsetY}
                             isInteractive={isInteractive}
-                            isSelected={isSelected}
                             onSelect={() => handleSelectElement(element.id)}
-                            onUpdate={(updates) => updateElement(element.id, updates)}
                           />
                         </Group>
                       );
@@ -638,9 +617,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                         <Group key={element.id}>
                           <CenterlineElementComponent
                             element={centerlineEl}
-                            isSelected={isSelected}
                             onSelect={() => handleSelectElement(element.id)}
-                            onUpdate={(updates) => updateElement(element.id, updates)}
                             stageWidth={template.width_px * zoom}
                             stageHeight={template.height_px * zoom}
                             plateOffsetY={plateOffsetY}
@@ -738,7 +715,6 @@ export const Canvas: React.FC<CanvasProps> = ({
             <Rulers
               canvasWidth={template.width_px * zoom}
               canvasHeight={template.height_px * zoom + (Math.min(template.width_px, template.height_px) * zoom * 0.2)}
-              zoom={zoom}
               stageRef={stageRef}
             />
           </Layer>

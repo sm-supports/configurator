@@ -193,7 +193,6 @@ export const ShapeElementComponent: React.FC<ShapeElementProps> = ({
       onTransformEnd={(e: Konva.KonvaEventObject<Event>) => {
         const node = e.target as Konva.Group;
         const scaleX = node.scaleX();
-        const scaleY = node.scaleY();
         
         // Update position, dimensions, and rotation when transform is complete
         const newX = node.x() / zoom;

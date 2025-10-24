@@ -82,7 +82,6 @@ export const ImageElementComponent: React.FC<ImageElementProps> = React.memo(fun
       onTransformEnd={isInteractive ? (e) => {
         const node = e.target;
         const scaleX = node.scaleX();
-        const scaleY = node.scaleY();
         
         // Update position, dimensions, and rotation when transform is complete
         const newX = node.x() / zoom;

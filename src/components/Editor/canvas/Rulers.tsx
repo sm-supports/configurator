@@ -1,20 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Group, Text, Line, Rect } from 'react-konva';
+import { Group, Line, Rect } from 'react-konva';
 import type { ReactNode } from 'react';
+import Konva from 'konva';
 
 interface RulersProps {
   canvasWidth: number;
   canvasHeight: number;
-  zoom: number;
-  stageRef: React.RefObject<any>;
+  stageRef: React.RefObject<Konva.Stage>;
 }
 
 // Constants for ruler
 const PIXELS_PER_INCH = 96; // Standard screen DPI
-const MM_PER_INCH = 25.4;
 const RULER_WIDTH = 30; // Width of ruler in pixels
-const MAJOR_TICK_INTERVAL = 1; // Every 1 inch
-const MINOR_TICK_INTERVAL = 0.25; // Every 1/4 inch
 
 interface PointerPos {
   x: number;
@@ -24,7 +21,6 @@ interface PointerPos {
 export const Rulers: React.FC<RulersProps> = ({
   canvasWidth,
   canvasHeight,
-  zoom,
   stageRef,
 }) => {
   const [pointerPos, setPointerPos] = useState<PointerPos>({ x: 0, y: 0 });
@@ -34,7 +30,7 @@ export const Rulers: React.FC<RulersProps> = ({
 
     const stage = stageRef.current;
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const handleMouseMove = () => {
       // Get mouse position relative to the stage
       const pointerPos = stage.getPointerPosition();
       if (pointerPos) {

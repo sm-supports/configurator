@@ -5,21 +5,15 @@ import { PaintElement } from '../../core/types';
 interface PaintElementProps {
   element: PaintElement;
   zoom: number;
-  plateOffsetY?: number;
   isInteractive?: boolean;
-  isSelected?: boolean;
   onSelect: () => void;
-  onUpdate: (updates: Partial<PaintElement>) => void;
 }
 
 export const PaintElementComponent: React.FC<PaintElementProps> = React.memo(function PaintComponent({
   element,
   zoom,
-  plateOffsetY = 0,
   isInteractive = true,
-  isSelected = false,
   onSelect,
-  onUpdate
 }) {
   // Convert paint points to Konva line points format
   // Points are relative to element position, not absolute
@@ -166,37 +160,6 @@ export const PaintElementComponent: React.FC<PaintElementProps> = React.memo(fun
   return (
     <Group>
       {renderBrushStroke()}
-      {/* Selection rectangle - relative to parent Group position */}
-      {isSelected && element.width && element.height && (
-        <React.Fragment>
-          {/* Semi-transparent background for clickability */}
-          <Circle
-            x={(element.width / 2) * zoom}
-            y={(element.height / 2) * zoom}
-            radius={Math.max(element.width, element.height) * zoom * 0.6}
-            fill="rgba(59, 130, 246, 0.1)"
-            listening={false}
-          />
-          {/* Selection corners */}
-          {[
-            { x: 0, y: 0 },
-            { x: element.width, y: 0 },
-            { x: element.width, y: element.height },
-            { x: 0, y: element.height },
-          ].map((corner, i) => (
-            <Circle
-              key={i}
-              x={corner.x * zoom}
-              y={corner.y * zoom}
-              radius={4}
-              fill="#3b82f6"
-              stroke="#ffffff"
-              strokeWidth={1}
-              listening={false}
-            />
-          ))}
-        </React.Fragment>
-      )}
     </Group>
   );
 });

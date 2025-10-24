@@ -4,9 +4,7 @@ import { CenterlineElement as CenterlineElementType } from '../../core/types';
 
 interface CenterlineElementProps {
   element: CenterlineElementType;
-  isSelected: boolean;
   onSelect: () => void;
-  onUpdate: (updates: Partial<CenterlineElementType>) => void;
   stageWidth: number;
   stageHeight: number;
   plateOffsetY: number;
@@ -15,9 +13,7 @@ interface CenterlineElementProps {
 
 export const CenterlineElement: React.FC<CenterlineElementProps> = ({
   element,
-  isSelected,
   onSelect,
-  onUpdate,
   stageWidth,
   stageHeight,
   plateOffsetY,
