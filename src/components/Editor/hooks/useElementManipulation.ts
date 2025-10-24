@@ -138,16 +138,32 @@ export const useElementManipulation = (
           // If text is empty, remove the element
           if (!textEl.text || !textEl.text.trim()) {
             pushHistory(prev);
+            
+            // Get the element being selected to determine if we should close the shape toolbar
+            const selectedElement = prev.elements.find(el => el.id === id);
+            const shouldCloseShapeTool = selectedElement && selectedElement.type !== 'shape' && prev.activeTool === 'shape';
+            
             return {
               ...prev,
               elements: prev.elements.filter(el => el.id !== prev.editingTextId),
               editingTextId: null,
-              selectedId: id
+              selectedId: id,
+              activeTool: shouldCloseShapeTool ? 'select' : prev.activeTool
             };
           }
         }
       }
-      return { ...prev, selectedId: id, editingTextId: null };
+      
+      // Check if we're selecting a non-shape element while shape tool is active
+      const selectedElement = prev.elements.find(el => el.id === id);
+      const shouldCloseShapeTool = selectedElement && selectedElement.type !== 'shape' && prev.activeTool === 'shape';
+      
+      return { 
+        ...prev, 
+        selectedId: id, 
+        editingTextId: null,
+        activeTool: shouldCloseShapeTool ? 'select' : prev.activeTool
+      };
     });
   }, [setState, pushHistory]);
 
