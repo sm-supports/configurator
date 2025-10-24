@@ -12,8 +12,7 @@
     "start": "next start",
     "lint": "eslint",
     "type-check": "tsc --noEmit",
-    "vercel-build": "npm run asbuild && next build",
-    "pages:build": "npm run asbuild && npm install -D @opennextjs/cloudflare@latest && npx opennextjs-cloudflare build && cp .open-next/worker.js .open-next/assets/_worker.js",
+    "pages:build": "npm run asbuild && opennextjs-cloudflare build",
     "preview": "npm run asbuild && opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy": "npm run asbuild && opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
@@ -22,6 +21,7 @@
     "asbuild": "npm run asbuild:debug && npm run asbuild:release"
   },
   "dependencies": {
+    "@opennextjs/cloudflare": "^1.11.0",
     "@supabase/supabase-js": "^2.57.0",
     "@types/uuid": "^10.0.0",
     "jspdf": "^3.0.2",
@@ -36,7 +36,6 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
-    "@opennextjs/cloudflare": "^1.11.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
