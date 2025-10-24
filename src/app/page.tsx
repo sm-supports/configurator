@@ -14,7 +14,7 @@ export default function HomePage() {
 
         {/* Main Heading */}
         <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 tracking-tight">
-          We're Building Something
+          We&apos;re Building Something
           <span className="block text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
             Amazing
           </span>

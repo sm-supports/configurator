@@ -65,7 +65,7 @@ export class EditorExportService {
     }
   }
 
-  async saveDesign(state: EditorState, userId: string, options: SaveOptions = {}): Promise<{ success: boolean; error?: string; designId?: string }> {
+  async saveDesign(_state: EditorState, _userId: string, _options: SaveOptions = {}): Promise<{ success: boolean; error?: string; designId?: string }> {
     // Save functionality disabled in demo version
     return { success: false, error: 'Save feature coming soon in the full version!' };
   }

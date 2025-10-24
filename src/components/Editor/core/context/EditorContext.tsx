@@ -123,8 +123,6 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
   children,
   template,
   existingDesign,
-  existingDesignId,
-  existingDesignName,
 }) => {
   // Create default elements
   const createDefaultElements = useCallback((): Element[] => {
@@ -161,7 +159,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
   });
 
   // UI state
-  const [isSaving, setIsSaving] = useState(false);
+  const isSaving = false; // Always false in demo mode
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);

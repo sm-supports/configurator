@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import { PlateTemplate } from '@/types';
 import ClientOnlyEditor from '@/components/Editor/ClientOnlyEditor';
 
@@ -29,9 +28,6 @@ const SAMPLE_TEMPLATE: PlateTemplate = {
 };
 
 export default function EditorPage() {
-  const params = useParams();
-  const templateId = params.templateId as string;
-  
   const [template] = useState<PlateTemplate>(SAMPLE_TEMPLATE);
   const [loading, setLoading] = useState(true);
 
@@ -44,10 +40,6 @@ export default function EditorPage() {
   const handleSave = async () => {
     console.log('Save feature coming soon!');
     alert('Save feature coming soon! This is a demo version.');
-  };
-
-  const handleDownload = () => {
-    console.log('Download triggered');
   };
 
   if (loading) {
