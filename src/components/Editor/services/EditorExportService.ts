@@ -1,8 +1,7 @@
 import type Konva from 'konva';
-import { PlateTemplate, DesignData, DesignElement } from '@/types';
+import { PlateTemplate } from '@/types';
 import { EditorState } from '../core/types';
 import { exportToDataURL, downloadFile } from '../canvas/utils/canvasUtils';
-import { saveDesign, updateDesign, SaveDesignParams, UpdateDesignParams } from '@/lib/designUtils';
 
 export interface ExportOptions {
   format: 'png' | 'jpeg' | 'pdf' | 'eps' | 'tiff';
@@ -67,55 +66,8 @@ export class EditorExportService {
   }
 
   async saveDesign(state: EditorState, userId: string, options: SaveOptions = {}): Promise<{ success: boolean; error?: string; designId?: string }> {
-    try {
-      if (!userId) {
-        return { success: false, error: 'You must be logged in to save designs' };
-      }
-
-      const designData: DesignData = {
-        elements: state.elements.filter(el => el.type !== 'paint') as DesignElement[],
-        template_id: this.template.id,
-        width: this.template.width_px,
-        height: this.template.height_px,
-      };
-
-      // If designId exists, update the existing design
-      if (options.designId) {
-        const updateParams: UpdateDesignParams = {
-          id: options.designId,
-          designData,
-          name: options.name,
-          isPublic: options.isPublic,
-        };
-
-        const result = await updateDesign(updateParams);
-
-        if (result.error) {
-          return { success: false, error: result.error };
-        }
-
-        return { success: true, designId: result.design?.id };
-      } else {
-        // Otherwise, create a new design
-        const saveParams: SaveDesignParams = {
-          designData,
-          templateId: this.template.id,
-          name: options.name || `${this.template.name} Design`,
-          isPublic: options.isPublic || false,
-        };
-
-        const result = await saveDesign(saveParams);
-
-        if (result.error) {
-          return { success: false, error: result.error };
-        }
-
-        return { success: true, designId: result.design?.id };
-      }
-    } catch (error) {
-      console.error('Save design failed:', error);
-      return { success: false, error: 'Failed to save design' };
-    }
+    // Save functionality disabled in demo version
+    return { success: false, error: 'Save feature coming soon in the full version!' };
   }
 
   generatePreviewUrl(): string | null {

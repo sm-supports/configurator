@@ -1,11 +1,9 @@
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import type Konva from 'konva';
 import { PlateTemplate } from '@/types';
-import { useAuth } from '@/contexts/AuthContext';
 import { EditorState, Element, ToolType, PaintSettings, ShapeSettings } from '../types';
 import { TextElement } from '@/types';
 import { vehiclePlateFonts } from '../constants';
-import { User } from '@supabase/supabase-js';
 
 import { useEditorHistory } from '../../hooks/useEditorHistory';
 import { useZoom } from '../../hooks/useZoom';
@@ -97,10 +95,6 @@ export interface EditorContextValue {
   
   // Utility functions
   setEditingPos: (pos: { x: number; y: number } | null) => void;
-  
-  // Auth context
-  user: User | null;
-  isAdmin: boolean;
 }
 
 const EditorContext = createContext<EditorContextValue | null>(null);
@@ -132,8 +126,6 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
   existingDesignId,
   existingDesignName,
 }) => {
-  const { user, isAdmin } = useAuth();
-
   // Create default elements
   const createDefaultElements = useCallback((): Element[] => {
     if (existingDesign?.design_json?.elements) {
@@ -195,12 +187,13 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
   }, []);
 
   // Random seed for element positioning
+  // Seed for pseudorandom ID generation (deterministic per session)
   const seed = useMemo(() => {
-    const base = `${template.id}|${user?.id || 'anon'}`;
-    let hash = 0;
-    for (let i = 0; i < base.length; i++) hash = (hash * 31 + base.charCodeAt(i)) | 0;
-    return hash >>> 0;
-  }, [template.id, user?.id]);
+    const base = `${template.id}|anon`;
+    let h = 0xdeadbeef;
+    for (let i = 0; i < base.length; i++) h = Math.imul(h ^ base.charCodeAt(i), 2654435761);
+    return (h ^ (h >>> 16)) >>> 0;
+  }, [template.id]);
 
   const mulberry32 = useCallback((a: number) => {
     return function() {
@@ -277,39 +270,10 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
 
   // Save design function
   const handleSaveDesign = useCallback(async () => {
-    if (!user) {
-      setSaveError('You must be logged in to save designs');
-      return;
-    }
-
-    setIsSaving(true);
-    setSaveError(null);
-    setSaveSuccess(false);
-
-    try {
-      if (!exportService) {
-        throw new Error('Export service not ready');
-      }
-
-      const result = await exportService.saveDesign(state, user.id || '', {
-        name: existingDesignName || `${template.name} Design`,
-        isPublic: false,
-        designId: existingDesignId,
-      });
-
-      if (!result.success) {
-        setSaveError(result.error || 'Failed to save design');
-      } else {
-        setSaveSuccess(true);
-        setTimeout(() => setSaveSuccess(false), 3000);
-      }
-    } catch (error) {
-      console.error('Save failed:', error);
-      setSaveError('Failed to save design');
-    } finally {
-      setIsSaving(false);
-    }
-  }, [user, state, template, exportService, existingDesignId, existingDesignName]);
+    setSaveError('Save feature coming soon in the full version!');
+    setTimeout(() => setSaveError(null), 3000);
+    return;
+  }, []);
 
   // Download function
   const handleDownload = useCallback(async (format: 'png' | 'jpeg' | 'pdf' | 'eps' | 'tiff') => {
@@ -409,10 +373,6 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
     
     // Utility functions
     setEditingPos,
-    
-    // Auth context
-    user,
-    isAdmin,
   }), [
     // Dependencies for memoization
     state, template, stateManager, exportService, imageService,
@@ -425,7 +385,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({
     setActiveTool, setPaintSettings, startPainting, addPaintPoint, finishPainting, eraseAtPoint,
     setShapeSettings, addShape, addCenterline,
     handleSaveDesign, handleDownload, setEditingPos,
-    user, isAdmin, setShowDownloadDropdown, setShowLayersPanel, setEditingValue, setShowCenterline, setShowRulers, setShowFrameThickness
+    setShowDownloadDropdown, setShowLayersPanel, setEditingValue, setShowCenterline, setShowRulers, setShowFrameThickness
   ]);
 
   return (

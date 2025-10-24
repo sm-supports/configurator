@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { AuthProvider } from "@/contexts/AuthContext";
-import PageWrapper from "@/components/Navigation/PageWrapper";
 import { WASMInitializer } from "@/components/WASMInitializer";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -15,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "License Plate Designer",
+  title: "PlateCreate - License Plate Designer",
   description: "Create custom license plate designs with our powerful visual editor",
 };
 
@@ -30,11 +29,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <WASMInitializer />
-        <AuthProvider>
-          <PageWrapper>
-            {children}
-          </PageWrapper>
-        </AuthProvider>
+        {children}
       </body>
     </html>
   );
