@@ -65,7 +65,6 @@ export const EditorContent: React.FC<EditorContentProps> = ({
           licensePlateFrame={licensePlateFrame}
           state={state}
           selectElement={selectElement}
-          setActiveTool={setActiveTool}
           updateElement={updateElement}
           bumpOverlay={bumpOverlay}
           startPainting={startPainting}
