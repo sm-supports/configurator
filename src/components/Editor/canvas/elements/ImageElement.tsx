@@ -71,9 +71,34 @@ export const ImageElementComponent: React.FC<ImageElementProps> = React.memo(fun
       } : undefined}
       onTransform={isInteractive ? (e) => {
         const node = e.target;
+        const transformer = node.getStage()?.findOne('Transformer');
         
-        // Just trigger visual redraw - let keepRatio handle proportions
-        // State update happens only in onTransformEnd to avoid re-render lag
+        if (transformer) {
+          // Get the active anchor to determine scaling mode
+          const activeAnchor = (transformer as any).getActiveAnchor();
+          
+          // Corner anchors: maintain aspect ratio (proportional scaling)
+          // Edge/middle anchors: allow free scaling
+          const isCornerAnchor = activeAnchor && (
+            activeAnchor === 'top-left' ||
+            activeAnchor === 'top-right' ||
+            activeAnchor === 'bottom-left' ||
+            activeAnchor === 'bottom-right'
+          );
+          
+          if (isCornerAnchor) {
+            // For corner anchors, enforce proportional scaling
+            const scaleX = Math.abs(node.scaleX());
+            const scaleY = Math.abs(node.scaleY());
+            const avgScale = (scaleX + scaleY) / 2;
+            
+            // Apply uniform scale while preserving flip state
+            node.scaleX(element.flippedH ? -avgScale : avgScale);
+            node.scaleY(element.flippedV ? -avgScale : avgScale);
+          }
+        }
+        
+        // Trigger visual redraw for smooth transformation
         const layer = node.getLayer();
         if (layer) {
           layer.batchDraw();
@@ -82,16 +107,17 @@ export const ImageElementComponent: React.FC<ImageElementProps> = React.memo(fun
       onTransformEnd={isInteractive ? (e) => {
         const node = e.target;
         const scaleX = node.scaleX();
+        const scaleY = node.scaleY();
         
         // Update position, dimensions, and rotation when transform is complete
         const newX = node.x() / zoom;
         const newY = plateOffsetY !== undefined ? (node.y() - plateOffsetY) / zoom : node.y() / zoom;
         
-        // Use the same scale for both dimensions to maintain proportions
-        // This works with keepRatio={true} on the Transformer
-        const scale = Math.abs(scaleX);
-        const newWidth = Math.max(10, (element.width || 100) * scale);
-        const newHeight = Math.max(10, (element.height || 100) * scale);
+        // Apply the scales independently for free scaling
+        const absScaleX = Math.abs(scaleX);
+        const absScaleY = Math.abs(scaleY);
+        const newWidth = Math.max(10, (element.width || 100) * absScaleX);
+        const newHeight = Math.max(10, (element.height || 100) * absScaleY);
         
         // Reset scale back to 1 (dimensions are now stored in width/height)
         node.scaleX(element.flippedH ? -1 : 1);

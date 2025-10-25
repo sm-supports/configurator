@@ -58,14 +58,11 @@ export const useElementManipulation = (
       return {
         ...prev,
         elements: [...prev.elements, newText],
-        editingTextId: newText.id, // Immediately enter edit mode
-        selectedId: null // Deselect during editing
+        selectedId: newText.id, // Select the text element immediately
+        editingTextId: null // Don't enter edit mode, allow property adjustments
       };
     });
-    
-    // Set editing value to demo text so it appears in the input
-    setEditingValue(demoText);
-  }, [state.elements.length, pushHistory, template, nextRand, vehiclePlateFonts, setState, setEditingValue]);
+  }, [state.elements.length, pushHistory, template, nextRand, vehiclePlateFonts, setState]);
 
   const addImage = useCallback((file: File) => {
     const reader = new FileReader();

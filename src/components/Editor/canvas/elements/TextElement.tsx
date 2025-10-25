@@ -72,6 +72,33 @@ export const TextElementComponent: React.FC<TextElementProps> = React.memo(funct
         }}
         onTransform={(e) => {
           const node = e.target as unknown as Konva.Text;
+          const transformer = node.getStage()?.findOne('Transformer');
+          
+          if (transformer) {
+            // Get the active anchor to determine scaling mode
+            const activeAnchor = (transformer as any).getActiveAnchor();
+            
+            // Corner anchors: maintain aspect ratio (proportional scaling)
+            // Edge/middle anchors: allow free scaling
+            const isCornerAnchor = activeAnchor && (
+              activeAnchor === 'top-left' ||
+              activeAnchor === 'top-right' ||
+              activeAnchor === 'bottom-left' ||
+              activeAnchor === 'bottom-right'
+            );
+            
+            if (isCornerAnchor) {
+              // For corner anchors, enforce proportional scaling
+              const scaleX = Math.abs(node.scaleX());
+              const scaleY = Math.abs(node.scaleY());
+              const avgScale = (scaleX + scaleY) / 2;
+              
+              // Apply uniform scale while preserving flip state
+              node.scaleX(element.flippedH ? -avgScale : avgScale);
+              node.scaleY(element.flippedV ? -avgScale : avgScale);
+            }
+          }
+          
           node.getLayer()?.batchDraw();
           bumpOverlay();
         }}
@@ -84,11 +111,13 @@ export const TextElementComponent: React.FC<TextElementProps> = React.memo(funct
           
           const isVertical = element.writingMode === 'vertical';
           
-          // Calculate new font size based on the scale
-          const avgScale = (Math.abs(scaleX) + Math.abs(scaleY)) / 2;
+          // Calculate new font size based on the average scale (for proportional feel)
+          const absScaleX = Math.abs(scaleX);
+          const absScaleY = Math.abs(scaleY);
+          const avgScale = (absScaleX + absScaleY) / 2;
           const newFontSize = Math.max(8, Math.round(element.fontSize * avgScale));
           
-          // Calculate new dimensions
+          // Calculate new dimensions - apply scales independently for free scaling
           let newWidth, newHeight;
           
           if (isVertical) {
@@ -98,18 +127,18 @@ export const TextElementComponent: React.FC<TextElementProps> = React.memo(funct
             const minHeight = charCount * newFontSize * lineHeight;
             
             // Use the scaled height, but ensure it's at least the minimum needed
-            const scaledHeight = Math.max(10, node.height() * Math.abs(scaleY));
+            const scaledHeight = Math.max(10, node.height() * absScaleY);
             newHeight = Math.max(minHeight, scaledHeight) / zoom;
             
-            // Width should be proportional to font size
-            newWidth = Math.max(newFontSize * 1.5, node.width() * Math.abs(scaleX)) / zoom;
+            // Width uses the actual scaleX
+            newWidth = Math.max(newFontSize * 1.5, node.width() * absScaleX) / zoom;
           } else {
             // For horizontal text, measure the actual text dimensions
             const measured = measureText(element.text, newFontSize, element.fontFamily, element.fontWeight, element.fontStyle);
             
-            // Use measured dimensions as minimum, but allow user to make it larger
-            const scaledWidth = Math.max(10, node.width() * Math.abs(scaleX));
-            const scaledHeight = Math.max(10, node.height() * Math.abs(scaleY));
+            // Use measured dimensions as minimum, but allow user to scale freely
+            const scaledWidth = Math.max(10, node.width() * absScaleX);
+            const scaledHeight = Math.max(10, node.height() * absScaleY);
             
             newWidth = Math.max(measured.width, scaledWidth / zoom);
             newHeight = Math.max(measured.height, scaledHeight / zoom);

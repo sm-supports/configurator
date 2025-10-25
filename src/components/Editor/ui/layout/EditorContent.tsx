@@ -85,7 +85,27 @@ export const EditorContent: React.FC<EditorContentProps> = ({
       {/* Canvas wrapper with styling */}
       <div className="relative">
         {/* Modern HTML Rulers Overlay - visible over masked layer */}
-        {showRulers && (
+        {showRulers && (() => {
+          // Physical dimensions based on frame size (in mm)
+          const frameDimensions = {
+            slim: { width: 313, height: 161.5 },
+            std: { width: 317, height: 172 },
+            xl: { width: 327, height: 182 }
+          };
+          
+          const physicalDims = frameDimensions[state.frameSize];
+          const canvasWidth = template.width_px * zoom;
+          const canvasHeight = (template.height_px + Math.min(template.width_px, template.height_px) * 0.2) * zoom;
+          
+          // Calculate pixels per mm based on actual dimensions
+          const pixelsPerMmWidth = canvasWidth / physicalDims.width;
+          const pixelsPerMmHeight = canvasHeight / physicalDims.height;
+          
+          // Calculate pixels per inch (1 inch = 25.4mm)
+          const pixelsPerInchWidth = pixelsPerMmWidth * 25.4;
+          const pixelsPerInchHeight = pixelsPerMmHeight * 25.4;
+          
+          return (
           <>
             {/* Horizontal Ruler (Top) - Modern Design */}
             <div 
@@ -103,9 +123,8 @@ export const EditorContent: React.FC<EditorContentProps> = ({
             >
               <svg width="100%" height="50" style={{ overflow: 'visible' }}>
                 {/* Inch markings */}
-                {Array.from({ length: Math.ceil(template.width_px * zoom / 96) + 5 }).map((_, inch) => {
-                  const x = inch * 96 * zoom;
-                  const canvasWidth = template.width_px * zoom;
+                {Array.from({ length: Math.ceil(physicalDims.width / 25.4) + 1 }).map((_, inch) => {
+                  const x = inch * pixelsPerInchWidth;
                   // Show all numbers that fit within the ruler width
                   if (x <= canvasWidth) {
                     return (
@@ -118,15 +137,15 @@ export const EditorContent: React.FC<EditorContentProps> = ({
                         </text>
                       
                         {/* Half inch */}
-                        <line x1={x + (96 * zoom / 2)} y1={35} x2={x + (96 * zoom / 2)} y2={48} stroke="#64748b" strokeWidth="1.5" />
+                        <line x1={x + (pixelsPerInchWidth / 2)} y1={35} x2={x + (pixelsPerInchWidth / 2)} y2={48} stroke="#64748b" strokeWidth="1.5" />
                         
                         {/* Quarter inch ticks */}
                         {[1, 3].map(quarter => (
                           <line 
                             key={quarter}
-                            x1={x + (quarter * 96 * zoom / 4)} 
+                            x1={x + (quarter * pixelsPerInchWidth / 4)} 
                             y1={40} 
-                            x2={x + (quarter * 96 * zoom / 4)} 
+                            x2={x + (quarter * pixelsPerInchWidth / 4)} 
                             y2={48} 
                             stroke="#475569" 
                             strokeWidth="1"
@@ -139,9 +158,8 @@ export const EditorContent: React.FC<EditorContentProps> = ({
                 })}
                 
                 {/* MM markings - every 10mm */}
-                {Array.from({ length: Math.ceil(template.width_px * zoom / 37.8) + 10 }).map((_, i) => {
-                  const x = i * 10 * 3.78 * zoom; // 10mm in pixels
-                  const canvasWidth = template.width_px * zoom;
+                {Array.from({ length: Math.ceil(physicalDims.width / 10) + 1 }).map((_, i) => {
+                  const x = i * 10 * pixelsPerMmWidth;
                   if (x <= canvasWidth) {
                     return (
                       <g key={`h-mm-${i}`}>
@@ -153,8 +171,8 @@ export const EditorContent: React.FC<EditorContentProps> = ({
                         </text>
                         
                         {/* 5mm tick - only if it fits */}
-                        {x + (5 * 3.78 * zoom) <= canvasWidth && (
-                          <line x1={x + (5 * 3.78 * zoom)} y1={20} x2={x + (5 * 3.78 * zoom)} y2={25} stroke="#94a3b8" strokeWidth="0.5" opacity="0.6" />
+                        {x + (5 * pixelsPerMmWidth) <= canvasWidth && (
+                          <line x1={x + (5 * pixelsPerMmWidth)} y1={20} x2={x + (5 * pixelsPerMmWidth)} y2={25} stroke="#94a3b8" strokeWidth="0.5" opacity="0.6" />
                         )}
                       </g>
                     );
@@ -191,8 +209,8 @@ export const EditorContent: React.FC<EditorContentProps> = ({
             >
               <svg width="50" height="100%">
                 {/* Inch markings */}
-                {Array.from({ length: Math.ceil((template.height_px + Math.min(template.width_px, template.height_px) * 0.2) * zoom / 96) + 2 }).map((_, inch) => {
-                  const y = inch * 96 * zoom;
+                {Array.from({ length: Math.ceil(physicalDims.height / 25.4) + 1 }).map((_, inch) => {
+                  const y = inch * pixelsPerInchHeight;
                   return (
                     <g key={`v-inch-${inch}`}>
                       {/* Major inch tick */}
@@ -203,16 +221,16 @@ export const EditorContent: React.FC<EditorContentProps> = ({
                       </text>
                       
                       {/* Half inch */}
-                      <line x1={35} y1={y + (96 * zoom / 2)} x2={48} y2={y + (96 * zoom / 2)} stroke="#64748b" strokeWidth="1.5" />
+                      <line x1={35} y1={y + (pixelsPerInchHeight / 2)} x2={48} y2={y + (pixelsPerInchHeight / 2)} stroke="#64748b" strokeWidth="1.5" />
                       
                       {/* Quarter inch ticks */}
                       {[1, 3].map(quarter => (
                         <line 
                           key={quarter}
                           x1={40} 
-                          y1={y + (quarter * 96 * zoom / 4)} 
+                          y1={y + (quarter * pixelsPerInchHeight / 4)} 
                           x2={48} 
-                          y2={y + (quarter * 96 * zoom / 4)} 
+                          y2={y + (quarter * pixelsPerInchHeight / 4)} 
                           stroke="#475569" 
                           strokeWidth="1"
                         />
@@ -222,9 +240,8 @@ export const EditorContent: React.FC<EditorContentProps> = ({
                 })}
                 
                 {/* MM markings - every 10mm */}
-                {Array.from({ length: Math.ceil((template.height_px + Math.min(template.width_px, template.height_px) * 0.2) * zoom / 37.8) + 10 }).map((_, i) => {
-                  const y = i * 10 * 3.78 * zoom;
-                  const canvasHeight = (template.height_px + Math.min(template.width_px, template.height_px) * 0.2) * zoom;
+                {Array.from({ length: Math.ceil(physicalDims.height / 10) + 1 }).map((_, i) => {
+                  const y = i * 10 * pixelsPerMmHeight;
                   if (y <= canvasHeight) {
                     return (
                       <g key={`v-mm-${i}`}>
@@ -236,8 +253,8 @@ export const EditorContent: React.FC<EditorContentProps> = ({
                         </text>
                         
                         {/* 5mm tick - only if it fits */}
-                        {y + (5 * 3.78 * zoom) <= canvasHeight && (
-                          <line x1={20} y1={y + (5 * 3.78 * zoom)} x2={25} y2={y + (5 * 3.78 * zoom)} stroke="#94a3b8" strokeWidth="0.5" opacity="0.6" />
+                        {y + (5 * pixelsPerMmHeight) <= canvasHeight && (
+                          <line x1={20} y1={y + (5 * pixelsPerMmHeight)} x2={25} y2={y + (5 * pixelsPerMmHeight)} stroke="#94a3b8" strokeWidth="0.5" opacity="0.6" />
                         )}
                       </g>
                     );
@@ -277,7 +294,8 @@ export const EditorContent: React.FC<EditorContentProps> = ({
               </svg>
             </div>
           </>
-        )}
+          );
+        })()}
 
         <div ref={canvasWrapperRef} className="relative overflow-hidden shadow-2xl border-2 border-gray-300 bg-white" style={{ borderRadius: '3rem' }}>
           <Canvas

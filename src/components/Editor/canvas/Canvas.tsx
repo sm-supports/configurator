@@ -776,6 +776,7 @@ export const Canvas: React.FC<CanvasProps> = ({
             ignoreStroke={true}
             shouldOverdrawWholeArea={true}
             useSingleNodeRotation={false}
+            anchorCornerRadius={3}
           />
         </Layer>
 

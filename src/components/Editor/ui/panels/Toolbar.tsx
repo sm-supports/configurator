@@ -932,24 +932,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                       ? 'bg-blue-500 text-white'
                       : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                   }`}
-                  title={textElement.writingMode === 'vertical' ? 'Switch to Horizontal Text' : 'Switch to Vertical Text'}
+                  title="Switch to Vertical Text"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-                    {textElement.writingMode === 'vertical' ? (
-                      /* Horizontal text icon */
-                      <>
-                        <line x1="4" y1="8" x2="20" y2="8" strokeLinecap="round" />
-                        <line x1="4" y1="12" x2="20" y2="12" strokeLinecap="round" />
-                        <line x1="4" y1="16" x2="20" y2="16" strokeLinecap="round" />
-                      </>
-                    ) : (
-                      /* Vertical text icon */
-                      <>
-                        <line x1="8" y1="4" x2="8" y2="20" strokeLinecap="round" />
-                        <line x1="12" y1="4" x2="12" y2="20" strokeLinecap="round" />
-                        <line x1="16" y1="4" x2="16" y2="20" strokeLinecap="round" />
-                      </>
-                    )}
+                    {/* Always show vertical text icon */}
+                    <line x1="8" y1="4" x2="8" y2="20" strokeLinecap="round" />
+                    <line x1="12" y1="4" x2="12" y2="20" strokeLinecap="round" />
+                    <line x1="16" y1="4" x2="16" y2="20" strokeLinecap="round" />
                   </svg>
                 </button>
               </div>
@@ -1626,13 +1615,58 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               <div className="w-px h-8 bg-slate-700" />
               
               <button
-                onClick={() => {
+                onClick={(e) => {
+                  if (isShapeElement) {
+                    // Show guide when trying to click disabled button
+                    e.preventDefault();
+                    
+                    // Create a temporary tooltip/notification
+                    const notification = document.createElement('div');
+                    notification.className = 'fixed z-[9999] bg-gradient-to-r from-amber-500 to-orange-500 text-white px-4 py-3 rounded-lg shadow-2xl border-2 border-amber-400';
+                    notification.style.left = '50%';
+                    notification.style.transform = 'translateX(-50%) translateY(-100px)';
+                    notification.style.transition = 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                    notification.style.top = '100px';
+                    notification.innerHTML = `
+                      <div class="flex items-center gap-3">
+                        <svg class="w-6 h-6 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                        </svg>
+                        <div>
+                          <div class="font-bold text-sm">Shape Already Selected!</div>
+                          <div class="text-xs mt-1">Click elsewhere on the canvas to deselect the current shape, then try again.</div>
+                        </div>
+                      </div>
+                    `;
+                    
+                    document.body.appendChild(notification);
+                    
+                    // Trigger swoop in animation
+                    setTimeout(() => {
+                      notification.style.transform = 'translateX(-50%) translateY(0)';
+                    }, 10);
+                    
+                    // Swoop out and remove notification after 4 seconds
+                    setTimeout(() => {
+                      notification.style.transform = 'translateX(-50%) translateY(-100px)';
+                      setTimeout(() => {
+                        document.body.removeChild(notification);
+                      }, 500);
+                    }, 4000);
+                    
+                    return;
+                  }
+                  
                   addShape(state.shapeSettings.shapeType);
                   // Don't call setActiveTool here - shape is auto-selected in addShape
                   // and we want to keep it selected to show transformation handles
                 }}
-                className="px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 hover:border-blue-500/50 text-blue-400 hover:text-blue-300 text-sm font-medium rounded-md transition-all flex items-center gap-1.5 hover:scale-105"
-                title={`Add ${state.shapeSettings.shapeType}`}
+                className={`px-3 py-1.5 border text-sm font-medium rounded-md transition-all flex items-center gap-1.5 ${
+                  isShapeElement
+                    ? 'bg-slate-700/50 border-slate-600 text-slate-500 cursor-not-allowed opacity-50'
+                    : 'bg-blue-500/10 hover:bg-blue-500/20 border-blue-500/30 hover:border-blue-500/50 text-blue-400 hover:text-blue-300 hover:scale-105'
+                }`}
+                title={isShapeElement ? 'Deselect shape to add new shape' : `Add ${state.shapeSettings.shapeType}`}
               >
                 <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>

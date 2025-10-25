@@ -1,5 +1,5 @@
 import React from 'react';
-import { Rect, Circle, Line, Star, Group } from 'react-konva';
+import { Rect, Ellipse, Line, Star, Group } from 'react-konva';
 import type Konva from 'konva';
 import { ShapeElement } from '../../core/types';
 
@@ -51,12 +51,14 @@ export const ShapeElementComponent: React.FC<ShapeElementProps> = ({
         );
 
       case 'circle':
+        // Use Ellipse to support independent width/height scaling (oval)
         return (
-          <Circle
+          <Ellipse
             {...shapeProps}
             x={(element.width / 2) * zoom}
             y={(element.height / 2) * zoom}
-            radius={(Math.min(element.width, element.height) / 2) * zoom}
+            radiusX={(element.width / 2) * zoom}
+            radiusY={(element.height / 2) * zoom}
           />
         );
 
@@ -76,6 +78,7 @@ export const ShapeElementComponent: React.FC<ShapeElementProps> = ({
         );
 
       case 'star':
+        // Use independent radiusX and radiusY for elliptical stars
         return (
           <Star
             {...shapeProps}
@@ -84,19 +87,24 @@ export const ShapeElementComponent: React.FC<ShapeElementProps> = ({
             numPoints={5}
             innerRadius={(Math.min(element.width, element.height) / 4) * zoom}
             outerRadius={(Math.min(element.width, element.height) / 2) * zoom}
+            // Apply scale to support oval stars
+            scaleX={element.width / Math.min(element.width, element.height)}
+            scaleY={element.height / Math.min(element.width, element.height)}
           />
         );
 
       case 'hexagon':
-        const hexPoints: number[] = [];
-        const hexRadius = (Math.min(element.width, element.height) / 2) * zoom;
+        // Use independent radiusX and radiusY for elliptical hexagons
+        const hexRadiusX = (element.width / 2) * zoom;
+        const hexRadiusY = (element.height / 2) * zoom;
         const hexCenterX = (element.width / 2) * zoom;
         const hexCenterY = (element.height / 2) * zoom;
+        const hexPoints: number[] = [];
         
         for (let i = 0; i < 6; i++) {
           const angle = (Math.PI / 3) * i;
-          hexPoints.push(hexCenterX + hexRadius * Math.cos(angle));
-          hexPoints.push(hexCenterY + hexRadius * Math.sin(angle));
+          hexPoints.push(hexCenterX + hexRadiusX * Math.cos(angle));
+          hexPoints.push(hexCenterY + hexRadiusY * Math.sin(angle));
         }
         
         return (
@@ -108,15 +116,17 @@ export const ShapeElementComponent: React.FC<ShapeElementProps> = ({
         );
 
       case 'pentagon':
-        const pentPoints: number[] = [];
-        const pentRadius = (Math.min(element.width, element.height) / 2) * zoom;
+        // Use independent radiusX and radiusY for elliptical pentagons
+        const pentRadiusX = (element.width / 2) * zoom;
+        const pentRadiusY = (element.height / 2) * zoom;
         const pentCenterX = (element.width / 2) * zoom;
         const pentCenterY = (element.height / 2) * zoom;
+        const pentPoints: number[] = [];
         
         for (let i = 0; i < 5; i++) {
           const angle = (Math.PI / 2.5) * i - Math.PI / 2;
-          pentPoints.push(pentCenterX + pentRadius * Math.cos(angle));
-          pentPoints.push(pentCenterY + pentRadius * Math.sin(angle));
+          pentPoints.push(pentCenterX + pentRadiusX * Math.cos(angle));
+          pentPoints.push(pentCenterY + pentRadiusY * Math.sin(angle));
         }
         
         return (
@@ -182,9 +192,34 @@ export const ShapeElementComponent: React.FC<ShapeElementProps> = ({
       }}
       onTransform={(e: Konva.KonvaEventObject<Event>) => {
         const node = e.target as Konva.Group;
+        const transformer = node.getStage()?.findOne('Transformer');
         
-        // Just trigger visual redraw - let keepRatio handle proportions
-        // State update happens only in onTransformEnd to avoid re-render lag
+        if (transformer) {
+          // Get the active anchor to determine scaling mode
+          const activeAnchor = (transformer as any).getActiveAnchor();
+          
+          // Corner anchors: maintain aspect ratio (proportional scaling)
+          // Edge/middle anchors: allow free scaling
+          const isCornerAnchor = activeAnchor && (
+            activeAnchor === 'top-left' ||
+            activeAnchor === 'top-right' ||
+            activeAnchor === 'bottom-left' ||
+            activeAnchor === 'bottom-right'
+          );
+          
+          if (isCornerAnchor) {
+            // For corner anchors, enforce proportional scaling
+            const scaleX = Math.abs(node.scaleX());
+            const scaleY = Math.abs(node.scaleY());
+            const avgScale = (scaleX + scaleY) / 2;
+            
+            // Apply uniform scale while preserving flip state
+            node.scaleX(element.flippedH ? -avgScale : avgScale);
+            node.scaleY(element.flippedV ? -avgScale : avgScale);
+          }
+        }
+        
+        // Trigger visual redraw for smooth transformation
         const layer = node.getLayer();
         if (layer) {
           layer.batchDraw();
@@ -193,15 +228,17 @@ export const ShapeElementComponent: React.FC<ShapeElementProps> = ({
       onTransformEnd={(e: Konva.KonvaEventObject<Event>) => {
         const node = e.target as Konva.Group;
         const scaleX = node.scaleX();
+        const scaleY = node.scaleY();
         
         // Update position, dimensions, and rotation when transform is complete
         const newX = node.x() / zoom;
         const newY = (node.y() - plateOffsetY) / zoom;
         
-        // Use the same scale for both dimensions to maintain proportions
-        const scale = Math.abs(scaleX);
-        const newWidth = Math.max(10, element.width * scale);
-        const newHeight = Math.max(10, element.height * scale);
+        // Apply the scales independently for free scaling
+        const absScaleX = Math.abs(scaleX);
+        const absScaleY = Math.abs(scaleY);
+        const newWidth = Math.max(10, element.width * absScaleX);
+        const newHeight = Math.max(10, element.height * absScaleY);
         
         // Reset scale back to 1 (dimensions are now stored in width/height)
         node.scaleX(element.flippedH ? -1 : 1);
